@@ -18,11 +18,11 @@ static Dimensions2i windowDim;
 #define DrawCircle							OpenGLDrawCircle
 #define DrawDisc							OpenGLDrawDisc
 #define DrawCurve							OpenGLDrawCurve
-#define ClearScreen 						OpenGLClearScreen
+#define GraphicsClearScreen 				OpenGLClearScreen
 
 
 TextureHandle LoadTexture(Arena* arena, const char* filePath, Filter filter){
-	Image image = LoadImage(arena, "stuff_tileset.bmp");
+	Image image = LoadImage(arena, filePath);
 	return GenerateTexture(image, filter);
 }
 

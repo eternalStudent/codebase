@@ -33,6 +33,17 @@ union UIBox {
 	struct {Point2i pos; Dimensions2i dim;};
 };
 
+struct UIImage {
+	union {
+		struct {int32 x, y, width, height;};
+		struct {Point2i pos; Dimensions2i dim;};
+		UIBox box;
+	};
+
+	TextureHandle atlas;
+	Box2 crop;
+};
+
 struct UIElement {
 	union {
 		struct {int32 x, y, width, height;};
@@ -55,6 +66,7 @@ struct UIElement {
 	uint32 flags;
 	void (*onClick)(UIElement*);
 	void (*onHover)(UIElement*);
+	void (*onResize)(UIElement*);
 
 	UIElement* parent;
 	UIElement* first;
@@ -63,6 +75,7 @@ struct UIElement {
 	UIElement* prev;
 
 	UIText* text;
+	UIImage* image;
 };
 
 struct {
@@ -237,6 +250,8 @@ void UpdateActiveElement(Point2i cursorPos) {
 		element->y = MAX(y0, 0);
 		element->width = MIN(x1 - element->x, element->parent->width - element->x);
 		element->height = MIN(y1 - element->y, element->parent->height - element->y);
+
+		if (element->onResize) element->onResize(element);
 	}
 }
 
@@ -246,6 +261,14 @@ void RenderText(UIText* text, Point2i parentPos) {
 	float32 x = (float32)(text->pos.x + parentPos.x);
 	float32 y = FLIPY((float32)(text->pos.y + parentPos.y)) - text->font->height;
 	DrawText(text->font, x, y, text->string);
+}
+
+void RenderImage(UIImage* image, Point2i parentPos) {
+	if (!image) return;
+
+	Point2i p0 = MOVE2(image->pos, parentPos);
+	Box2 renderBox = Box2{(float32)p0.x, (float32)FLIPY(p0.y+image->width), (float32)(p0.x+image->height), (float32)FLIPY(p0.y)};
+	DrawImage(image->atlas, image->crop, renderBox);
 }
 
 int32 __center(UIElement* element) {
@@ -272,10 +295,11 @@ void RenderElement(UIElement* element) {
 		child = child->next;
 	}
 	RenderText(element->text, box.p0);
+	RenderImage(element->image, box.p0);
 }
 
 void UIInit(Arena* persist, Arena* scratch) {
-	int32 capacity = 30;
+	int32 capacity = 100;
 	ArenaAlign(persist, 8);
 	void* buffer = ArenaAlloc(persist, capacity*sizeof(UIElement));
 	memset(buffer, 0, capacity*sizeof(UIElement));
@@ -284,13 +308,35 @@ void UIInit(Arena* persist, Arena* scratch) {
 	ui.arena = scratch;
 }
 
+void UIRenderElements() {
+	UIElement* child = ui.windowElement->first;
+	while (child) {
+		RenderElement(child);
+		child = child->next;
+	}
+	RenderText(ui.windowElement->text, {0, 0});
+	RenderImage(ui.windowElement->image, {0, 0});
+}
+
 void UICreateWindow(Arena* arena, const char* title, Dimensions2i dimensions, uint32 background) {
 	Window window = OsCreateWindow(title, dimensions.width, dimensions.height);
-	GraphicsInit(arena, window, dimensions);
+	GraphicsInit(arena, window, dimensions, background);
 
 	ui.elementCount = 1;
 	ui.window = window;
 	ui.windowElement->dim = dimensions;
+	ui.windowElement->pos = {0, 0};
+	ui.windowElement->background = background;
+}
+
+void UICreateWindowFullScreen(Arena* arena, const char* title, uint32 background) {
+	int32 width, height;
+	Window window = OsCreateWindowFullScreen(title, &width, &height);
+	GraphicsInit(arena, window, {width, height}, background);
+
+	ui.elementCount = 1;
+	ui.window = window;
+	ui.windowElement->dim = {width, height};
 	ui.windowElement->pos = {0, 0};
 	ui.windowElement->background = background;
 }
@@ -321,6 +367,15 @@ UIText* UICreateText(UIElement* parent) {
 	return text;
 }
 
+UIImage* UICreateImage(UIElement* parent) {
+	if (ui.elementCount == ui.capacity) return NULL;
+	UIImage* image = (UIImage*)&(ui.elements[ui.elementCount++]);
+	if (parent) parent->image = image;
+	else ui.windowElement->image = image;
+	image->dim = parent->dim;
+	return image;
+}
+
 void UIUpdateDimensions(Dimensions2i dimensions) {
 	ui.windowElement->dim = dimensions;
 }
@@ -332,25 +387,8 @@ void UIUpdateElements(Event event){
 	UpdateActiveElement(cursorPos);
 }
 
-void UIClearScreen() {
-	ClearScreen(ui.windowElement->background);
-}
-
 Point2i UIGetCursorPosition() {
 	return OsGetCursorPosition(ui.window);
-}
-
-void UIRenderElements() {
-	UIElement* child = ui.windowElement->first;
-	while (child) {
-		RenderElement(child);
-		child = child->next;
-	}
-	RenderText(ui.windowElement->text, {0, 0});
-}
-
-void UISwapBuffers() {
-	GraphicsSwapBuffers();
 }
 
 // specific elements
@@ -434,9 +472,9 @@ void __hover(UIElement* e) {
 	OsSetCursorIcon(CUR_HAND);
 }
 
-UIElement* UICreateButton(UIElement* parent) {
+UIElement* UICreateButton(UIElement* parent, Dimensions2i dim) {
 	UIElement* button = UICreateElement(parent);
-	button->dim = {128, 42};
+	button->dim = dim;
 	button->background = RGBA_LIGHTGREY;
 	button->radius = 12.0f;
 	button->borderWidth = 1;
@@ -458,17 +496,40 @@ void __choose(UIElement* e) {
 	ui.originalStyle = e->style;
 }
 
-UIElement* UICreateTab(UIElement* parent, String title, Font* font) {
+void __fit(UIElement* e) {
+	for (UIElement* child = e->first; child != NULL; child = child->next) {
+		Dimensions2i dim = child->dim;
+		UIElement* body = child->first;
+		body->height = e->height - (dim.height+1);
+    	body->width = e->width-2;
+	}
+}
+
+UIElement* UICreateTabControl(UIElement* parent, Dimensions2i dim) {
+	UIElement* control = UICreateElement(parent);
+	control->dim = dim;
+	control->background = RGBA_LIGHTGREY;
+	control->flags = UI_MOVABLE | UI_RESIZABLE;
+	control->borderColor = RGBA_WHITE;
+	control->borderWidth = 1;
+	control->onResize = __fit;
+	control->name = STR("tab control");
+
+	return control;
+}
+
+UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* font) {
 	UIElement* last = parent->last;
 
 	UIElement* header = UICreateElement(parent);
 	header->x = last ? last->x+last->width+1 : 24;
-	header->dim = {54, 24};
+	header->dim = dim;
 	header->radius = 3;
 	header->flags = UI_CLICKABLE;
 	header->onHover = __hover;
 	header->onClick = __choose;
 	header->background = RGBA_LIGHTGREY;
+	header->name = STR("tab header");
 
 	UIText* text = UICreateText(header);
     text->string = title;
@@ -477,10 +538,11 @@ UIElement* UICreateTab(UIElement* parent, String title, Font* font) {
 
     UIElement* body = UICreateElement(header);
     body->x = -header->x;
-    body->y = 24;
-    body->height = parent->height - 25;
+    body->y = dim.height;
+    body->height = parent->height - (dim.height+1);
     body->width = parent->width-2;
     body->background = RGBA_DARKGREY;
+    body->name = STR("tab body");
 
     return body;
 }

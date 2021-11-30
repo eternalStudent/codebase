@@ -7,6 +7,7 @@ struct {
 		Dimensions2 invdimensions;
 		struct {float32 iwidth, iheight;};
 	};
+	uint32 rgba;
 	Arena* arena;
 } opengl;
 
@@ -64,12 +65,13 @@ GLuint OpenGLGenerateTexture(Image image, GLint filter) {
 	return texture;
 }
 
-void OpenGLInit(Arena* arena, Window window, Dimensions2i dimensions) {
+void OpenGLInit(Arena* arena, Window window, Dimensions2i dimensions, uint32 rgba) {
 	OsOpenGLInit(window);
 
 	opengl.window = window;
 	opengl.dimensions = dimensions;
 	opengl.invdimensions = {1.0f / opengl.dimensions.width, 1.0f / opengl.dimensions.height};
+	opengl.rgba = rgba;
 	opengl.arena = arena;
 
 	GLchar* vertexSource = (GLchar*)R"STRING(
@@ -135,9 +137,9 @@ void OpenGLUpdateDimensions(Dimensions2i dimensions){
 	opengl.invdimensions = {1.0f / opengl.dimensions.width, 1.0f / opengl.dimensions.height};
 }
 
-void OpenGLClearScreen(uint32 rgba) {
+void OpenGLClearScreen() {
 	glViewport(0, 0, opengl.dimensions.width, opengl.dimensions.height);
-	Color color = RgbaToColor(rgba);
+	Color color = RgbaToColor(opengl.rgba);
 	glClearColor(color.r, color.g, color.b, color.a);
 	glClear(GL_COLOR_BUFFER_BIT);
 }

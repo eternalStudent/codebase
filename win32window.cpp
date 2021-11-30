@@ -101,14 +101,14 @@ BOOL GetPrimaryMonitorRect(RECT* monitorRect){
 	return TRUE;
 }
 
-HWND Win32CreateWindowFullScreen(LPCSTR title) {
+HWND Win32CreateWindowFullScreen(LPCSTR title, int32* width, int32* height) {
 	WNDCLASSA windowClass = CreateWindowClass();
 	RECT monitorRect;
 	if (!GetPrimaryMonitorRect(&monitorRect))
 		return NULL;
 
-	LONG width = monitorRect.right - monitorRect.left;
-	LONG height = monitorRect.bottom - monitorRect.top;
+	*width = monitorRect.right - monitorRect.left;
+	*height = monitorRect.bottom - monitorRect.top;
 
 	HWND window = CreateWindowExA(0,
 		windowClass.lpszClassName, 
@@ -116,8 +116,8 @@ HWND Win32CreateWindowFullScreen(LPCSTR title) {
 		WS_VISIBLE,
 		monitorRect.left,
 		monitorRect.top,
-		width,
-		height,
+		*width,
+		*height,
 		0, 0, windowClass.hInstance, 0);
 	
 	// NOTE: WTF ?!?
