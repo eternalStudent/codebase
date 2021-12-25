@@ -1,33 +1,10 @@
-// https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
-void Win32ToggleFullscreen(HWND window) {
-	static WINDOWPLACEMENT windowPlacement = { sizeof(WINDOWPLACEMENT) };
+void Win32ExitFullScreen(HWND window) {
 	DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
-	if (dwStyle & WS_OVERLAPPEDWINDOW) {
-		MONITORINFO mi = { sizeof(mi) };
-		if (GetWindowPlacement(window, &windowPlacement) &&
-			GetMonitorInfo(MonitorFromWindow(window,
-				MONITOR_DEFAULTTOPRIMARY), &mi)) {
-			SetWindowLong(window, GWL_STYLE,
-				dwStyle & ~WS_OVERLAPPEDWINDOW);
-			SetWindowPos(window, HWND_TOP,
-				mi.rcMonitor.left, mi.rcMonitor.top,
-				mi.rcMonitor.right - mi.rcMonitor.left,
-				mi.rcMonitor.bottom - mi.rcMonitor.top,
-				SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-		}
-	}
-	else {
-		SetWindowLong(window, GWL_STYLE,
-			dwStyle | WS_OVERLAPPEDWINDOW);
-		SetWindowPlacement(window, &windowPlacement);
-		SetWindowPos(window, NULL, 0, 0, 0, 0,
-			SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
-			SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-	}
+	SetWindowLong(window, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window, NULL, 0, 0, 920, 540, SWP_FRAMECHANGED);
 }
 
-void OpenGLUpdateDimensions(Dimensions2i dimensions);
-void UIUpdateDimensions(Dimensions2i dimensions);
+void UpdateDimensions(Dimensions2i dimensions);
 
 Dimensions2i Win32GetWindowDimensions(HWND window) {
 	RECT clientRect;
@@ -39,14 +16,17 @@ Dimensions2i Win32GetWindowDimensions(HWND window) {
 
 LRESULT CALLBACK MainWindowCallback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch (message) {
+		case WM_CLOSE: {
+			DestroyWindow(window);
+			return 0;
+		}
     	case WM_DESTROY: {
-        	PostQuitMessage(0);
-        	return 0;
+    		PostQuitMessage(0);
+    		return 0;
         }
         case WM_SIZE: {
         	Dimensions2i dimensions = Win32GetWindowDimensions(window);
-        	OpenGLUpdateDimensions(dimensions);
-        	UIUpdateDimensions(dimensions);
+        	UpdateDimensions(dimensions);
         } break;
     }
 
@@ -59,7 +39,7 @@ WNDCLASSA CreateWindowClass() {
 	windowClass.lpfnWndProc = MainWindowCallback;
 	windowClass.hInstance = GetModuleHandle(NULL);
 	windowClass.lpszClassName = "WindowClass";
-	//windowClass.hCursor = LoadCursorA(NULL, IDC_ARROW);
+	windowClass.hCursor = LoadCursorA(NULL, IDC_ARROW);
 
 	RegisterClassA(&windowClass);
 

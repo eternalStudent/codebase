@@ -9,7 +9,7 @@ struct BakedChar {
 
 struct Font {
 	BakedChar chardata[96];
-	TextureHandle texture;
+	TextureId texture;
    float32 height;
 };
 

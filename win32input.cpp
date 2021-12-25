@@ -1,4 +1,4 @@
-Point2i Win32GetCursorPosition(HWND window){
+Point2i Win32GetCursorPosition(HWND window) {
 	POINT cursorPos;
 	GetCursorPos(&cursorPos); // relative to screen
 

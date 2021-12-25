@@ -1,15 +1,15 @@
-static Dimensions2i windowDim;
-
+#include "image.cpp"
+#include "window.cpp"
 #include "win32opengl.cpp"
 #define OsOpenGLInit						Win32OpenGLInit
-#define GraphicsSwapBuffers					Win32OpenGLSwapBuffers
 
 #include "opengl.cpp"
-#define TextureHandle 						GLuint
+#define TextureId 							GLuint
 #define Filter								GLint
 #define Smooth								GL_LINEAR
 #define Pixelated							GL_NEAREST
 
+#define GraphicsSwapBuffers					Win32OpenGLSwapBuffers
 #define GraphicsInit						OpenGLInit
 #define GenerateTexture						OpenGLGenerateTexture
 #define DrawImage							OpenGLDrawImage
@@ -19,9 +19,12 @@ static Dimensions2i windowDim;
 #define DrawDisc							OpenGLDrawDisc
 #define DrawCurve							OpenGLDrawCurve
 #define GraphicsClearScreen 				OpenGLClearScreen
+#define GraphicsUpdateDimensions			OpenGLUpdateDimensions
+#define GraphicsCropScreen					glScissor
+#define GraphicsClearCrop					OpenGlClearCrop
 
 
-TextureHandle LoadTexture(Arena* arena, const char* filePath, Filter filter){
+TextureId LoadTexture(Arena* arena, const char* filePath, Filter filter){
 	Image image = LoadImage(arena, filePath);
 	return GenerateTexture(image, filter);
 }
@@ -58,9 +61,9 @@ void DrawBox2Rounded(uint32 rgba, Box2 box, float32 r) {
 	DrawDisc(rgba, {{box.x0+r, box.y0+r}, r}, 180, 270);
 	DrawDisc(rgba, {{box.x1-r, box.y0+r}, r}, 270, 360);
 
-	DrawBox2(rgba, {0, 0, 1, 1}, {box.x0+r, box.y0, box.x1-r, box.y1});
-	DrawBox2(rgba, {0, 0, 1, 1}, {box.x0, box.y0+r, box.x0+r, box.y1-r});
-	DrawBox2(rgba, {0, 0, 1, 1}, {box.x1-r, box.y0+r, box.x1, box.y1-r});
+	DrawBox2(rgba, {box.x0+r, box.y0, box.x1-r, box.y1});
+	DrawBox2(rgba, {box.x0, box.y0+r, box.x0+r, box.y1-r});
+	DrawBox2(rgba, {box.x1-r, box.y0+r, box.x1, box.y1-r});
 }
 
 void DrawBox2Lines(uint32 rgba, float32 lineWidth, Box2 box) {

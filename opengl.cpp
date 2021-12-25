@@ -2,11 +2,8 @@ struct {
 	GLuint drawImage;
 	GLuint drawShape;
 	Window window;
-	Dimensions2i dimensions;
-	union {
-		Dimensions2 invdimensions;
-		struct {float32 iwidth, iheight;};
-	};
+	Dimensions2i clientDim;
+	float32 iwidth, iheight;
 	uint32 rgba;
 	Arena* arena;
 } opengl;
@@ -65,13 +62,17 @@ GLuint OpenGLGenerateTexture(Image image, GLint filter) {
 	return texture;
 }
 
-void OpenGLInit(Arena* arena, Window window, Dimensions2i dimensions, uint32 rgba) {
+void OpenGLUpdateDimensions(Dimensions2i dimensions){
+	opengl.clientDim = dimensions;
+
+	opengl.iwidth = 1.0f/opengl.clientDim.width;
+	opengl.iheight = 1.0f/opengl.clientDim.height;
+}
+
+void OpenGLInit(Arena* arena, Window window) {
 	OsOpenGLInit(window);
 
 	opengl.window = window;
-	opengl.dimensions = dimensions;
-	opengl.invdimensions = {1.0f / opengl.dimensions.width, 1.0f / opengl.dimensions.height};
-	opengl.rgba = rgba;
 	opengl.arena = arena;
 
 	GLchar* vertexSource = (GLchar*)R"STRING(
@@ -130,22 +131,18 @@ void main()
 
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-}
-
-void OpenGLUpdateDimensions(Dimensions2i dimensions){
-	opengl.dimensions = dimensions;
-	opengl.invdimensions = {1.0f / opengl.dimensions.width, 1.0f / opengl.dimensions.height};
+	glEnable(GL_SCISSOR_TEST);
 }
 
 void OpenGLClearScreen() {
-	glViewport(0, 0, opengl.dimensions.width, opengl.dimensions.height);
-	Color color = RgbaToColor(opengl.rgba);
-	glClearColor(color.r, color.g, color.b, color.a);
+	glClearColor(0, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	glViewport(0, 0, opengl.clientDim.width, opengl.clientDim.height);
 }
 
 Point2 AdjustCoordinates(Point2 p){
-	return {(2.0f * p.x * opengl.iwidth) - 1, (2.0f * p.y * opengl.iheight) - 1};
+	return {(2.0f*p.x*opengl.iwidth) - 1, (2.0f*p.y*opengl.iheight) - 1};
 }
 
 void OpenGLDrawImage(GLuint texture, Box2 crop, Box2 pos) {
@@ -193,7 +190,7 @@ void OpenGLDrawImage(GLuint texture, Box2 crop, Box2 pos) {
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawBox2(uint32 rgba, Box2 crop, Box2 pos) {
+void OpenGLDrawBox2(uint32 rgba, Box2 pos) {
 	Point2 p0 = AdjustCoordinates(pos.p0);
 	Point2 p1 = AdjustCoordinates(pos.p1);
 
@@ -369,4 +366,8 @@ void OpenGLDrawCurve(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Point
 
 	glDeleteVertexArrays(1, &verticesHandle);
 	glDeleteBuffers(1, &buffersHandle);
+}
+
+void OpenGlClearCrop() {
+	glScissor(0, 0, opengl.clientDim.width, opengl.clientDim.height);
 }

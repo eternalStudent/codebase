@@ -230,15 +230,12 @@ BOOL Win32OpenGLInit(HWND window) {
 	return TRUE;
 }
 
-void Win32OpenGLSwapBuffers() {
+BOOL Win32OpenGLSwapBuffers() {
 	HDC dc = wglGetCurrentDC();
-	if (dc == NULL) {
-		Log("failed to get current DC");
-		return;
-	}
-	BOOL success = SwapBuffers(dc);
-	if (success == FALSE)
-		Log("failed to swap buffers");
+	if (dc == NULL)
+		return Fail("failed to get current DC");
+
+	return SwapBuffers(dc);
 }
 
 #define GL_CLAMP_TO_EDGE 				  0x812F

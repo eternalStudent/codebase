@@ -10,6 +10,11 @@ String ReadAll(Arena* arena, const char* path) {
 	byte* buffer = NULL;
 	int64 size = 0;
 
+	// NOTE: goto shouldn't skip variable declarations
+	int32 read;
+	int64 left;
+	byte* pos;
+
 	File file = OsOpenFile(path);
 	if (!file) goto CloseAndReturn;
 
@@ -19,10 +24,9 @@ String ReadAll(Arena* arena, const char* path) {
 	buffer = ArenaAlloc(arena, size+1);
 	if (!buffer) goto CloseAndReturn;
 	buffer[size] = 0;
-
-	int32 read;
-	int64 left = size;
-	byte* pos = buffer;
+	
+	left = size;
+	pos = buffer;
 	do {
 		read = OsReadFile(file, pos, (int32)(left & MAX_INT32));
 		pos  += read;

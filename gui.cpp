@@ -6,10 +6,7 @@
 #define UI_HIDDEN			8
 #define UI_CENTER           16
 
-#define RGBA_WHITE          0xffffffff
-#define RGBA_LIGHTGREY      0xff7e7872
-#define RGBA_GREY           0xff5e574f
-#define RGBA_DARKGREY       0xff413830
+#include "font.cpp"
 
 struct UIText {
 	union {
@@ -40,7 +37,7 @@ struct UIImage {
 		UIBox box;
 	};
 
-	TextureHandle atlas;
+	TextureId atlas;
 	Box2 crop;
 };
 
@@ -61,9 +58,10 @@ struct UIElement {
 		UIStyle style;
 	};
 
-	String name;
+	String name; // NOTE: for debugging
 
 	uint32 flags;
+
 	void (*onClick)(UIElement*);
 	void (*onHover)(UIElement*);
 	void (*onResize)(UIElement*);
@@ -76,6 +74,7 @@ struct UIElement {
 
 	UIText* text;
 	UIImage* image;
+	void* context;
 };
 
 struct {
@@ -195,7 +194,7 @@ void HandleCursorPosition(Point2i cursorPos){
 			OsSetCursorIcon(CUR_RESIZE);
 			ui.isBottomRight = true;
 		}
-		else{
+		else {
 			if (element->onHover) element->onHover(element);
 			else if (element->flags & UI_CLICKABLE) OsSetCursorIcon(CUR_HAND);
 			else if (element->flags & UI_MOVABLE) OsSetCursorIcon(CUR_MOVE);        
@@ -285,7 +284,7 @@ void RenderElement(UIElement* element) {
 			DrawBox2RoundedLines(element->borderColor, element->borderWidth, renderBox, element->radius);
 	}
 	else {
-		DrawBox2(element->background, {0.0f, 0.0f, 1.0f, 1.0f}, renderBox);
+		DrawBox2(element->background, renderBox);
 		if (element->borderWidth && element->borderColor) 
 			DrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
 	}
@@ -318,27 +317,24 @@ void UIRenderElements() {
 	RenderImage(ui.windowElement->image, {0, 0});
 }
 
-void UICreateWindow(Arena* arena, const char* title, Dimensions2i dimensions, uint32 background) {
-	Window window = OsCreateWindow(title, dimensions.width, dimensions.height);
-	GraphicsInit(arena, window, dimensions, background);
-
+void UISetWindowElement(Window window, uint32 background) {
 	ui.elementCount = 1;
 	ui.window = window;
-	ui.windowElement->dim = dimensions;
 	ui.windowElement->pos = {0, 0};
 	ui.windowElement->background = background;
+}
+
+void UICreateWindow(Arena* arena, const char* title, Dimensions2i dimensions, uint32 background) {
+	Window window = OsCreateWindow(title, dimensions.width, dimensions.height);
+	GraphicsInit(arena, window);
+	UISetWindowElement(window, background);
 }
 
 void UICreateWindowFullScreen(Arena* arena, const char* title, uint32 background) {
 	int32 width, height;
 	Window window = OsCreateWindowFullScreen(title, &width, &height);
-	GraphicsInit(arena, window, {width, height}, background);
-
-	ui.elementCount = 1;
-	ui.window = window;
-	ui.windowElement->dim = {width, height};
-	ui.windowElement->pos = {0, 0};
-	ui.windowElement->background = background;
+	GraphicsInit(arena, window);
+	UISetWindowElement(window, background);
 }
 
 Event UIHandleWindowEvents() {
@@ -403,11 +399,13 @@ UIBox __pad(UIElement* parent, int32 pad) {
 }
 
 void __toggle(UIElement* e) {
-	e->background = e->background ? 0 : RGBA_DARKGREY;
+	byte* context = (byte*)e->context;
+	*context = !(*context);
+	e->background = *context ? RGBA_DARKGREY : 0;
 	ui.originalStyle = e->style;
 }
 
-UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str) {
+UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str, byte* context) {
 	UIElement* wrapper = UICreateElement(parent);
 	wrapper->width = 37+(int32)GetTextWidth(font, str);
 	wrapper->height = 24;
@@ -424,6 +422,7 @@ UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str) {
 	check->flags = UI_CLICKABLE;
 	check->radius = 3;
 	check->onClick = __toggle;
+	check->context = context;
 	check->name = STR("check");
 
 	UIText* text = UICreateText(wrapper);

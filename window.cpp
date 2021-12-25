@@ -12,3 +12,4 @@
 #define OsCreateWindowFullScreen	Win32CreateWindowFullScreen
 #define OsHandleWindowEvents		Win32HandleWindowEvents
 #define OsSetCursorIcon				Win32SetCursorIcon
+#define OsExitFullScreen			Win32ExitFullScreen

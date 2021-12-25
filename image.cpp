@@ -7,6 +7,7 @@ struct Image {
     byte* data;
 };
 
+#include "binary_reader.cpp"
 #include "bitmap.cpp"
 
 Image LoadImage(Arena* arena, const char* filepath) {
@@ -15,6 +16,16 @@ Image LoadImage(Arena* arena, const char* filepath) {
 }
 
 typedef Point4 Color;
+
+#define RGBA_WHITE          0xffffffff
+#define RGBA_LIGHTGREY      0xff7e7872
+#define RGBA_GREY           0xff5e574f
+#define RGBA_DARKGREY       0xff413830
+#define RGBA_BLUE           0xffcc9966
+#define RGBA_GREEN          0xff94c799
+#define RGBA_ORANGE         0xff58aef9
+#define RGBA_LILAC          0xffc69569
+#define RGBA_RED            0xff665fec
 
 inline Color RgbaToColor(uint32 rgba) {
     union {
