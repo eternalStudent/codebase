@@ -114,7 +114,7 @@ inline int64 GetPosition(Stream data) {
 }
 
 inline void Seek(Stream* data, int64 offset) {
-   	Assert(!(offset > data->length || offset < 0));
+   	ASSERT(!(offset > data->length || offset < 0));
    	data->current = (offset > data->length || offset < 0) ? 
    		data->begin+data->length : data->begin+offset;
 }
@@ -134,7 +134,7 @@ inline byte PeekByte(Stream* data) {
 inline uint64 ReadUintNBigEndian(Stream* data, int32 n) {
    	uint64 v = 0;
    	int32 i;
-   	Assert(n >= 1 && n <= 4);
+   	ASSERT(n >= 1 && n <= 4);
    	for (i = 0; i < n; i++)
       	v = (v << 8) | ReadByte(data);
    	return v;

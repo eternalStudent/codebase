@@ -11,7 +11,7 @@ struct Image {
 #include "bitmap.cpp"
 
 Image LoadImage(Arena* arena, const char* filepath) {
-    byte* data = ReadAll(arena, filepath).data;
+    byte* data = OsReadAll(arena, filepath).data;
     return BMPLoadImage(arena, data);
 }
 

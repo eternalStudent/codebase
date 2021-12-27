@@ -4,6 +4,31 @@ void Win32ExitFullScreen(HWND window) {
 	SetWindowPos(window, NULL, 0, 0, 920, 540, SWP_FRAMECHANGED);
 }
 
+BOOL GetPrimaryMonitorRect(RECT* monitorRect){
+	const POINT ptZero = {0, 0};
+	HMONITOR monitor = MonitorFromPoint(ptZero, MONITOR_DEFAULTTOPRIMARY);
+
+	MONITORINFO mi = { sizeof(mi) };
+
+	if (GetMonitorInfo(monitor, &mi) == FALSE) {
+		FAIL("failed to get monitor-info");
+	}
+
+	*monitorRect = mi.rcMonitor;
+	return TRUE;
+}
+
+BOOL Win32EnterFullScreen(HWND window) {
+	RECT monitorRect;
+	if (!GetPrimaryMonitorRect(&monitorRect))
+		return FAIL("failed to get monitor placement");
+
+	DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
+	SetWindowLong(window, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window, NULL, 0, 0, monitorRect.right, monitorRect.bottom, SWP_FRAMECHANGED);
+	return TRUE;
+}
+
 void UpdateDimensions(Dimensions2i dimensions);
 
 Dimensions2i Win32GetWindowDimensions(HWND window) {
@@ -53,7 +78,7 @@ HWND Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 	RECT rect = {0, 0, width, height};
 	BOOL success = AdjustWindowRect(&rect, style, FALSE);
 	if (!success)
-		Log("failed to adjust window size");
+		LOG("failed to adjust window size");
 
 	return CreateWindowExA(0,
 		windowClass.lpszClassName, 
@@ -66,26 +91,11 @@ HWND Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 		0, 0, windowClass.hInstance, 0);
 }
 
-BOOL GetPrimaryMonitorRect(RECT* monitorRect){
-	const POINT ptZero = {0, 0};
-	HMONITOR monitor = MonitorFromPoint(ptZero, MONITOR_DEFAULTTOPRIMARY);
-
-	MONITORINFO mi = { sizeof(mi) };
-
-	if (GetMonitorInfo(monitor, &mi) == FALSE) {
-		Log("failed to get monitor-info");
-		return FALSE;
-	}
-
-	*monitorRect = mi.rcMonitor;
-	return TRUE;
-}
-
 HWND Win32CreateWindowFullScreen(LPCSTR title, int32* width, int32* height) {
 	WNDCLASSA windowClass = CreateWindowClass();
 	RECT monitorRect;
 	if (!GetPrimaryMonitorRect(&monitorRect))
-		return NULL;
+		return FAIL("failed to get monitor placement");
 
 	*width = monitorRect.right - monitorRect.left;
 	*height = monitorRect.bottom - monitorRect.top;

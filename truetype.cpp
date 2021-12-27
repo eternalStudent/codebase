@@ -8,7 +8,7 @@ Stream cff_get_index(Stream* data) {
    count = ReadUint16BigEndian(data);
    if (count) {
       offsize = ReadByte(data);
-      Assert(offsize >= 1 && offsize <= 4);
+      ASSERT(offsize >= 1 && offsize <= 4);
       Skip(data, offsize * count);
       Skip(data, ReadUintNBigEndian(data, offsize) - 1);
    }
@@ -22,13 +22,13 @@ uint32 cff_int(Stream* data) {
    else if (b0 >= 251 && b0 <= 254) return -(b0 - 251)*256 - ReadByte(data) - 108;
    else if (b0 == 28)               return ReadUint16BigEndian(data);
    else if (b0 == 29)               return ReadUint32BigEndian(data);
-   Assert(0);
+   ASSERT(0);
    return 0;
 }
 
 void cff_skip_operand(Stream* data) {
    int32 v, b0 = PeekByte(data);
-   Assert(b0 >= 28);
+   ASSERT(b0 >= 28);
    if (b0 == 30) {
       Skip(data, 1);
       while (GetPosition(data) < data->length) {
@@ -68,8 +68,8 @@ Stream cff_index_get(Stream data, int32 i) {
    Seek(&data, 0);
    count = ReadUint16BigEndian(&data);
    offsize = ReadByte(&data);
-   Assert(i >= 0 && i < count);
-   Assert(offsize >= 1 && offsize <= 4);
+   ASSERT(i >= 0 && i < count);
+   ASSERT(offsize >= 1 && offsize <= 4);
    Skip(&data, i*offsize);
    start = ReadUintNBigEndian(&data, offsize);
    end = ReadUintNBigEndian(&data, offsize);
@@ -329,7 +329,7 @@ int32 FindGlyphIndex(const FontInfo* info, int32 unicode_codepoint) {
          return __USHORT(data + index_map + 10 + (unicode_codepoint - first)*2);
       return 0;
    } else if (format == 2) {
-      Assert(0); // @TODO: high-byte mapping for japanese/chinese/korean
+      ASSERT(0); // @TODO: high-byte mapping for japanese/chinese/korean
       return 0;
    } else if (format == 4) { // standard mapping for windows fonts: binary search collection of ranges
       uint16 segcount = __USHORT(data+index_map+6) >> 1;
@@ -365,7 +365,7 @@ int32 FindGlyphIndex(const FontInfo* info, int32 unicode_codepoint) {
          uint16 offset, start;
          uint16 item = (uint16) ((search - endCount) >> 1);
 
-         Assert(unicode_codepoint <= __USHORT(data + endCount + 2*item));
+         ASSERT(unicode_codepoint <= __USHORT(data + endCount + 2*item));
          start = __USHORT(data + index_map + 14 + segcount*2 + 2 + 2*item);
          if (unicode_codepoint < start)
             return 0;
@@ -400,7 +400,7 @@ int32 FindGlyphIndex(const FontInfo* info, int32 unicode_codepoint) {
       return 0; // not found
    }
    // @TODO
-   Assert(0);
+   ASSERT(0);
    return 0;
 }
 
@@ -536,22 +536,22 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
 
       case 0x15: // rmoveto
          in_header = 0;
-         if (sp < 2) return Fail("rmoveto stack");
+         if (sp < 2) return FAIL("rmoveto stack");
          csctx_rmove_to(c, s[sp-2], s[sp-1]);
          break;
       case 0x04: // vmoveto
          in_header = 0;
-         if (sp < 1) return Fail("vmoveto stack");
+         if (sp < 1) return FAIL("vmoveto stack");
          csctx_rmove_to(c, 0, s[sp-1]);
          break;
       case 0x16: // hmoveto
          in_header = 0;
-         if (sp < 1) return Fail("hmoveto stack");
+         if (sp < 1) return FAIL("hmoveto stack");
          csctx_rmove_to(c, s[sp-1], 0);
          break;
 
       case 0x05: // rlineto
-         if (sp < 2) return Fail("rlineto stack");
+         if (sp < 2) return FAIL("rlineto stack");
          for (; i + 1 < sp; i += 2)
             csctx_rline_to(c, s[i], s[i+1]);
          break;
@@ -560,10 +560,10 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
       // starting from a different place.
 
       case 0x07: // vlineto
-         if (sp < 1) return Fail("vlineto stack");
+         if (sp < 1) return FAIL("vlineto stack");
          goto vlineto;
       case 0x06: // hlineto
-         if (sp < 1) return Fail("hlineto stack");
+         if (sp < 1) return FAIL("hlineto stack");
          for (;;) {
             if (i >= sp) break;
             csctx_rline_to(c, s[i], 0);
@@ -576,10 +576,10 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
          break;
 
       case 0x1F: // hvcurveto
-         if (sp < 4) return Fail("hvcurveto stack");
+         if (sp < 4) return FAIL("hvcurveto stack");
          goto hvcurveto;
       case 0x1E: // vhcurveto
-         if (sp < 4) return Fail("vhcurveto stack");
+         if (sp < 4) return FAIL("vhcurveto stack");
          for (;;) {
             if (i + 3 >= sp) break;
             csctx_rccurve_to(c, 0, s[i], s[i+1], s[i+2], s[i+3], (sp - i == 5) ? s[i + 4] : 0.0f);
@@ -592,30 +592,30 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
          break;
 
       case 0x08: // rrcurveto
-         if (sp < 6) return Fail("rcurveline stack");
+         if (sp < 6) return FAIL("rcurveline stack");
          for (; i + 5 < sp; i += 6)
             csctx_rccurve_to(c, s[i], s[i+1], s[i+2], s[i+3], s[i+4], s[i+5]);
          break;
 
       case 0x18: // rcurveline
-         if (sp < 8) return Fail("rcurveline stack");
+         if (sp < 8) return FAIL("rcurveline stack");
          for (; i + 5 < sp - 2; i += 6)
             csctx_rccurve_to(c, s[i], s[i+1], s[i+2], s[i+3], s[i+4], s[i+5]);
-         if (i + 1 >= sp) return Fail("rcurveline stack");
+         if (i + 1 >= sp) return FAIL("rcurveline stack");
          csctx_rline_to(c, s[i], s[i+1]);
          break;
 
       case 0x19: // rlinecurve
-         if (sp < 8) return Fail("rlinecurve stack");
+         if (sp < 8) return FAIL("rlinecurve stack");
          for (; i + 1 < sp - 6; i += 2)
             csctx_rline_to(c, s[i], s[i+1]);
-         if (i + 5 >= sp) return Fail("rlinecurve stack");
+         if (i + 5 >= sp) return FAIL("rlinecurve stack");
          csctx_rccurve_to(c, s[i], s[i+1], s[i+2], s[i+3], s[i+4], s[i+5]);
          break;
 
       case 0x1A: // vvcurveto
       case 0x1B: // hhcurveto
-         if (sp < 4) return Fail("(vv|hh)curveto stack");
+         if (sp < 4) return FAIL("(vv|hh)curveto stack");
          f = 0.0;
          if (sp & 1) { f = s[i]; i++; }
          for (; i + 3 < sp; i += 4) {
@@ -635,18 +635,18 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
          }
          // fallthrough
       case 0x1D: // callgsubr
-         if (sp < 1) return Fail("call(g|)subr stack");
+         if (sp < 1) return FAIL("call(g|)subr stack");
          v = (int) s[--sp];
-         if (subr_stack_height >= 10) return Fail("recursion limit");
+         if (subr_stack_height >= 10) return FAIL("recursion limit");
          subr_stack[subr_stack_height++] = data;
          data = get_subr(b0 == 0x0A ? subrs : info->gsubrs, v);
-         if (data.length == 0) return Fail("subr not found");
+         if (data.length == 0) return FAIL("subr not found");
          data.current = data.begin;
          clear_stack = 0;
          break;
 
       case 0x0B: // return
-         if (subr_stack_height <= 0) return Fail("return outside subr");
+         if (subr_stack_height <= 0) return FAIL("return outside subr");
          data = subr_stack[--subr_stack_height];
          clear_stack = 0;
          break;
@@ -663,7 +663,7 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
          // @TODO These "flex" implementations ignore the flex-depth and resolution,
          // and always draw beziers.
          case 0x22: // hflex
-            if (sp < 7) return Fail("hflex stack");
+            if (sp < 7) return FAIL("hflex stack");
             dx1 = s[0];
             dx2 = s[1];
             dy2 = s[2];
@@ -676,7 +676,7 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
             break;
 
          case 0x23: // flex
-            if (sp < 13) return Fail("flex stack");
+            if (sp < 13) return FAIL("flex stack");
             dx1 = s[0];
             dy1 = s[1];
             dx2 = s[2];
@@ -695,7 +695,7 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
             break;
 
          case 0x24: // hflex1
-            if (sp < 9) return Fail("hflex1 stack");
+            if (sp < 9) return FAIL("hflex1 stack");
             dx1 = s[0];
             dy1 = s[1];
             dx2 = s[2];
@@ -710,7 +710,7 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
             break;
 
          case 0x25: // flex1
-            if (sp < 11) return Fail("flex1 stack");
+            if (sp < 11) return FAIL("flex1 stack");
             dx1 = s[0];
             dy1 = s[1];
             dx2 = s[2];
@@ -733,13 +733,13 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
             break;
 
          default:
-            return Fail("unimplemented");
+            return FAIL("unimplemented");
          }
       } break;
 
       default:
          if (b0 != 255 && b0 != 28 && (b0 < 32 || b0 > 254))
-            return Fail("reserved operator");
+            return FAIL("reserved operator");
 
          // push immediate
          if (b0 == 255) {
@@ -748,14 +748,14 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
             Skip(&data, -1);
             f = (float32)(int16)cff_int(&data);
          }
-         if (sp >= 48) return Fail("push stack overflow");
+         if (sp >= 48) return FAIL("push stack overflow");
          s[sp++] = f;
          clear_stack = 0;
          break;
       }
       if (clear_stack) sp = 0;
    }
-   return Fail("no endchar");
+   return FAIL("no endchar");
 }
 
 int32 GetGlyphInfoT2(const FontInfo* info, int32 glyph_index, 
@@ -772,7 +772,7 @@ int32 GetGlyphInfoT2(const FontInfo* info, int32 glyph_index,
 int32 GetGlyfOffset(const FontInfo* info, int32 glyph_index) {
    int32 g1,g2;
 
-   Assert(!info->cff.length);
+   ASSERT(!info->cff.length);
 
    if (glyph_index >= info->numGlyphs) return -1; // glyph index out of range
    if (info->indexToLocFormat >= 2)    return -1; // unknown index->glyph map format
@@ -1013,7 +1013,7 @@ int32 GetGlyphShapeTT(Arena* arena, const FontInfo* info, int32 glyph_index, ver
          }
          else {
             // @TODO handle matching point
-            Assert(0);
+            ASSERT(0);
          }
          if (flags & (1<<3)) { // WE_HAVE_A_SCALE
             mtx[0] = mtx[3] = __SHORT(comp)/16384.0f; comp+=2;
@@ -1076,7 +1076,7 @@ int32 GetGlyphShapeT2(Arena* arena, const FontInfo* info, int32 glyph_index, ver
       *pvertices = (vertex*)ArenaAlloc(arena, count_ctx.num_vertices*sizeof(vertex));
       output_ctx.pvertices = *pvertices;
       if (run_charstring(info, glyph_index, &output_ctx)) {
-         Assert(output_ctx.num_vertices == count_ctx.num_vertices);
+         ASSERT(output_ctx.num_vertices == count_ctx.num_vertices);
          return output_ctx.num_vertices;
       }
    }
@@ -1148,8 +1148,8 @@ Font TTLoadFont(Arena* arena, byte* data, float32 height, uint32 rgb) {
       y = bottom_y, x = 1; // advance to next row
       if (y + gh + 1 >= ph) // check if it fits vertically AFTER potentially moving to next row
          return {};
-      Assert(x + gw < pw);
-      Assert(y + gh < ph);
+      ASSERT(x + gw < pw);
+      ASSERT(y + gh < ph);
       MakeGlyphBitmap(arena, &f, mono_bitmap + x + y*pw, gw, gh, pw, scale, scale, g);
       font.chardata[i].x0 = x;
       font.chardata[i].y0 = y;

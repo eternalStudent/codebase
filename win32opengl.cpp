@@ -113,14 +113,14 @@ BOOL Win32CreateRenderingContext(HDC dc) {
 	// https://www.khronos.org/registry/OpenGL/extensions/ARB/WGL_ARB_create_context.txt
 	HGLRC context = wglCreateContext(dc);
 	if (!context)
-		return Fail("failed to create rendering context");
+		return FAIL("failed to create rendering context");
 
 	if (!wglMakeCurrent(dc, context)) 
-		return Fail("failed to make rendering context current");
+		return FAIL("failed to make rendering context current");
 
 	type_wglCreateContextAttribsARB* wglCreateModernContext = (type_wglCreateContextAttribsARB*)wglGetProcAddress("wglCreateContextAttribsARB");
 	if (!wglCreateModernContext)
-		return Fail("failed to get address of create modern rendering context");
+		return FAIL("failed to get address of create modern rendering context");
 
 	int Win32OpenGLAttribs[] = {
 		WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
@@ -141,10 +141,10 @@ BOOL Win32CreateRenderingContext(HDC dc) {
 	};
 	HGLRC modern = wglCreateModernContext(dc, 0, Win32OpenGLAttribs);
 	if (!modern)
-		return Fail("failed to create modern rendering context");
+		return FAIL("failed to create modern rendering context");
 
 	if (!wglMakeCurrent(dc, modern))
-		return Fail("failed to make modern rendering context current");
+		return FAIL("failed to make modern rendering context current");
 
 	return TRUE;
 }
@@ -161,23 +161,23 @@ BOOL Win32SetPixelFormat(HWND window, HDC dc) {
 
 	int closestMatchPixelFormatIndex = ChoosePixelFormat(dc, &requestedPixelFormat);
 	if (!closestMatchPixelFormatIndex)
-		return Fail("failed to choose pixel format");
+		return FAIL("failed to choose pixel format");
 	
 	PIXELFORMATDESCRIPTOR closestMatchPixelFormat;
 	int maximumPixelFormatIndex = DescribePixelFormat(dc, closestMatchPixelFormatIndex, sizeof(closestMatchPixelFormat), &closestMatchPixelFormat);
 	if (!maximumPixelFormatIndex)
-		return Fail("failed to describe pixel format");
+		return FAIL("failed to describe pixel format");
 	
 	BOOL success = SetPixelFormat(dc, closestMatchPixelFormatIndex, &closestMatchPixelFormat);
 	if (success == FALSE)
-		return Fail("failed to set pixel format");
+		return FAIL("failed to set pixel format");
 
 	return TRUE;
 }
 
 BOOL Win32OpenGLInit(HWND window) {
 	HDC dc = GetDC(window);
-	if (!dc) return Fail("failed to get DC");
+	if (!dc) return FAIL("failed to get DC");
 	if (!Win32SetPixelFormat(window, dc)) return FALSE;
 	if (!Win32CreateRenderingContext(dc)) return FALSE;
 
@@ -223,7 +223,7 @@ BOOL Win32OpenGLInit(HWND window) {
 
 	type_wglSwapIntervalEXT* wglSwapInteravl = (type_wglSwapIntervalEXT*)wglGetProcAddress("wglSwapIntervalEXT");
 	if (wglSwapInteravl) wglSwapInteravl(1);
-	else (Log("failed to set swap interval"));
+	else (LOG("failed to set swap interval"));
 
 	ReleaseDC(window, dc);
 
@@ -233,7 +233,7 @@ BOOL Win32OpenGLInit(HWND window) {
 BOOL Win32OpenGLSwapBuffers() {
 	HDC dc = wglGetCurrentDC();
 	if (dc == NULL)
-		return Fail("failed to get current DC");
+		return FAIL("failed to get current DC");
 
 	return SwapBuffers(dc);
 }

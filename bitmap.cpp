@@ -20,9 +20,9 @@ int32 shiftsigned(uint32 v, int32 shift, int32 bits) {
         v <<= -shift;
     else
         v >>= shift;
-    Assert(v < 256);
+    ASSERT(v < 256);
     v >>= (8 - bits);
-    Assert(bits >= 0 && bits <= 8);
+    ASSERT(bits >= 0 && bits <= 8);
     return (int32)(v * mul_table[bits]) >> shift_table[bits];
 }
 

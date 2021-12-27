@@ -11,6 +11,7 @@ void ArenaInit(Arena* arena, void* buffer, int64 capacity) {
 }
 
 void ArenaAlign(Arena* arena, int32 divisibility) {
+	ASSERT(divisibility == 2 || divisibility == 4 || divisibility == 8 || divisibility == 16);
 	uint32 modulo = arena->ptr & (divisibility - 1);
 	if (modulo != 0) arena->ptr += (divisibility - modulo);
 }

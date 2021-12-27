@@ -58,7 +58,7 @@ struct active_edge {
 active_edge *new_active(Arena* arena, hheap *hh, edge *e, int32 off_x, float32 start_point) {
    active_edge *z = (active_edge *) hheap_alloc(arena, hh, sizeof(*z));
    float32 dxdy = (e->x1 - e->x0) / (e->y1 - e->y0);
-   Assert(z != NULL);
+   ASSERT(z != NULL);
    if (!z) return z;
    z->fdx = dxdy;
    z->fdy = dxdy != 0.0f ? (1.0f/dxdy) : 0.0f;
@@ -74,8 +74,8 @@ active_edge *new_active(Arena* arena, hheap *hh, edge *e, int32 off_x, float32 s
 void handle_clipped_edge(float32 *scanline, int32 x, active_edge *e, 
                          float32 x0, float32 y0, float32 x1, float32 y1) {
    if (y0 == y1) return;
-   Assert(y0 < y1);
-   Assert(e->sy <= e->ey);
+   ASSERT(y0 < y1);
+   ASSERT(e->sy <= e->ey);
    if (y0 > e->ey) return;
    if (y1 < e->sy) return;
    if (y0 < e->sy) {
@@ -88,22 +88,22 @@ void handle_clipped_edge(float32 *scanline, int32 x, active_edge *e,
    }
 
    if (x0 == x)
-      {Assert(x1 <= x+1);}
+      {ASSERT(x1 <= x+1);}
    else if (x0 == x+1)
-      {Assert(x1 >= x);}
+      {ASSERT(x1 >= x);}
    else if (x0 <= x)
-      {Assert(x1 <= x);}
+      {ASSERT(x1 <= x);}
    else if (x0 >= x+1)
-      {Assert(x1 >= x+1);}
+      {ASSERT(x1 >= x+1);}
    else
-      {Assert(x1 >= x && x1 <= x+1);}
+      {ASSERT(x1 >= x && x1 <= x+1);}
 
    if (x0 <= x && x1 <= x)
       scanline[x] += e->direction * (y1-y0);
    else if (x0 >= x+1 && x1 >= x+1)
       ;
    else {
-      Assert(x0 >= x && x0 <= x+1 && x1 >= x && x1 <= x+1);
+      ASSERT(x0 >= x && x0 <= x+1 && x1 >= x && x1 <= x+1);
       scanline[x] += e->direction * (y1-y0) * (1-((x0-x)+(x1-x))/2); // coverage = 1 - average x position
    }
 }
@@ -116,7 +116,7 @@ void fill_active_edges_new(float32 *scanline, float32 *scanline_fill,
       // brute force every pixel
 
       // compute intersection points with top & bottom
-      Assert(e->ey >= y_top);
+      ASSERT(e->ey >= y_top);
 
       if (e->fdx == 0) {
          float32 x0 = e->fx;
@@ -135,7 +135,7 @@ void fill_active_edges_new(float32 *scanline, float32 *scanline_fill,
          float32 x_top, x_bottom;
          float32 sy0,sy1;
          float32 dy = e->fdy;
-         Assert(e->sy <= y_bottom && e->ey >= y_top);
+         ASSERT(e->sy <= y_bottom && e->ey >= y_top);
 
          // compute endpoints of line segment clipped to this scanline (if the
          // line segment starts on this scanline. x0 is the intersection of the
@@ -163,7 +163,7 @@ void fill_active_edges_new(float32 *scanline, float32 *scanline_fill,
                // simple case, only spans one pixel
                int32 x = (int) x_top;
                height = sy1 - sy0;
-               Assert(x >= 0 && x < len);
+               ASSERT(x >= 0 && x < len);
                scanline[x] += e->direction * (1-((x_top - x) + (x_bottom-x))/2)  * height;
                scanline_fill[x] += e->direction * height; // everything right of this pixel is filled
             } else {
@@ -200,7 +200,7 @@ void fill_active_edges_new(float32 *scanline, float32 *scanline_fill,
                }
                y_crossing += dy * (x2 - (x1+1));
 
-               Assert(fabs(area) <= 1.01f);
+               ASSERT(fabs(area) <= 1.01f);
 
                scanline[x2] += area + sign * (1-((x2-x2)+(x_bottom-x2))/2) * (sy1-y_crossing);
 
@@ -305,7 +305,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
          active_edge * z = *step;
          if (z->ey <= scan_y_top) {
             *step = z->next; // delete from list
-            Assert(z->direction);
+            ASSERT(z->direction);
             z->direction = 0;
             hheap_free(&hh, z);
          } else {
@@ -324,7 +324,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
                      z->ey = scan_y_top;
                   }
                }
-               Assert(z->ey >= scan_y_top); // if we get really unlucky a tiny bit of an edge can be out of bounds
+               ASSERT(z->ey >= scan_y_top); // if we get really unlucky a tiny bit of an edge can be out of bounds
                // insert at front
                z->next = active;
                active = z;

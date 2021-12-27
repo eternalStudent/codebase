@@ -18,8 +18,8 @@ GLuint CreateProgram(GLchar* vertexSource, GLchar* fragmentSource) {
 	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		Log("fail to compile vertex shader");
-		Log(infoLog);
+		LOG("fail to compile vertex shader");
+		LOG(infoLog);
 	}
 
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -29,8 +29,8 @@ GLuint CreateProgram(GLchar* vertexSource, GLchar* fragmentSource) {
 	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		Log("fail to compile fragment shader");
-		Log(infoLog);
+		LOG("fail to compile fragment shader");
+		LOG(infoLog);
 	}
 
 	GLuint program = glCreateProgram();
@@ -40,8 +40,8 @@ GLuint CreateProgram(GLchar* vertexSource, GLchar* fragmentSource) {
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetProgramInfoLog(program, 512, NULL, infoLog);
-		Log("fail to link program");
-		Log(infoLog);
+		LOG("fail to link program");
+		LOG(infoLog);
 	}
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);

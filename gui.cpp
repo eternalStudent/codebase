@@ -211,7 +211,7 @@ void HandleMouseEvent(Event mouseEvent, Point2i cursorPos) {
 			if (element->onClick)
 				element->onClick(element);
 		}
-		else{
+		else {
 			if (ui.isBottomRight && (element->flags & UI_RESIZABLE)) ui.isResizing = true;
 			else if (element->flags & UI_MOVABLE) ui.isGrabbing = true;
 			ui.grabPos = cursorPos;
@@ -266,7 +266,7 @@ void RenderImage(UIImage* image, Point2i parentPos) {
 	if (!image) return;
 
 	Point2i p0 = MOVE2(image->pos, parentPos);
-	Box2 renderBox = Box2{(float32)p0.x, (float32)FLIPY(p0.y+image->width), (float32)(p0.x+image->height), (float32)FLIPY(p0.y)};
+	Box2 renderBox = Box2{(float32)p0.x, (float32)FLIPY(p0.y+image->height), (float32)(p0.x+image->width), (float32)FLIPY(p0.y)};
 	DrawImage(image->atlas, image->crop, renderBox);
 }
 
@@ -295,6 +295,21 @@ void RenderElement(UIElement* element) {
 	}
 	RenderText(element->text, box.p0);
 	RenderImage(element->image, box.p0);
+}
+
+// API
+//-----------
+
+Event UIHandleWindowEvents() {
+	return OsHandleWindowEvents(ui.window);
+}
+
+Point2i UIGetCursorPosition() {
+	return OsGetCursorPosition(ui.window);
+}
+
+bool UIEnterFullScreen() {
+	return OsEnterFullScreen(ui.window);
 }
 
 void UIInit(Arena* persist, Arena* scratch) {
@@ -337,10 +352,6 @@ void UICreateWindowFullScreen(Arena* arena, const char* title, uint32 background
 	UISetWindowElement(window, background);
 }
 
-Event UIHandleWindowEvents() {
-	return OsHandleWindowEvents(ui.window);
-}
-
 UIElement* UICreateElement(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
 
@@ -366,9 +377,11 @@ UIText* UICreateText(UIElement* parent) {
 UIImage* UICreateImage(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
 	UIImage* image = (UIImage*)&(ui.elements[ui.elementCount++]);
-	if (parent) parent->image = image;
+	if (parent) {
+		parent->image = image;
+		image->dim = parent->dim;
+	}
 	else ui.windowElement->image = image;
-	image->dim = parent->dim;
 	return image;
 }
 
@@ -376,15 +389,11 @@ void UIUpdateDimensions(Dimensions2i dimensions) {
 	ui.windowElement->dim = dimensions;
 }
 
-void UIUpdateElements(Event event){
-	Point2i cursorPos = OsGetCursorPosition(ui.window);
+bool UIUpdateElements(Event event, Point2i cursorPos){
 	HandleCursorPosition(cursorPos);
 	HandleMouseEvent(event, cursorPos);
 	UpdateActiveElement(cursorPos);
-}
-
-Point2i UIGetCursorPosition() {
-	return OsGetCursorPosition(ui.window);
+	return ui.active != NULL;
 }
 
 // specific elements

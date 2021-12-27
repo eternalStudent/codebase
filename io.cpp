@@ -6,7 +6,7 @@
 #define OsCloseFile   CloseHandle
 
 
-String ReadAll(Arena* arena, const char* path) {
+String OsReadAll(Arena* arena, const char* path) {
 	byte* buffer = NULL;
 	int64 size = 0;
 
