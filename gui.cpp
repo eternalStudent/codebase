@@ -189,7 +189,8 @@ void HandleCursorPosition(Point2i cursorPos){
 		if (prev)       prev->style = ui.originalStyle;
 		if (element)    ui.originalStyle = element->style;
 	}
-	OsSetCursorIcon(CUR_ARROW);
+	if (cursorPos.x < ui.windowElement->width-1 && cursorPos.y < ui.windowElement->height-1)
+		OsSetCursorIcon(CUR_ARROW);
 	if (element) {
 		if(IsInBottomRight(element, cursorPos) && (element->flags & UI_RESIZABLE)){
 			OsSetCursorIcon(CUR_RESIZE);
