@@ -1,8 +1,5 @@
 #include "image.cpp"
 #include "window.cpp"
-#include "win32opengl.cpp"
-#define OsOpenGLInit						Win32OpenGLInit
-
 #include "opengl.cpp"
 #define TextureId 							GLuint
 #define Filter								GLint
@@ -12,6 +9,7 @@
 #define GraphicsSwapBuffers					Win32OpenGLSwapBuffers
 #define GraphicsInit						OpenGLInit
 #define GenerateTexture						OpenGLGenerateTexture
+#define UpdateTextureData					OpenGLUpdateTextureData
 #define DrawImage							OpenGLDrawImage
 #define DrawBox2							OpenGLDrawBox2
 #define DrawLine							OpenGLDrawLine

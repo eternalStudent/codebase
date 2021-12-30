@@ -24,7 +24,7 @@ typedef Point4 Color;
 #define RGBA_BLUE           0xffcc9966
 #define RGBA_GREEN          0xff94c799
 #define RGBA_ORANGE         0xff58aef9
-#define RGBA_LILAC          0xffc69569
+#define RGBA_LILAC          0xffc695c6
 #define RGBA_RED            0xff665fec
 
 inline Color RgbaToColor(uint32 rgba) {

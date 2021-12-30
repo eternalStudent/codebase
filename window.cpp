@@ -14,3 +14,6 @@
 #define OsSetCursorIcon				Win32SetCursorIcon
 #define OsExitFullScreen			Win32ExitFullScreen
 #define OsEnterFullScreen			Win32EnterFullScreen
+#define MAX_PATH_SIZE				MAX_PATH
+#define OsOpenFileDialog			Win32OpenFileDialog
+#define OsSaveFileDialog			Win32SaveFileDialog

@@ -1,3 +1,6 @@
+#include "win32opengl.cpp"
+#define OsOpenGLInit	Win32OpenGLInit
+
 struct {
 	GLuint drawImage;
 	GLuint drawShape;
@@ -60,6 +63,11 @@ GLuint OpenGLGenerateTexture(Image image, GLint filter) {
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	return texture;
+}
+
+void OpenGLUpdateTextureData(GLuint texture, int32 xoffset, int32 yoffset, int32 width, int32 height, void* data) {
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, xoffset, yoffset, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
 }
 
 void OpenGLUpdateDimensions(Dimensions2i dimensions){

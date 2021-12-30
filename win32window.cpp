@@ -139,3 +139,27 @@ UINT Win32HandleWindowEvents(HWND window) {
 void Win32SetCursorIcon(LPCSTR icon) {
 	SetCursor(LoadCursorA(NULL, icon));
 }
+
+BOOL Win32OpenFileDialog(LPSTR path, DWORD max, HWND window) {
+    OPENFILENAME dialog = {};
+    dialog.lStructSize = sizeof(OPENFILENAME);
+    path[0] = 0;
+    dialog.lpstrFile = path;
+    dialog.nMaxFile = max;
+    dialog.hwndOwner = window;
+    dialog.Flags = OFN_FILEMUSTEXIST;
+    dialog.Flags |= OFN_NOCHANGEDIR;
+    return GetOpenFileName(&dialog);
+}
+
+BOOL Win32SaveFileDialog(LPSTR path, DWORD max, HWND window) {
+    OPENFILENAME dialog = {};
+    dialog.lStructSize = sizeof(OPENFILENAME);
+    path[0] = 0;
+    dialog.lpstrFile = path;
+    dialog.nMaxFile = max;
+    dialog.hwndOwner = window;
+    dialog.Flags = OFN_OVERWRITEPROMPT;
+    dialog.Flags |= OFN_NOCHANGEDIR;
+    return GetSaveFileName(&dialog);
+}

@@ -65,6 +65,7 @@ struct UIElement {
 	void (*onClick)(UIElement*);
 	void (*onHover)(UIElement*);
 	void (*onResize)(UIElement*);
+	void (*onMove)(UIElement*);
 
 	UIElement* parent;
 	UIElement* first;
@@ -235,6 +236,7 @@ void UpdateActiveElement(Point2i cursorPos) {
 		int32 newx  = ui.originalPos.x + cursorPos.x - ui.grabPos.x;
 		int32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
 		SetPosition(element, newx, newy);
+		if (element->onMove) element->onMove(element);
 	}
 
 	// Handle resizing
@@ -310,6 +312,10 @@ Point2i UIGetCursorPosition() {
 
 bool UIEnterFullScreen() {
 	return OsEnterFullScreen(ui.window);
+}
+
+void UIExitFullScreen() {
+	OsExitFullScreen(ui.window);
 }
 
 void UIInit(Arena* persist, Arena* scratch) {
