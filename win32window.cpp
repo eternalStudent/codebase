@@ -94,8 +94,10 @@ HWND Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 HWND Win32CreateWindowFullScreen(LPCSTR title, int32* width, int32* height) {
 	WNDCLASSA windowClass = CreateWindowClass();
 	RECT monitorRect;
-	if (!GetPrimaryMonitorRect(&monitorRect))
-		return FAIL("failed to get monitor placement");
+	if (!GetPrimaryMonitorRect(&monitorRect)) {
+		LOG("failed to get monitor placement");
+		return NULL;
+	}
 
 	*width = monitorRect.right - monitorRect.left;
 	*height = monitorRect.bottom - monitorRect.top;

@@ -321,7 +321,7 @@ void UIExitFullScreen() {
 
 void UIInit(Arena* persist, Arena* scratch) {
 	int32 capacity = 100;
-	ArenaAlign(persist, 8);
+	ArenaAlign(persist, alignof(UIElement));
 	void* buffer = ArenaAlloc(persist, capacity*sizeof(UIElement));
 	memset(buffer, 0, capacity*sizeof(UIElement));
 	ui.elements = (UIElement*) buffer;

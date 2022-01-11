@@ -3,8 +3,8 @@
 #include "opengl.cpp"
 #define TextureId 							GLuint
 #define Filter								GLint
-#define Smooth								GL_LINEAR
-#define Pixelated							GL_NEAREST
+#define GRAPHICS_SMOOTH 					GL_LINEAR
+#define GRAPHICS_PIXELATED					GL_NEAREST
 
 #define GraphicsSwapBuffers					Win32OpenGLSwapBuffers
 #define GraphicsInit						OpenGLInit

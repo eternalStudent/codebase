@@ -1165,7 +1165,7 @@ Font TTLoadFont(Arena* arena, byte* data, float32 height, uint32 rgb) {
 
    byte* bitmap = ExpandChannels(arena, mono_bitmap, pw*ph, rgb);
 
-   font.texture = GenerateTexture(Image{pw, ph, 4, bitmap}, Smooth);
+   font.texture = GenerateTexture(Image{pw, ph, 4, bitmap}, GRAPHICS_SMOOTH);
    font.height = height;
 
    return font;

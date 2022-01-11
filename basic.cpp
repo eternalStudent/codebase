@@ -9,3 +9,7 @@
 
 #include "memory.cpp"
 #include "io.cpp"
+
+#if defined(__clang__) || defined(__GNUC__)
+#  define alignof	__alignof__
+#endif 
