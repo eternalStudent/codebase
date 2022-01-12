@@ -204,9 +204,12 @@ void HandleCursorPosition(Point2i cursorPos){
 	}
 }
 
-void HandleMouseEvent(Event mouseEvent, Point2i cursorPos) {
+void HandleMouseEvent(Point2i cursorPos) {
 	UIElement* element = ui.active;
-	if (mouseEvent == MOUSE_LDN && element){
+	static bool mouseWasDown = false;
+	bool mouseIsDown = IsMouseDown(MOUSE_L);
+	if (mouseIsDown && !mouseWasDown && element) {
+		mouseWasDown = true;
 		MoveToFront(element);
 		if (element->flags & UI_CLICKABLE){
 			ui.isPressed = true;
@@ -220,11 +223,12 @@ void HandleMouseEvent(Event mouseEvent, Point2i cursorPos) {
 			ui.originalPos = element->pos;
 		}
 	}
-	else if (mouseEvent == MOUSE_LUP) {
+	else if (!mouseIsDown) {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
 		ui.isPressed = false;
 	}
+	mouseWasDown = mouseIsDown;
 }
 
 void UpdateActiveElement(Point2i cursorPos) {
@@ -303,8 +307,8 @@ void RenderElement(UIElement* element) {
 // API
 //-----------
 
-Event UIHandleWindowEvents() {
-	return OsHandleWindowEvents(ui.window);
+void UIHandleWindowEvents() {
+	OsHandleWindowEvents(ui.window);
 }
 
 Point2i UIGetCursorPosition() {
@@ -329,6 +333,20 @@ void UIInit(Arena* persist, Arena* scratch) {
 	ui.arena = scratch;
 }
 
+void WriteDebug() {
+	static Font font = LoadFont(ui.arena, "data/AzeretMono-Regular.ttf", 18, 0xffffff);
+	byte buffer[256];
+	byte* data = buffer;
+	byte* ptr = buffer;
+	ptr += StringCopy("isGrabbing: ", ptr);
+	ptr += BoolToAnsi(ui.isGrabbing, ptr);
+	UIText text;
+	text.string = {data, ptr-data};
+	text.pos = {0, 0};
+	text.font = &font;
+	RenderText(&text, {6, 240});
+}
+
 void UIRenderElements() {
 	UIElement* child = ui.windowElement->first;
 	while (child) {
@@ -337,6 +355,8 @@ void UIRenderElements() {
 	}
 	RenderText(ui.windowElement->text, {0, 0});
 	RenderImage(ui.windowElement->image, {0, 0});
+
+	WriteDebug();	
 }
 
 void UISetWindowElement(Window window, uint32 background) {
@@ -396,9 +416,9 @@ void UIUpdateDimensions(Dimensions2i dimensions) {
 	ui.windowElement->dim = dimensions;
 }
 
-bool UIUpdateElements(Event event, Point2i cursorPos){
+bool UIUpdateElements(Point2i cursorPos){
 	HandleCursorPosition(cursorPos);
-	HandleMouseEvent(event, cursorPos);
+	HandleMouseEvent(cursorPos);
 	UpdateActiveElement(cursorPos);
 	return ui.active != NULL;
 }
@@ -453,21 +473,10 @@ void __move_sideway(UIElement* e) {
 	OsSetCursorIcon(CUR_MOVESIDE);
 }
 
-uint32 __get_background_color(UIElement* e) {
-	uint32 result;
-	do {
-		result = e->parent->background;
-		e = e->parent;
-	} while(!(result & 0xff000000) && e);
-	return result;
-}
-
 UIElement* UICreateSlider(UIElement* parent, int32 width) {
 	UIElement* slider = UICreateElement(parent);
 	slider->dim = {width, 16};
 	slider->background = RGBA_LIGHTGREY;
-	slider->borderWidth = 4;
-	slider->borderColor = __get_background_color(slider);
 	slider->name = STR("slider");
 
 	UIElement* sled = UICreateElement(slider);

@@ -1,5 +1,4 @@
 #include "geometry.cpp"
-#include "input.cpp"
 #include "image.cpp"
 #include "window.cpp"
 #include "opengl.cpp"

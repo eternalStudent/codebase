@@ -1,3 +1,8 @@
+struct {
+	byte keys[256];
+	byte mouse[3];
+} _window;
+
 void Win32ExitFullScreen(HWND window) {
 	DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
 	SetWindowLong(window, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
@@ -53,6 +58,32 @@ LRESULT CALLBACK MainWindowCallback(HWND window, UINT message, WPARAM wParam, LP
         	Dimensions2i dimensions = Win32GetWindowDimensions(window);
         	UpdateDimensions(dimensions);
         } break;
+        case WM_KEYDOWN: {
+        	UINT vkcode = (UINT)wParam;
+        	_window.keys[vkcode] = 1;
+        } break;
+        case WM_KEYUP: {
+        	UINT vkcode = (UINT)wParam;
+        	_window.keys[vkcode] = 0;
+        } break;
+        case WM_LBUTTONDOWN : {
+        	_window.mouse[0] = 1;
+        } break;
+        case WM_LBUTTONUP : {
+        	_window.mouse[0] = 0;
+        } break;
+        case WM_MBUTTONDOWN : {
+        	_window.mouse[1] = 1;
+        } break;
+        case WM_MBUTTONUP : {
+        	_window.mouse[1] = 0;
+        } break;
+        case WM_RBUTTONDOWN : {
+        	_window.mouse[2] = 0;
+        } break;
+        case WM_RBUTTONUP : {
+        	_window.mouse[2] = 1;
+        } break;
     }
 
     return DefWindowProc(window, message, wParam, lParam);
@@ -73,6 +104,7 @@ WNDCLASSA CreateWindowClass() {
 
 HWND Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 	WNDCLASSA windowClass = CreateWindowClass();
+	_window = {};
 
 	DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
 	RECT rect = {0, 0, width, height};
@@ -93,6 +125,8 @@ HWND Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 
 HWND Win32CreateWindowFullScreen(LPCSTR title, int32* width, int32* height) {
 	WNDCLASSA windowClass = CreateWindowClass();
+	_window = {};
+
 	RECT monitorRect;
 	if (!GetPrimaryMonitorRect(&monitorRect)) {
 		LOG("failed to get monitor placement");
@@ -119,23 +153,13 @@ HWND Win32CreateWindowFullScreen(LPCSTR title, int32* width, int32* height) {
 	return window;
 }
 
-UINT Win32HandleWindowEvents(HWND window) {
+void Win32HandleWindowEvents(HWND window) {
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 	{
-		if (message.message == WM_KEYUP)
-		{
-			uint32 VKCode = (uint32)message.wParam;
-			int32 wasDown = ((message.lParam & (1 << 30)) != 0);
-			int32 isDown = ((message.lParam & (1 << 31)) == 0);
-			if (wasDown != isDown) return VKCode;
-		}
-		else {
-			TranslateMessage(&message);
-			DispatchMessageA(&message);
-		}
+		TranslateMessage(&message);
+		DispatchMessageA(&message);
 	}
-	return message.message;
 }
 
 void Win32SetCursorIcon(LPCSTR icon) {
@@ -164,4 +188,20 @@ BOOL Win32SaveFileDialog(LPSTR path, DWORD max, HWND window) {
     dialog.Flags = OFN_OVERWRITEPROMPT;
     dialog.Flags |= OFN_NOCHANGEDIR;
     return GetSaveFileName(&dialog);
+}
+
+Point2i Win32GetCursorPosition(HWND window) {
+	POINT cursorPos;
+	GetCursorPos(&cursorPos); // relative to screen
+
+	ScreenToClient(window, &cursorPos);
+	return Point2i{cursorPos.x, cursorPos.y};
+}
+
+BOOL Win32IsKeyDown(DWORD key) {
+	return _window.keys[key] == 1;
+}
+
+BOOL Win32IsMouseDown(DWORD mouse) {
+	return _window.mouse[mouse] == 1;
 }

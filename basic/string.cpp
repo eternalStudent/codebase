@@ -132,12 +132,12 @@ int32 Float32ToDecimal(float32 number, int32 precision, _Out_ byte* str) {
 
 #define StringCopy(source, dest) (memcpy((dest), (source), (sizeof(source)-1)), (sizeof(source)-1))
 
-inline int32 BoolToAnsi(bool b, char* str){
+inline int32 BoolToAnsi(bool b, void* str){
 	if (b){
-		return StringCopy("true", str) - 1;
+		return StringCopy("true", str);
 	}
 	else {
-		return StringCopy("false", str) - 1;
+		return StringCopy("false", str);
 	}
 }
 
