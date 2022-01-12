@@ -19,12 +19,28 @@ inline Point2 Cerp2(float32 t, Point2 p0, Point2 p1, Point2 p2, Point2 p3) {
             (1-t)*(1-t)*(1-t)*p0.y + 3*(1-t)*(1-t)*t*p1.y + 3*(1-t)*t*t*p2.y + t*t*t*p3.y};
 }
 
+void PushPoint2(StringBuilder* builder, Point2 p, int32 precision) {
+    builder->ptr += StringCopy("(", builder->ptr);
+    builder->ptr += Float32ToDecimal(p.x, precision, builder->ptr);
+    builder->ptr += StringCopy(", ", builder->ptr);
+    builder->ptr += Float32ToDecimal(p.y, precision, builder->ptr);
+    builder->ptr += StringCopy(")", builder->ptr);
+}
+
 union Point2i {
     struct {int32 x, y;};
     struct {int32 width, height;};
     int32 e[2];
 };
 typedef Point2i Dimensions2i;
+
+void PushPoint2i(StringBuilder* builder, Point2i p) {
+    builder->ptr += StringCopy("(", builder->ptr);
+    builder->ptr += Int32ToDecimal(p.x, builder->ptr);
+    builder->ptr += StringCopy(", ", builder->ptr);
+    builder->ptr += Int32ToDecimal(p.y, builder->ptr);
+    builder->ptr += StringCopy(")", builder->ptr);
+}
 
 #define MOVE2(p0, p1)           {(p0).x+(p1).x, (p0).y+(p1).y}
 #define SCALE2(p, a)            {a*(p).x, a*(p).y}

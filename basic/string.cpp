@@ -216,3 +216,36 @@ float64 AnsiToFloat64(String str) {
 	if (start == 1) result = -result;
 	return result;
 }
+
+// String Builder
+//----------------
+
+struct StringBuilder {
+	byte* buffer;
+	byte* ptr;
+};
+
+String GetString(StringBuilder* builder) {
+	return {builder->buffer, builder->ptr-builder->buffer};
+}
+
+void PushString(StringBuilder* builder, String str) {
+	builder->ptr += StringCopy2(str, builder->ptr);
+}
+
+void PushNewLine(StringBuilder* builder) {
+	*(builder->ptr) = 10;
+	builder->ptr+=1;
+}
+
+void PushBool(StringBuilder* builder, bool b) {
+	builder->ptr += BoolToAnsi(b, builder->ptr);
+}
+
+void PushInt32(StringBuilder* builder, int32 i) {
+	builder->ptr += Int32ToDecimal(i, builder->ptr);
+}
+
+void PushFloat32(StringBuilder* builder, float32 f, int32 precision) {
+	builder->ptr += Float32ToDecimal(f, precision, builder->ptr);
+}

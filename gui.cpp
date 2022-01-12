@@ -333,20 +333,6 @@ void UIInit(Arena* persist, Arena* scratch) {
 	ui.arena = scratch;
 }
 
-void WriteDebug() {
-	static Font font = LoadFont(ui.arena, "data/AzeretMono-Regular.ttf", 18, 0xffffff);
-	byte buffer[256];
-	byte* data = buffer;
-	byte* ptr = buffer;
-	ptr += StringCopy("isGrabbing: ", ptr);
-	ptr += BoolToAnsi(ui.isGrabbing, ptr);
-	UIText text;
-	text.string = {data, ptr-data};
-	text.pos = {0, 0};
-	text.font = &font;
-	RenderText(&text, {6, 240});
-}
-
 void UIRenderElements() {
 	UIElement* child = ui.windowElement->first;
 	while (child) {
@@ -354,9 +340,7 @@ void UIRenderElements() {
 		child = child->next;
 	}
 	RenderText(ui.windowElement->text, {0, 0});
-	RenderImage(ui.windowElement->image, {0, 0});
-
-	WriteDebug();	
+	RenderImage(ui.windowElement->image, {0, 0});	
 }
 
 void UISetWindowElement(Window window, uint32 background) {

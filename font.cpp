@@ -22,13 +22,18 @@ Font LoadFont(Arena* arena, const char* filePath, float32 height, uint32 rgb){
 
 // NOTE: adopted from stbtt_GetBakedQuad
 void DrawText(Font* font, float32 x, float32 y, String string){
-   int32 pw = 512;
-   int32 ph = 512;
-   int32 first_char = 32;
-   int32 last_char = 128;
+   const int32 pw = 512;
+   const int32 ph = 512;
+   const int32 first_char = 32;
+   const int32 last_char = 128;
+   const float32 original_x = x;
 
    for (int32 i=0; i<string.length; i++) {
       byte b = string.data[i];
+      if (b == 10) {
+         y -= font->height;
+         x = original_x;
+      }
       if (b >= first_char && b < last_char) {
          float32 ipw = 1.0f / pw, iph = 1.0f / ph; // NOTE: division takes longer than multipication, this runs division at compile time.
          BakedChar* bakedchar = font->chardata + (b - first_char);
