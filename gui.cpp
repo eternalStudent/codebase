@@ -209,7 +209,6 @@ void HandleMouseEvent(Point2i cursorPos) {
 	static bool mouseWasDown = false;
 	bool mouseIsDown = IsMouseDown(MOUSE_L);
 	if (mouseIsDown && !mouseWasDown && element) {
-		mouseWasDown = true;
 		MoveToFront(element);
 		if (element->flags & UI_CLICKABLE){
 			ui.isPressed = true;
@@ -400,11 +399,11 @@ void UIUpdateDimensions(Dimensions2i dimensions) {
 	ui.windowElement->dim = dimensions;
 }
 
-bool UIUpdateElements(Point2i cursorPos){
+UIElement* UIUpdateElements(Point2i cursorPos){
 	HandleCursorPosition(cursorPos);
 	HandleMouseEvent(cursorPos);
 	UpdateActiveElement(cursorPos);
-	return ui.active != NULL;
+	return ui.active;
 }
 
 // specific elements

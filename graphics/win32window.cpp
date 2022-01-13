@@ -8,6 +8,7 @@ void Win32ExitFullScreen(HWND window) {
 	DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
 	SetWindowLong(window, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
 	SetWindowPos(window, NULL, 0, 0, 920, 540, SWP_FRAMECHANGED);
+	_window = {};
 }
 
 BOOL GetPrimaryMonitorRect(RECT* monitorRect){
