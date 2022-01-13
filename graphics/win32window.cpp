@@ -77,10 +77,10 @@ LRESULT CALLBACK MainWindowCallback(HWND window, UINT message, WPARAM wParam, LP
         	_window.mouse[1] = 0;
         } break;
         case WM_RBUTTONDOWN : {
-        	_window.mouse[2] = 0;
+        	_window.mouse[2] = 1;
         } break;
         case WM_RBUTTONUP : {
-        	_window.mouse[2] = 1;
+        	_window.mouse[2] = 0;
         } break;
     }
 
