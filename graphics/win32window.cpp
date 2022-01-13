@@ -1,6 +1,7 @@
 struct {
-	byte keys[256];
-	byte mouse[3];
+	BYTE keys[256];
+	BYTE mouse[3];
+	BOOL destroyed;
 } _window;
 
 void Win32ExitFullScreen(HWND window) {
@@ -46,12 +47,8 @@ Dimensions2i Win32GetWindowDimensions(HWND window) {
 
 LRESULT CALLBACK MainWindowCallback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch (message) {
-		case WM_CLOSE: {
-			DestroyWindow(window);
-			return 0;
-		}
     	case WM_DESTROY: {
-    		PostQuitMessage(0);
+    		_window.destroyed = true;
     		return 0;
         }
         case WM_SIZE: {
@@ -100,6 +97,10 @@ WNDCLASSA CreateWindowClass() {
 	RegisterClassA(&windowClass);
 
 	return windowClass;
+}
+
+BOOL Win32WindowDestroyed() {
+	return _window.destroyed;
 }
 
 HWND Win32CreateWindow(LPCSTR title, LONG width, LONG height) {

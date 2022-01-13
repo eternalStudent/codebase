@@ -30,3 +30,4 @@
 #define OsGetCursorPosition 		Win32GetCursorPosition
 #define IsKeyDown					Win32IsKeyDown
 #define IsMouseDown 				Win32IsMouseDown
+#define OsWindowDestroyed			Win32WindowDestroyed
