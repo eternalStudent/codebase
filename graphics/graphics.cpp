@@ -16,11 +16,12 @@
 #define DrawLine							OpenGLDrawLine
 #define DrawCircle							OpenGLDrawCircle
 #define DrawDisc							OpenGLDrawDisc
-#define DrawCurve							OpenGLDrawCurve
+#define DrawCurve3							OpenGLDrawCurve3
+#define DrawCurve4							OpenGLDrawCurve4
 #define GraphicsClearScreen 				OpenGLClearScreen
-#define GraphicsUpdateDimensions			OpenGLUpdateDimensions
 #define GraphicsCropScreen					glScissor
 #define GraphicsClearCrop					OpenGlClearCrop
+#define GraphicsSetColor					OpenGLSetColor
 
 
 TextureId LoadTexture(Arena* arena, const char* filePath, Filter filter){

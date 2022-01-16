@@ -13,4 +13,10 @@
 
 #if defined(__clang__) || defined(__GNUC__)
 #  define alignof	__alignof__
-#endif 
+#endif
+
+union opaque64 {
+	void* p;
+	float64 f;
+	int64 i;
+};

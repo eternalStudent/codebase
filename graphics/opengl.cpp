@@ -4,9 +4,6 @@
 struct {
 	GLuint drawImage;
 	GLuint drawShape;
-	Window window;
-	Dimensions2i clientDim;
-	float32 iwidth, iheight;
 	uint32 rgba;
 	Arena* arena;
 } opengl;
@@ -70,17 +67,9 @@ void OpenGLUpdateTextureData(GLuint texture, int32 xoffset, int32 yoffset, int32
 	glTexSubImage2D(GL_TEXTURE_2D, 0, xoffset, yoffset, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
 }
 
-void OpenGLUpdateDimensions(Dimensions2i dimensions){
-	opengl.clientDim = dimensions;
+void OpenGLInit(Arena* arena) {
+	OsOpenGLInit();
 
-	opengl.iwidth = 1.0f/opengl.clientDim.width;
-	opengl.iheight = 1.0f/opengl.clientDim.height;
-}
-
-void OpenGLInit(Arena* arena, Window window) {
-	OsOpenGLInit(window);
-
-	opengl.window = window;
 	opengl.arena = arena;
 
 	GLchar* vertexSource = (GLchar*)R"STRING(
@@ -142,15 +131,27 @@ void main()
 	glEnable(GL_SCISSOR_TEST);
 }
 
-void OpenGLClearScreen() {
-	glClearColor(0, 0, 0, 1);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	glViewport(0, 0, opengl.clientDim.width, opengl.clientDim.height);
+void OpenGLSetColor(uint32 rgba) {
+	opengl.rgba = rgba;
 }
 
-Point2 AdjustCoordinates(Point2 p){
-	return {(2.0f*p.x*opengl.iwidth) - 1, (2.0f*p.y*opengl.iheight) - 1};
+void OpenGLClearScreen() {
+	Dimensions2i dim = OsGetWindowDimensions();
+	glScissor(0, 0, dim.width, dim.height);
+	Color color = RgbaToColor(opengl.rgba);
+	glClearColor(color.r, color.g, color.b, color.a);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glViewport(0, 0, dim.width, dim.height);
+}
+
+Point2 AdjustCoordinates(Point2 p) {
+	// TODO: maybe add these to Window?
+	Dimensions2i dim = OsGetWindowDimensions();
+	float32 iwidth = 1.0f/dim.width;
+	float32 iheight = 1.0f/dim.height;
+
+	return {(2.0f*p.x*iwidth) - 1, (2.0f*p.y*iheight) - 1};
 }
 
 void OpenGLDrawImage(GLuint texture, Box2 crop, Box2 pos) {
@@ -341,7 +342,42 @@ void OpenGLDrawDisc(uint32 rgba, Sphere2 disc, int32 startAngle, int32 endAngle)
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawCurve(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Point2 p2, Point2 p3) {
+void OpenGLDrawCurve3(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Point2 p2) {
+	float32 vertices[257*2];
+
+	float32 fraction = LoadExp(-8);
+	for (int32 i = 0; i<=256; i++) {
+		float32 t = i*fraction;
+		Point2 p = AdjustCoordinates(Qerp2(t, p0, p1, p2));
+		vertices[i*2  ] = p.x;
+		vertices[i*2+1] = p.y;
+	}
+
+	GLuint buffersHandle;
+	glGenBuffers(1, &buffersHandle);
+	glBindBuffer(GL_ARRAY_BUFFER, buffersHandle);
+	glBufferData(GL_ARRAY_BUFFER, 2*257*sizeof(float32), vertices, GL_STATIC_DRAW);
+
+	GLuint verticesHandle;
+	glGenVertexArrays(1, &verticesHandle);
+	glBindVertexArray(verticesHandle);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float32), NULL);
+
+	GLint location = glGetUniformLocation(opengl.drawShape, "color");
+	Color color = RgbaToColor(rgba);
+	glUseProgram(opengl.drawShape);
+	glUniform4f(location, color.r, color.g, color.b, color.a);
+	glLineWidth(lineWidth ? lineWidth : 1);
+
+	glDrawArrays(GL_LINE_STRIP, 0, 257);
+
+	glDeleteVertexArrays(1, &verticesHandle);
+	glDeleteBuffers(1, &buffersHandle);
+}
+
+void OpenGLDrawCurve4(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Point2 p2, Point2 p3) {
 	float32 vertices[257*2];
 
 	float32 fraction = LoadExp(-8);
@@ -377,5 +413,6 @@ void OpenGLDrawCurve(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Point
 }
 
 void OpenGlClearCrop() {
-	glScissor(0, 0, opengl.clientDim.width, opengl.clientDim.height);
+	Dimensions2i dim = OsGetWindowDimensions();
+	glScissor(0, 0, dim.width, dim.height);
 }

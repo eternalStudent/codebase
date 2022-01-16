@@ -1,4 +1,4 @@
-#define FLIPY(y)        (ui.windowElement->height-(y)-1)         
+#define UI_FLIPY(y)        (ui.windowElement->height-(y)-1)         
 
 #define UI_MOVABLE          1
 #define UI_RESIZABLE        2
@@ -75,20 +75,17 @@ struct UIElement {
 
 	UIText* text;
 	UIImage* image;
-	void* context;
+	opaque64 context;
 };
 
 struct {
-	union {
-		UIElement* elements;
-		UIElement* windowElement;
-	};
+	FixedSize allocator;
 	int32 capacity;
 	int32 elementCount;
 
 	UIStyle originalStyle;
 
-	Window window;
+	UIElement* windowElement;
 
 	UIElement* active;
 	Point2i originalPos;
@@ -264,7 +261,7 @@ void RenderText(UIText* text, Point2i parentPos) {
 	if (!text) return;
 
 	float32 x = (float32)(text->pos.x + parentPos.x);
-	float32 y = FLIPY((float32)(text->pos.y + parentPos.y)) - text->font->height;
+	float32 y = UI_FLIPY((float32)(text->pos.y + parentPos.y)) - text->font->height;
 	DrawText(text->font, x, y, text->string);
 }
 
@@ -272,7 +269,7 @@ void RenderImage(UIImage* image, Point2i parentPos) {
 	if (!image) return;
 
 	Point2i p0 = MOVE2(image->pos, parentPos);
-	Box2 renderBox = Box2{(float32)p0.x, (float32)FLIPY(p0.y+image->height), (float32)(p0.x+image->width), (float32)FLIPY(p0.y)};
+	Box2 renderBox = Box2{(float32)p0.x, (float32)UI_FLIPY(p0.y+image->height), (float32)(p0.x+image->width), (float32)UI_FLIPY(p0.y)};
 	DrawImage(image->atlas, image->crop, renderBox);
 }
 
@@ -281,9 +278,10 @@ int32 __center(UIElement* element) {
 }
 
 void RenderElement(UIElement* element) {
+	if (element->flags & UI_HIDDEN) return;
 	if (element->flags & UI_CENTER) element->x = __center(element);
 	Box2i box = GetAbsolutePosition(element);
-	Box2 renderBox = Box2{(float32)box.x0, (float32)FLIPY(box.y1), (float32)box.x1, (float32)FLIPY(box.y0)};
+	Box2 renderBox = Box2{(float32)box.x0, (float32)UI_FLIPY(box.y1), (float32)box.x1, (float32)UI_FLIPY(box.y0)};
 	if (element->radius) {
 		DrawBox2Rounded(element->background, renderBox, element->radius);
 		if (element->borderWidth && element->borderColor) 
@@ -306,28 +304,9 @@ void RenderElement(UIElement* element) {
 // API
 //-----------
 
-void UIHandleWindowEvents() {
-	OsHandleWindowEvents(ui.window);
-}
-
-Point2i UIGetCursorPosition() {
-	return OsGetCursorPosition(ui.window);
-}
-
-bool UIEnterFullScreen() {
-	return OsEnterFullScreen(ui.window);
-}
-
-void UIExitFullScreen() {
-	OsExitFullScreen(ui.window);
-}
-
 void UIInit(Arena* persist, Arena* scratch) {
-	int32 capacity = 100;
-	ArenaAlign(persist, alignof(UIElement));
-	void* buffer = ArenaAlloc(persist, capacity*sizeof(UIElement));
-	memset(buffer, 0, capacity*sizeof(UIElement));
-	ui.elements = (UIElement*) buffer;
+	int32 capacity = 200;
+	ui.allocator = CreateFixedSize(persist, capacity, sizeof(UIElement));
 	ui.capacity = capacity;
 	ui.arena = scratch;
 }
@@ -342,30 +321,30 @@ void UIRenderElements() {
 	RenderImage(ui.windowElement->image, {0, 0});	
 }
 
-void UISetWindowElement(Window window, uint32 background) {
+void UISetWindowElement(uint32 background) {
 	ui.elementCount = 1;
-	ui.window = window;
+	ui.windowElement = (UIElement*)FixedSizeAlloc(&ui.allocator);
 	ui.windowElement->pos = {0, 0};
 	ui.windowElement->background = background;
+	GraphicsSetColor(background);
 }
 
 void UICreateWindow(Arena* arena, const char* title, Dimensions2i dimensions, uint32 background) {
-	Window window = OsCreateWindow(title, dimensions.width, dimensions.height);
-	GraphicsInit(arena, window);
-	UISetWindowElement(window, background);
+	OsCreateWindow(title, dimensions.width, dimensions.height);
+	GraphicsInit(arena);
+	UISetWindowElement(background);
 }
 
 void UICreateWindowFullScreen(Arena* arena, const char* title, uint32 background) {
-	int32 width, height;
-	Window window = OsCreateWindowFullScreen(title, &width, &height);
-	GraphicsInit(arena, window);
-	UISetWindowElement(window, background);
+	OsCreateWindowFullScreen(title);
+	GraphicsInit(arena);
+	UISetWindowElement(background);
 }
 
 UIElement* UICreateElement(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
-
-	UIElement* element = &(ui.elements[ui.elementCount++]);
+	UIElement* element = (UIElement*)FixedSizeAlloc(&ui.allocator);
+	ui.elementCount++;
 	if (parent == NULL) parent = ui.windowElement;
 
 	if (parent->last) parent->last->next = element;
@@ -376,9 +355,22 @@ UIElement* UICreateElement(UIElement* parent) {
 	return element;
 }
 
+void UIDestroyElement(UIElement* element) {
+	if (element->prev) element->prev->next = element->next;
+	else element->parent->first = element->next;
+	if (element->next) element->next->prev = element->prev;
+	else element->parent->last = element->prev;
+	ui.elementCount--;
+	for (UIElement* child = element->first; child != NULL; child = child->next)
+		UIDestroyElement(child);
+
+	FixedSizeFree(&ui.allocator, element);
+}
+
 UIText* UICreateText(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
-	UIText* text = (UIText*)&(ui.elements[ui.elementCount++]);
+	UIText* text = (UIText*)FixedSizeAlloc(&ui.allocator);
+	ui.elementCount++;
 	if (parent) parent->text = text;
 	else ui.windowElement->text = text;
 	return text;
@@ -386,7 +378,8 @@ UIText* UICreateText(UIElement* parent) {
 
 UIImage* UICreateImage(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
-	UIImage* image = (UIImage*)&(ui.elements[ui.elementCount++]);
+	UIImage* image = (UIImage*)FixedSizeAlloc(&ui.allocator);
+	ui.elementCount++;
 	if (parent) {
 		parent->image = image;
 		image->dim = parent->dim;
@@ -395,15 +388,22 @@ UIImage* UICreateImage(UIElement* parent) {
 	return image;
 }
 
-void UIUpdateDimensions(Dimensions2i dimensions) {
-	ui.windowElement->dim = dimensions;
-}
-
 UIElement* UIUpdateElements(Point2i cursorPos){
+	ui.windowElement->dim = OsGetWindowDimensions();
 	HandleCursorPosition(cursorPos);
 	HandleMouseEvent(cursorPos);
 	UpdateActiveElement(cursorPos);
 	return ui.active;
+}
+
+void UIDrawLine(Point2i p0, Point2i p1, uint32 rgba, float32 lineWidth) {
+	Point2 points[2] = {{(float32)p0.x, (float32)UI_FLIPY(p0.y)}, {(float32)p1.x, (float32)UI_FLIPY(p1.y)}};
+	Line2 line = {points, 2};
+	DrawLine(rgba, lineWidth, line);
+}
+
+Box2i UIGetAbsolutePosition(UIElement* element) {
+	return GetAbsolutePosition(element);
 }
 
 // specific elements
@@ -418,7 +418,7 @@ UIBox __pad(UIElement* parent, int32 pad) {
 }
 
 void __toggle(UIElement* e) {
-	byte* context = (byte*)e->context;
+	byte* context = (byte*)e->context.p;
 	*context = !(*context);
 	e->background = *context ? RGBA_DARKGREY : 0;
 	ui.originalStyle = e->style;
@@ -441,7 +441,7 @@ UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str, byte* con
 	check->flags = UI_CLICKABLE;
 	check->radius = 3;
 	check->onClick = __toggle;
-	check->context = context;
+	check->context.p = context;
 	check->name = STR("check");
 
 	UIText* text = UICreateText(wrapper);

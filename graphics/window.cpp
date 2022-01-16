@@ -1,7 +1,6 @@
 #include "win32window.cpp"
-#define Window                  	HWND
 #define CursorIcon 					LPCSTR
-#define CUR_MOVE				    IDC_SIZEALL	 					
+#define CUR_MOVE					IDC_SIZEALL	 					
 #define CUR_ARROW 					IDC_ARROW
 #define CUR_RESIZE 					IDC_SIZENWSE
 #define CUR_HAND					IDC_HAND
@@ -17,7 +16,8 @@
 #define KEY_RIGHT					VK_RIGHT		// 0x27
 #define KEY_DOWN					VK_DOWN			// 0x28
 
-#define OsGetWindowDimensions   	Win32GetWindowDimensions
+#define OsGetWindowDimensions		Win32GetWindowDimensions
+#define OsGetWindowHandle			Win32GetWindowHandle
 #define OsCreateWindow				Win32CreateWindow
 #define OsCreateWindowFullScreen	Win32CreateWindowFullScreen
 #define OsHandleWindowEvents		Win32HandleWindowEvents

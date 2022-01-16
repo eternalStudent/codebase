@@ -149,7 +149,7 @@ BOOL Win32CreateRenderingContext(HDC dc) {
 	return TRUE;
 }
 
-BOOL Win32SetPixelFormat(HWND window, HDC dc) {
+BOOL Win32SetPixelFormat(HDC dc) {
 	// https://docs.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-pixelformatdescriptor
 	PIXELFORMATDESCRIPTOR requestedPixelFormat = {};
 	requestedPixelFormat.nSize = sizeof(PIXELFORMATDESCRIPTOR);
@@ -175,10 +175,11 @@ BOOL Win32SetPixelFormat(HWND window, HDC dc) {
 	return TRUE;
 }
 
-BOOL Win32OpenGLInit(HWND window) {
+BOOL Win32OpenGLInit() {
+	HWND window = OsGetWindowHandle();
 	HDC dc = GetDC(window);
 	if (!dc) return FAIL("failed to get DC");
-	if (!Win32SetPixelFormat(window, dc)) return FALSE;
+	if (!Win32SetPixelFormat(dc)) return FALSE;
 	if (!Win32CreateRenderingContext(dc)) return FALSE;
 
 	Win32GetOpenGLFunction(glAttachShader);
