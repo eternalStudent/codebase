@@ -25,6 +25,7 @@ void* FixedSizeAlloc(FixedSize*  allocator) {
 }
 
 void FixedSizeFree(FixedSize* allocator, void* data) {
+	if (data == NULL) return;
 	*(void**)data = allocator->next;
 	allocator->next = data;
 }

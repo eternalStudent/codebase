@@ -292,11 +292,7 @@ void RenderElement(UIElement* element) {
 		if (element->borderWidth && element->borderColor) 
 			DrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
 	}
-	UIElement* child = element->first;
-	while (child) {
-		RenderElement(child);
-		child = child->next;
-	}
+	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
 	RenderText(element->text, box.p0);
 	RenderImage(element->image, box.p0);
 }
@@ -312,11 +308,7 @@ void UIInit(Arena* persist, Arena* scratch) {
 }
 
 void UIRenderElements() {
-	UIElement* child = ui.windowElement->first;
-	while (child) {
-		RenderElement(child);
-		child = child->next;
-	}
+	LINKEDLIST_FOREACH(ui.windowElement, UIElement, child) RenderElement(child);
 	RenderText(ui.windowElement->text, {0, 0});
 	RenderImage(ui.windowElement->image, {0, 0});	
 }
@@ -344,26 +336,23 @@ void UICreateWindowFullScreen(Arena* arena, const char* title, uint32 background
 UIElement* UICreateElement(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
 	UIElement* element = (UIElement*)FixedSizeAlloc(&ui.allocator);
-	ui.elementCount++;
-	if (parent == NULL) parent = ui.windowElement;
 
-	if (parent->last) parent->last->next = element;
-	else parent->first = element;
-	element->prev = parent->last;
-	parent->last = element;
+	ui.elementCount++;
+
+	if (parent == NULL) parent = ui.windowElement;
+	LINKEDLIST_ADD(parent, element);
 	element->parent = parent;
 	return element;
 }
 
 void UIDestroyElement(UIElement* element) {
-	if (element->prev) element->prev->next = element->next;
-	else element->parent->first = element->next;
-	if (element->next) element->next->prev = element->prev;
-	else element->parent->last = element->prev;
 	ui.elementCount--;
-	for (UIElement* child = element->first; child != NULL; child = child->next)
-		UIDestroyElement(child);
 
+	LINKEDLIST_REMOVE(element->parent, element);
+	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
+
+	FixedSizeFree(&ui.allocator, element->text);
+	FixedSizeFree(&ui.allocator, element->image);
 	FixedSizeFree(&ui.allocator, element);
 }
 
@@ -371,6 +360,7 @@ UIText* UICreateText(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
 	UIText* text = (UIText*)FixedSizeAlloc(&ui.allocator);
 	ui.elementCount++;
+
 	if (parent) parent->text = text;
 	else ui.windowElement->text = text;
 	return text;
@@ -380,6 +370,7 @@ UIImage* UICreateImage(UIElement* parent) {
 	if (ui.elementCount == ui.capacity) return NULL;
 	UIImage* image = (UIImage*)FixedSizeAlloc(&ui.allocator);
 	ui.elementCount++;
+
 	if (parent) {
 		parent->image = image;
 		image->dim = parent->dim;
@@ -494,7 +485,7 @@ UIElement* UICreateButton(UIElement* parent, Dimensions2i dim) {
 
 void __choose(UIElement* e) {
 	UIElement* parent = e->parent;
-	for (UIElement* child = parent->first; child != NULL; child = child->next) {
+	LINKEDLIST_FOREACH(parent, UIElement, child) {
 		child->background = RGBA_LIGHTGREY;
 		child->onHover = __hover;
 	}
@@ -504,7 +495,7 @@ void __choose(UIElement* e) {
 }
 
 void __fit(UIElement* e) {
-	for (UIElement* child = e->first; child != NULL; child = child->next) {
+	LINKEDLIST_FOREACH(e, UIElement, child) {
 		Dimensions2i dim = child->dim;
 		UIElement* body = child->first;
 		body->height = e->height - (dim.height+1);

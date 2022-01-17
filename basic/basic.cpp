@@ -1,6 +1,7 @@
 #include "numbers.cpp"
 #include "intrinsics.cpp"
 #include "string.cpp"
+#include "linkedlist.cpp"
 
 #include <Windows.h>
 #define ASSERT(Expression) 		do{if(!(Expression)) {*(volatile int *)0 = 0;}}while(0)
