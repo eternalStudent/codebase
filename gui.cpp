@@ -5,6 +5,7 @@
 #define UI_CLICKABLE        4
 #define UI_HIDDEN			8
 #define UI_CENTER           16
+#define UI_RIGHT			32
 
 #include "font.cpp"
 
@@ -100,14 +101,22 @@ struct {
 } ui;
 
 Box2i GetAbsolutePosition(UIElement* element) {
-	if (element->parent == 0)
-		return Box2i{element->x, element->y, element->x+element->width, element->y+element->height};
+	if (element->parent == NULL) return {0, 0, element->width, element->height};
+	Box2i parent = GetAbsolutePosition(element->parent);
 
-	Point2i parent = GetAbsolutePosition(element->parent).p0;
-	Box2i result;
-	result.p0 = MOVE2(element->pos, parent);
-	result.p1 = MOVE2(result.p0, element->dim);
-	return result;
+	if (element->flags & UI_RIGHT) {
+		ASSERT(1);
+	}
+
+	return (element->flags & UI_RIGHT)
+		? Box2i{parent.x1 - element->x - element->width, 
+				parent.y0 + element->y, 
+				parent.x1 - element->x,
+				parent.y0 + element->y + element->height}
+		: Box2i{parent.x0 + element->x,
+				parent.y0 + element->y,
+				parent.x0 + element->x + element->width,
+				parent.y0 + element->y + element->height};
 }
 
 bool IsInBottomRight(UIElement* element, Point2i pos) {
