@@ -8,4 +8,4 @@
 											if ((n)->next) (n)->next->prev = (n)->prev;\
 											else (list)->last = (n)->prev;}while(0)
 
-#define LINKEDLIST_FOREACH(list, t, child)	for(t* child = (list)->first; child != NULL; child = child->next)
+#define LINKEDLIST_FOREACH(list, t, n)		for(t* n = (list)->first; n != NULL; n = n->next)
