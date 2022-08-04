@@ -12,6 +12,7 @@
 #define GenerateTexture						OpenGLGenerateTexture
 #define UpdateTextureData					OpenGLUpdateTextureData
 #define DrawImage							OpenGLDrawImage
+#define DrawImageMono						OpenGLDrawImageMono
 #define DrawBox2							OpenGLDrawBox2
 #define DrawLine							OpenGLDrawLine
 #define DrawCircle							OpenGLDrawCircle

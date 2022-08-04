@@ -17,6 +17,7 @@ Image LoadImage(Arena* arena, const char* filepath) {
 
 typedef Point4 Color;
 
+#define RGBA_BLACK          0xff000000
 #define RGBA_WHITE          0xffffffff
 #define RGBA_LIGHTGREY      0xff7e7872
 #define RGBA_GREY           0xff5e574f

@@ -241,6 +241,7 @@ BOOL Win32OpenGLSwapBuffers() {
 
 #define GL_CLAMP_TO_EDGE 				  0x812F
 
+#define GL_RG 							  0x8227
 #define GL_DEBUG_OUTPUT_SYNCHRONOUS       0x8242
 
 #define GL_TEXTURE0                       0x84C0

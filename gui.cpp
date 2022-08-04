@@ -1,10 +1,10 @@
 #define UI_FLIPY(y)        (ui.windowElement->height-(y)-1)         
 
-#define UI_MOVABLE          1
-#define UI_RESIZABLE        2
-#define UI_CLICKABLE        4
+#define UI_MOVABLE			1
+#define UI_RESIZABLE		2
+#define UI_CLICKABLE		4
 #define UI_HIDDEN			8
-#define UI_CENTER           16
+#define UI_CENTER			16
 #define UI_RIGHT			32
 
 #include "font.cpp"

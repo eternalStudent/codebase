@@ -4,6 +4,7 @@
 struct {
 	GLuint drawImage;
 	GLuint drawShape;
+	GLuint drawMono;
 	uint32 rgba;
 	Arena* arena;
 } opengl;
@@ -52,7 +53,17 @@ GLuint OpenGLGenerateTexture(Image image, GLint filter) {
 	GLuint texture;
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data);
+	static GLenum formats[] = {GL_RED, GL_RG, GL_RGB, GL_RGBA};
+	glTexImage2D(
+		GL_TEXTURE_2D, 
+		0, 
+		formats[image.channels - 1], 
+		image.width, 
+		image.height, 
+		0, 
+		formats[image.channels - 1], 
+		GL_UNSIGNED_BYTE, 
+		image.data);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -98,6 +109,23 @@ void main()
 } 
 	)STRING";
 	opengl.drawImage = CreateProgram(vertexSource, fragmentSource);
+
+	fragmentSource = (GLchar*)R"STRING(
+#version 330 core
+in vec2 TexCoords;
+out vec4 color;
+  
+uniform vec4 background;
+uniform vec4 foreground;
+uniform sampler2D image;
+
+void main()
+{
+	float channel = texture(image, TexCoords).r;
+    color = channel*foreground + (1.0-channel)*background;
+}   
+	)STRING";
+	opengl.drawMono = CreateProgram(vertexSource, fragmentSource);
 
 	vertexSource = (GLchar*)R"STRING(
 #version 330 core
@@ -192,6 +220,60 @@ void OpenGLDrawImage(GLuint texture, Box2 crop, Box2 pos) {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUniform1i(glGetUniformLocation(opengl.drawImage, "image"), 0);
+
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	glDeleteVertexArrays(1, &verticesHandle);
+	glDeleteBuffers(1, &buffersHandle);
+}
+
+void OpenGLDrawImageMono(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint32 foreground) {
+	Point2 p0 = AdjustCoordinates(pos.p0);
+	Point2 p1 = AdjustCoordinates(pos.p1);
+
+	float32 bottomTex = crop.y0;
+	float32 topTex = crop.y1;
+	float32 rightTex = crop.x1;
+	float32 leftTex = crop.x0;
+
+	float32 vertices[] = {
+		// pos            // tex
+		p1.x, p0.y,       rightTex, bottomTex,   // bottom-right
+		p0.x, p1.y,       leftTex, topTex,       // top-left
+		p0.x, p0.y,       leftTex, bottomTex,    // bottom-left
+
+		p0.x, p1.y,       leftTex, topTex,       // top-left
+		p1.x, p1.y,       rightTex, topTex,      // top-right
+		p1.x, p0.y,       rightTex, bottomTex    // bottom-right
+	};
+
+	GLsizeiptr size = sizeof(vertices);
+	GLuint buffersHandle;
+	glGenBuffers(1, &buffersHandle);
+	glBindBuffer(GL_ARRAY_BUFFER, buffersHandle);
+	glBufferData(GL_ARRAY_BUFFER, size, vertices, GL_STATIC_DRAW);
+
+	GLuint verticesHandle;
+	glGenVertexArrays(1, &verticesHandle);
+	glBindVertexArray(verticesHandle);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float32), NULL);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glUseProgram(opengl.drawMono);
+	
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glUniform1i(glGetUniformLocation(opengl.drawMono, "image"), 0);
+
+	GLint location = glGetUniformLocation(opengl.drawMono, "background");
+	Color color = RgbaToColor(background);
+	glUniform4f(location, color.r, color.g, color.b, color.a);
+
+	location = glGetUniformLocation(opengl.drawMono, "foreground");
+	color = RgbaToColor(foreground);
+	glUniform4f(location, color.r, color.g, color.b, color.a);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 

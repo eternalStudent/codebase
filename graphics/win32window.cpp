@@ -4,6 +4,8 @@ struct {
 	BOOL destroyed;
 	BYTE keys[256];
 	BYTE mouse[3];
+	BYTE keys_prev[256];
+	BYTE mouse_prev[3];
 } _window;
 
 HWND Win32GetWindowHandle() {
@@ -16,6 +18,10 @@ Dimensions2i Win32GetWindowDimensions() {
 
 BOOL Win32IsKeyDown(DWORD key) {
 	return _window.keys[key] == 1;
+}
+
+BOOL Win32IsKeyPressed(DWORD key) {
+	return _window.keys[key] == 1 && _window.keys_prev[key] == 0;
 }
 
 BOOL Win32IsMouseDown(DWORD mouse) {
@@ -177,6 +183,10 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 }
 
 void Win32HandleWindowEvents() {
+	for (int32 i = 0; i < 256; i++) _window.keys_prev[i] = _window.keys[i];
+	_window.mouse_prev[0] = _window.mouse[0];
+	_window.mouse_prev[1] = _window.mouse[1];
+	_window.mouse_prev[2] = _window.mouse[2];
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 	{
