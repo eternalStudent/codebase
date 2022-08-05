@@ -68,6 +68,8 @@ struct Sphere2 {
 };
 typedef Sphere2 Ball2;
 
+#include "trigonometry.cpp"
+
 Point2 PointOnSphere(Sphere2 sphere, float32 rad) {
     return {sphere.radius*cosf(rad) + sphere.center.x, 
             sphere.radius*sinf(rad) + sphere.center.y};

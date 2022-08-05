@@ -155,14 +155,16 @@ struct String {
 
 bool StringEquals(String str1, String str2) {
 	if (str1.length != str2.length) return false;
-	return (memcmp(str1.data, str2.data, str1.length) == 0);
+	for (int64 i = 0; i < str1.length; i++)
+		if (str1.data[i] != str2.data[i]) return false;
+	return true;
 }
 
 int32 StringSplit(String text, String separator, String* buffer) {
 	int32 j = 0;
 	buffer[0].data = text.data;
 	for (int32 i = 0; i < text.length - separator.length;) {
-		if (memcmp(text.data+i, separator.data, separator.length) == 0) {
+		if (StringEquals({text.data+i, separator.length}, separator)) {
 			buffer[j].length = text.data+i - buffer[j].data;
 			j++;
 			i+=(int32)separator.length;

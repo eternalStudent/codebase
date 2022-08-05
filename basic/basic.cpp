@@ -17,6 +17,10 @@
 #  define alignof	__alignof__
 #endif
 
+#ifdef _MSC_VER
+extern "C" int _fltused = 0;
+#endif
+
 union opaque64 {
 	void* p;
 	float64 f;

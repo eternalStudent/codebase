@@ -1,8 +1,25 @@
 #include <emmintrin.h>
-#include <memory.h>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 #include <intrin.h>
+extern "C" void* memset(void* dst, int src, size_t size);
+extern "C" void* memcpy(void* dst, const void* src, size_t size);
+
+#pragma function(memset)
+extern "C" void* memset(void* dst, int src, size_t size)
+{
+    __stosb((unsigned char*)dst, (unsigned char)src, size);
+    return dst;
+}
+#pragma function(memcpy)
+extern "C" void* memcpy(void* dst, const void* src, size_t size)
+{
+    __movsb((unsigned char*)dst, (unsigned char*)src, size);
+    return dst;
+}
+#else
+#include <memory.h>
+#include <smmintrin.h>
 #endif
 
 int32 HighBit(uint32 value, int32 onZero) {
@@ -56,4 +73,16 @@ int32 BitCount(uint32 value) {
     value = (value + (value >> 16)); // max 32 per 8 bits
     return value & 0xff;
 #endif
+}
+
+float32 sqrt(float32 value) {
+    return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(value)));
+} 
+
+float32 floor(float32 value) {
+    return _mm_cvtss_f32(_mm_floor_ss(_mm_setzero_ps(), _mm_set_ss(value)));
+}
+
+float32 ceil(float32 value) {
+    return _mm_cvtss_f32(_mm_ceil_ss(_mm_setzero_ps(), _mm_set_ss(value)));
 }

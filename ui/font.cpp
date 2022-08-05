@@ -38,11 +38,11 @@ void DrawText(Font* font, float32 x, float32 y, String string){
          float32 ipw = 1.0f / pw, iph = 1.0f / ph; // NOTE: division takes longer than multipication, this runs division at compile time.
          BakedChar* bakedchar = font->chardata + (b - first_char);
 
-         float32 round_y = floorf(y + bakedchar->yoff + 0.5f);
+         float32 round_y = floor(y + bakedchar->yoff + 0.5f);
          float32 y1 = round_y + bakedchar->y1 - bakedchar->y0;
          float32 printy = 2*y - y1;
 
-         float32 round_x = floorf(x + bakedchar->xoff + 0.5f);
+         float32 round_x = floor(x + bakedchar->xoff + 0.5f);
 
          float32 width = (float32)(bakedchar->x1 - bakedchar->x0);
          float32 height = (float32)(bakedchar->y1 - bakedchar->y0);
