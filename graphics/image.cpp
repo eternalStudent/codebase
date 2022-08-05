@@ -7,7 +7,6 @@ struct Image {
     byte* data;
 };
 
-#include "binary_reader.cpp"
 #include "bitmap.cpp"
 
 Image LoadImage(Arena* arena, const char* filepath) {

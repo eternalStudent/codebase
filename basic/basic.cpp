@@ -11,6 +11,7 @@
 #include "memory.cpp"
 #include "io.cpp"
 #include "time.cpp"
+#include "binary_reader.cpp"
 
 #if defined(__clang__) || defined(__GNUC__)
 #  define alignof	__alignof__
