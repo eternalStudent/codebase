@@ -1,6 +1,6 @@
 #include <emmintrin.h>
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
 #include <intrin.h>
 extern "C" void* memset(void* dst, int src, size_t size);
 extern "C" void* memcpy(void* dst, const void* src, size_t size);
