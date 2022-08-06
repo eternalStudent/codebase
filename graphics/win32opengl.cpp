@@ -224,7 +224,7 @@ BOOL Win32OpenGLInit() {
 
 	type_wglSwapIntervalEXT* wglSwapInteravl = (type_wglSwapIntervalEXT*)wglGetProcAddress("wglSwapIntervalEXT");
 	if (wglSwapInteravl) wglSwapInteravl(1);
-	else (LOG("failed to set swap interval"));
+	else LOG("failed to set swap interval");
 
 	ReleaseDC(window, dc);
 

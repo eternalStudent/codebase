@@ -3,21 +3,36 @@
 #include "string.cpp"
 #include "linkedlist.cpp"
 
-#include <Windows.h>
+#if defined(_WIN32)
+#  include <Windows.h>
+#endif
+
+#if defined(__gnu_linux__)
+#  include <fcntl.h>
+#  include <unistd.h>
+#  include <sys/stat.h>
+#  include <sys/mman.h>
+#endif
+
 #define ASSERT(Expression) 		do{if(!(Expression)) {*(volatile int *)0 = 0;}}while(0)
-#define LOG(text) 				MessageBoxA(NULL, text, "info", 0)
-#define FAIL(text)				(LOG(text), 0)
+#ifndef LOG
+#  define LOG(text) 			do{}while(0)
+#  define FAIL(text)			0
+#else
+#  define FAIL(text)			(LOG(text), 0)
+#endif
 
 #include "memory.cpp"
 #include "io.cpp"
 #include "time.cpp"
 #include "binary_reader.cpp"
+#include "array.cpp"
 
 #if defined(__clang__) || defined(__GNUC__)
 #  define alignof	__alignof__
 #endif
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
 extern "C" int _fltused = 0;
 #endif
 

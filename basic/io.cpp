@@ -1,12 +1,28 @@
-#include "win32io.cpp"
-#define File          		HANDLE
-#define OsOpenFile    		Win32OpenFile
-#define OsCreateFile 		Win32CreateFile
-#define OsReadFile    		Win32ReadFile
-#define OsWriteFile			Win32WriteFile
-#define OsGetFileSize 		Win32GetFileSize
-#define OsCloseFile   		CloseHandle
+#if defined(_WIN32)
+#  include "win32io.cpp"
+#  define File          		HANDLE
+#  define OsOpenFile    		Win32OpenFile
+#  define OsCreateFile 			Win32CreateFile
+#  define OsReadFile    		Win32ReadFile
+#  define OsWriteFile			Win32WriteFile
+#  define OsGetFileSize 		Win32GetFileSize
+#  define OsCloseFile   		CloseHandle
+#  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)
+#  define STDOUT 				GetStdHandle(STD_OUTPUT_HANDLE)
+#endif
 
+#if defined(__gnu_linux__)
+#  include "linuxio.cpp"
+#  define File          		int
+#  define OsOpenFile    		LinuxOpenFile
+#  define OsCreateFile 			LinuxCreateFile
+#  define OsReadFile    		LinuxReadFile
+#  define OsWriteFile			LinuxWriteFile
+#  define OsGetFileSize 		LinuxGetFileSize
+#  define OsCloseFile   		close
+#  define STDIN 				0
+#  define STDOUT 				1
+#endif
 
 String OsReadAll(Arena* arena, const char* path) {
 	byte* buffer = NULL;

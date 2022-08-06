@@ -1,7 +1,7 @@
 // Null-Terminated
 //-----------------
 
-int32 Uint32ToBinary(uint32 number, _Out_ char* str) {
+int32 Uint32ToBinary(uint32 number, char* str) {
 	int32 index = HighBit(number, 0);
 	int32 numberOfDigits = index + 1;
 
@@ -13,7 +13,7 @@ int32 Uint32ToBinary(uint32 number, _Out_ char* str) {
 	return numberOfDigits;
 }
 
-int32 Uint32ToHex(uint32 number, _Out_ char* str) {
+int32 Uint32ToHex(uint32 number, char* str) {
 	int32 index = HighBit(number, 0) / 4;
 	int32 numberOfDigits = index + 1;
 
@@ -73,7 +73,7 @@ inline int32 GetNumberOfDecimalDigits(uint32 number) {
 	}
 }
 
-int32 Uint32ToDecimal(uint32 number, _Out_ byte* str) {
+int32 Uint32ToDecimal(uint32 number, byte* str) {
 	int32 numberOfDigits = GetNumberOfDecimalDigits(number);
 	int32 index = numberOfDigits - 1;
 
@@ -86,7 +86,7 @@ int32 Uint32ToDecimal(uint32 number, _Out_ byte* str) {
 	return numberOfDigits;
 }
 
-int32 Int32ToDecimal(int32 number, _Out_ byte* str) {
+int32 Int32ToDecimal(int32 number, byte* str) {
 	if (number < 0) {
 		*str = '-';
 		return Uint32ToDecimal((uint32)(-number), str + 1) + 1;
@@ -95,7 +95,7 @@ int32 Int32ToDecimal(int32 number, _Out_ byte* str) {
 }
 
 // very naive implementation
-int32 Float32ToDecimal(float32 number, int32 precision, _Out_ byte* str) {
+int32 Float32ToDecimal(float32 number, int32 precision, byte* str) {
 	int32 count = 0;
 
 	// output sign

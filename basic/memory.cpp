@@ -1,6 +1,14 @@
-#include "win32memory.cpp"
-#define OsHeapAllocate			Win32HeapAllocate
-#define OsHeapFree				Win32HeapFree
+#if defined(_WIN32)
+#  include "win32memory.cpp"
+#  define OsHeapAllocate			Win32HeapAllocate
+#  define OsHeapFree				Win32HeapFree
+#endif
+
+#if defined(__gnu_linux__)
+#  include "linuxmemory.cpp"
+#  define OsHeapAllocate			LinuxHeapAllocate
+#  define OsHeapFree				LinuxHeapFree
+#endif
 
 #include "arena.cpp"
 #include "fixedsize.cpp"
