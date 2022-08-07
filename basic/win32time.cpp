@@ -8,7 +8,8 @@ struct {
 	BOOL isRunning; // for debug
 } stopwatch;
 
-void Win32TimeInit() {                       
+void Win32TimeInit() {     
+	stopwatch = {};                  
 	BOOL succeeded = QueryPerformanceFrequency(&stopwatch.frequency);            
 	if (!succeeded) {
 		LOG("failed querying performance frquency");
@@ -34,11 +35,13 @@ float64 Win32TimePause() {
  
 float64 Win32TimeStop() {
 	ASSERT(stopwatch.isRunning);
-	LONGLONG elapsedMilliseconds = stopwatch.elapsed*TICKS_PER_MILLISECOND;
+	LARGE_INTEGER endTimeStamp;
+	QueryPerformanceCounter(&endTimeStamp);                 
+	LONGLONG elapsed = stopwatch.elapsed + endTimeStamp.QuadPart - stopwatch.startTimeStamp.QuadPart;
 	stopwatch.elapsed = 0;
 	stopwatch.isRunning = FALSE;
-	stopwatch.startTimeStamp.QuadPart = 0;
 
+	LONGLONG elapsedMilliseconds = elapsed*TICKS_PER_MILLISECOND;
 	return ((float64)elapsedMilliseconds)/FREQUENCY;
 }
  
