@@ -5,6 +5,7 @@
 #endif
 
 #if defined(__gnu_linux__)
+#  include <sys/mman.h>
 #  include "linuxmemory.cpp"
 #  define OsHeapAllocate			LinuxHeapAllocate
 #  define OsHeapFree				LinuxHeapFree

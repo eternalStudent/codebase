@@ -71,8 +71,8 @@ typedef Sphere2 Ball2;
 #include "trigonometry.cpp"
 
 Point2 PointOnSphere(Sphere2 sphere, float32 rad) {
-    return {sphere.radius*cosf(rad) + sphere.center.x, 
-            sphere.radius*sinf(rad) + sphere.center.y};
+    return {sphere.radius*cos(rad) + sphere.center.x, 
+            sphere.radius*sin(rad) + sphere.center.y};
 }
 
 union Point3 {

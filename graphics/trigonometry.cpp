@@ -20,7 +20,7 @@ float32 _cos(float32 x) {
 	return data1.f + x2*(data2.f + x2*(data3.f + x2*data4.f));
 }
 
-float32 sinf(float32 x) {
+float32 sin(float32 x) {
 	bool negate = false;
 
 	// x in -infty, infty
@@ -55,7 +55,7 @@ float32 sinf(float32 x) {
 	return negate ? -y : y;
 }
 
-float32 cosf(float32 x) {
+float32 cos(float32 x) {
 	bool negate = false;
 
 	// x in -infty, infty

@@ -7,7 +7,6 @@
 #define GRAPHICS_SMOOTH 					GL_LINEAR
 #define GRAPHICS_PIXELATED					GL_NEAREST
 
-#define GraphicsSwapBuffers					Win32OpenGLSwapBuffers
 #define GraphicsInit						OpenGLInit
 #define GenerateTexture						OpenGLGenerateTexture
 #define UpdateTextureData					OpenGLUpdateTextureData
@@ -23,6 +22,7 @@
 #define GraphicsCropScreen					glScissor
 #define GraphicsClearCrop					OpenGlClearCrop
 #define GraphicsSetColor					OpenGLSetColor
+#define GraphicsSwapBuffers					OsOpenGLSwapBuffers
 
 
 TextureId LoadTexture(Arena* arena, const char* filePath, Filter filter){

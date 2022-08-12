@@ -1,5 +1,14 @@
-#include "win32opengl.cpp"
-#define OsOpenGLInit	Win32OpenGLInit
+#if defined(_Win32)
+#  include "win32opengl.cpp"
+#  define OsOpenGLInit			Win32OpenGLInit
+#  define OsOpenGLSwapBuffers	Win32OpenGLSwapBuffers
+#endif
+
+#if defined(__gnu_linux__)
+#  include "linuxopengl.cpp"
+#  define OsOpenGLInit			LinuxOpenGLInit
+#  define OsOpenGLSwapBuffers	LinuxOpenGLSwapBuffers
+#endif
 
 struct {
 	GLuint drawImage;

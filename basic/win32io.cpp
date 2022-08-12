@@ -10,8 +10,6 @@ HANDLE Win32OpenFile(LPCSTR filePath) {
     ); 
     if (hFile == INVALID_HANDLE_VALUE) {
         LOG("failed to open file");
-        CloseHandle(hFile);
-        return NULL;
     }
     return hFile;
 }
@@ -28,8 +26,6 @@ HANDLE Win32CreateFile(LPCSTR filePath) {
     ); 
     if (hFile == INVALID_HANDLE_VALUE) {
         LOG("failed to open file");
-        CloseHandle(hFile);
-        return NULL;
     }
     return hFile;
 }

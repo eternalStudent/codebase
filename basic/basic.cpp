@@ -8,10 +8,7 @@
 #endif
 
 #if defined(__gnu_linux__)
-#  include <fcntl.h>
 #  include <unistd.h>
-#  include <sys/stat.h>
-#  include <sys/mman.h>
 #endif
 
 #define ASSERT(Expression) 		do{if(!(Expression)) {*(volatile int *)0 = 0;}}while(0)

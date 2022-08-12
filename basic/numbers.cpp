@@ -21,9 +21,9 @@ typedef uint64_t uint64;
 typedef float float32;
 typedef double float64;
 
-#define MIN(x,y) (x)<(y)?(x):(y)
-#define MAX(x,y) (x)<(y)?(y):(x)
-#define ABS(x)   (x)<0? -(x):(x)
+#define MIN(x,y) ((x)<(y)?(x):(y))
+#define MAX(x,y) ((x)<(y)?(y):(x))
+#define ABS(x)   ((x)<0? -(x):(x))
 
 inline float32 INF32() {
 	union {uint32 u; float32 f;} data;
