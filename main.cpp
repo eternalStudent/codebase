@@ -1,25 +1,28 @@
-#define LOG(text)	write(1, text, sizeof(text)-1)
-
 #include "basic/basic.cpp"
 #include "graphics/graphics.cpp"
 #include "ui/ui.cpp"
 
 int main() {
-	OsCreateWindow("OpenGL Window", 512, 512);
+	Arena scratch = CreateArena(1024*1024);
+	Arena persist = CreateArena(1024*1024);
 
-	Arena scratch = CreateArena(1024);
-	GraphicsInit(&scratch);
-	GraphicsSetColor(0x0000ff);
+	UIInit(&persist, &scratch);
+	UICreateWindow("OpenGL Window", {512, 512}, RGBA_DARKGREY);
+	UIElement* element1 = UICreateElement(NULL);
+	element1->background = RGBA_BLUE;
+	element1->pos = {200, 200};
+	element1->dim = {64, 64};
+	element1->flags = UI_MOVABLE;
 
-	while(true) {
-		OsHandleWindowEvents();
-		if (OsWindowDestroyed() || IsKeyDown(KEY_ESC)) break; 
+	while(!OsWindowDestroyed() && !IsKeyDown(KEY_ESC)) {
+		OsProcessWindowEvents();
 
-		GraphicsClearScreen();
+		GfxClearScreen();
 
-		if (!GraphicsSwapBuffers()) {
-			LOG("Failed to swap OpenGL buffers!");
-		}
+		UIUpdateElements();
+		UIRenderElements();
+
+		GfxSwapBuffers();
 	}
 }
 

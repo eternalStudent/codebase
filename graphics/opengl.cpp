@@ -1,4 +1,4 @@
-#if defined(_Win32)
+#if defined(_WIN32)
 #  include "win32opengl.cpp"
 #  define OsOpenGLInit			Win32OpenGLInit
 #  define OsOpenGLSwapBuffers	Win32OpenGLSwapBuffers

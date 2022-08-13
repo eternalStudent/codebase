@@ -236,7 +236,10 @@ BOOL Win32OpenGLSwapBuffers() {
 	if (dc == NULL)
 		return FAIL("failed to get current DC");
 
-	return SwapBuffers(dc);
+	BOOL ok = SwapBuffers(dc);
+	if (!ok)
+		LOG("failed to swap buffers");
+	return ok;
 }
 
 #define GL_CLAMP_TO_EDGE 				  0x812F

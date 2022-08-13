@@ -173,5 +173,8 @@ EGLBoolean LinuxOpenGLSwapBuffers() {
 	if (display == EGL_NO_DISPLAY)
 		return FAIL("Failed to get EGL display");
 
-	return eglSwapBuffers(display, eglGetCurrentSurface(EGL_READ));
+	EGLBoolean ok = eglSwapBuffers(display, eglGetCurrentSurface(EGL_READ));
+	if(!ok)
+		LOG("Fail to swap buffers");
+	return ok;
 }

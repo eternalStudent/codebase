@@ -279,7 +279,7 @@ void RenderImage(UIImage* image, Point2i parentPos) {
 
 	Point2i p0 = MOVE2(image->pos, parentPos);
 	Box2 renderBox = Box2{(float32)p0.x, (float32)UI_FLIPY(p0.y+image->height), (float32)(p0.x+image->width), (float32)UI_FLIPY(p0.y)};
-	DrawImage(image->atlas, image->crop, renderBox);
+	GfxDrawImage(image->atlas, image->crop, renderBox);
 }
 
 int32 __center(UIElement* element) {
@@ -292,14 +292,14 @@ void RenderElement(UIElement* element) {
 	Box2i box = GetAbsolutePosition(element);
 	Box2 renderBox = Box2{(float32)box.x0, (float32)UI_FLIPY(box.y1), (float32)box.x1, (float32)UI_FLIPY(box.y0)};
 	if (element->radius) {
-		DrawBox2Rounded(element->background, renderBox, element->radius);
+		GfxDrawBox2Rounded(element->background, renderBox, element->radius);
 		if (element->borderWidth && element->borderColor) 
-			DrawBox2RoundedLines(element->borderColor, element->borderWidth, renderBox, element->radius);
+			GfxDrawBox2RoundedLines(element->borderColor, element->borderWidth, renderBox, element->radius);
 	}
 	else {
-		DrawBox2(element->background, renderBox);
+		GfxDrawBox2(element->background, renderBox);
 		if (element->borderWidth && element->borderColor) 
-			DrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
+			GfxDrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
 	}
 	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
 	RenderText(element->text, box.p0);
@@ -327,18 +327,18 @@ void UISetWindowElement(uint32 background) {
 	ui.windowElement = (UIElement*)FixedSizeAlloc(&ui.allocator);
 	ui.windowElement->pos = {0, 0};
 	ui.windowElement->background = background;
-	GraphicsSetColor(background);
+	GfxSetColor(background);
 }
 
-void UICreateWindow(Arena* arena, const char* title, Dimensions2i dimensions, uint32 background) {
+void UICreateWindow(const char* title, Dimensions2i dimensions, uint32 background) {
 	OsCreateWindow(title, dimensions.width, dimensions.height);
-	GraphicsInit(arena);
+	GfxInit(ui.arena);
 	UISetWindowElement(background);
 }
 
-void UICreateWindowFullScreen(Arena* arena, const char* title, uint32 background) {
+void UICreateWindowFullScreen(const char* title, uint32 background) {
 	OsCreateWindowFullScreen(title);
-	GraphicsInit(arena);
+	GfxInit(ui.arena);
 	UISetWindowElement(background);
 }
 
@@ -388,7 +388,8 @@ UIImage* UICreateImage(UIElement* parent) {
 	return image;
 }
 
-UIElement* UIUpdateElements(Point2i cursorPos){
+UIElement* UIUpdateElements(){
+	Point2i cursorPos = OsGetCursorPosition();
 	ui.windowElement->dim = OsGetWindowDimensions();
 	HandleCursorPosition(cursorPos);
 	HandleMouseEvent(cursorPos);
@@ -399,7 +400,7 @@ UIElement* UIUpdateElements(Point2i cursorPos){
 void UIDrawLine(Point2i p0, Point2i p1, uint32 rgba, float32 lineWidth) {
 	Point2 points[2] = {{(float32)p0.x, (float32)UI_FLIPY(p0.y)}, {(float32)p1.x, (float32)UI_FLIPY(p1.y)}};
 	Line2 line = {points, 2};
-	DrawLine(rgba, lineWidth, line);
+	GfxDrawLine(rgba, lineWidth, line);
 }
 
 Box2i UIGetAbsolutePosition(UIElement* element) {

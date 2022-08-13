@@ -182,7 +182,7 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 	SetWindowLong(_window.handle, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
 }
 
-void Win32HandleWindowEvents() {
+void Win32ProcessWindowEvents() {
 	for (int32 i = 0; i < 256; i++) _window.keys_prev[i] = _window.keys[i];
 	_window.mouse_prev[0] = _window.mouse[0];
 	_window.mouse_prev[1] = _window.mouse[1];
@@ -199,28 +199,40 @@ void Win32SetCursorIcon(LPCSTR icon) {
 	SetCursor(LoadCursorA(NULL, icon));
 }
 
-BOOL Win32OpenFileDialog(LPSTR path, DWORD max) {
+HANDLE Win32OpenFileDialog() {
+	STR path[MAX_PATH];
 	OPENFILENAME dialog = {};
 	dialog.lStructSize = sizeof(OPENFILENAME);
 	path[0] = 0;
 	dialog.lpstrFile = path;
-	dialog.nMaxFile = max;
+	dialog.nMaxFile = MAX_PATH;
 	dialog.hwndOwner = _window.handle;
 	dialog.Flags = OFN_FILEMUSTEXIST;
 	dialog.Flags |= OFN_NOCHANGEDIR;
-	return GetOpenFileName(&dialog);
+	BOOL success = GetOpenFileName(&dialog);
+	if (!success) {
+		LOG("failed to get save file name");
+		return INVALID_HANDLE_VALUE ;
+	}
+	return Win32OpenFile(path);
 }
 
-BOOL Win32SaveFileDialog(LPSTR path, DWORD max) {
+HANDLE Win32SaveFileDialog() {
+	STR path[MAX_PATH];
 	OPENFILENAME dialog = {};
 	dialog.lStructSize = sizeof(OPENFILENAME);
 	path[0] = 0;
 	dialog.lpstrFile = path;
-	dialog.nMaxFile = max;
+	dialog.nMaxFile = MAX_PATH;
 	dialog.hwndOwner = _window.handle;
 	dialog.Flags = OFN_OVERWRITEPROMPT;
 	dialog.Flags |= OFN_NOCHANGEDIR;
-	return GetSaveFileName(&dialog);
+	BOOL success = GetSaveFileName(&dialog);
+	if (!success) {
+		LOG("failed to get save file name");
+		return INVALID_HANDLE_VALUE ;
+	}
+	return Win32CreateFile(path);
 }
 
 Point2i Win32GetCursorPosition() {

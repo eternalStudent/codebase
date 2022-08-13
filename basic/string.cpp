@@ -176,7 +176,7 @@ int32 StringSplit(String text, String separator, String* buffer) {
 	return j+1;
 }
 
-int64 AnsiToInt64(String str) {
+int64 ParseInt64(String str) {
 	int64 result = 0;
 	int32 start = str.data[0] == '-' ? 1 : 0;
 	for (int32 i = start; i < str.length; i++) {
@@ -188,7 +188,7 @@ int64 AnsiToInt64(String str) {
 	return result;
 }
 
-float64 AnsiToFloat64(String str) {
+float64 ParseFloat64(String str) {
 	float64 result = 0.0;
 	int32 start = str.data[0] == '-' ? 1 : 0;
 	bool radix = false;
@@ -204,7 +204,7 @@ float64 AnsiToFloat64(String str) {
 			int32 j = str.data[i+1] == '+' ? i+2 : i+1;
 			exp.data = &str.data[j];
 			exp.length = str.length - j;
-			result *= pow10((int32)AnsiToInt64(exp));
+			result *= pow10((int32)ParseInt64(exp));
 			break;
 		}
 		if (radix) {

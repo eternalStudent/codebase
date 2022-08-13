@@ -101,7 +101,7 @@ void LinuxCreateWindowFullScreen(const char* title) {
 	LinuxEnterFullScreen();
 }
 
-void LinuxHandleWindowEvents() {
+void LinuxProcessWindowEvents() {
 	for (int32 i = 0; i < 256; i++) window.keys_prev[i] = window.keys[i];
 	window.mouse_prev[0] = window.mouse[0];
 	window.mouse_prev[1] = window.mouse[1];
@@ -196,6 +196,42 @@ Dimensions2i LinuxGetWindowDimensions() {
 	return window.dim;
 }
 
+// TODO: preload cursors
 void LinuxSetCursorIcon(unsigned int shape) {
 	XDefineCursor(window.display, window.window, XCreateFontCursor(window.display, shape));
+}
+
+Point2i LinuxGetCursorPosition() {
+	return window.cursorPos;
+}
+
+int OpenPipe(const char* cmd) {
+	int pipefd[2];
+	pipe(pipefd);
+	int write_end = pipefd[1];
+    int read_end = pipefd[0];
+	int pid = fork();
+	if (pid = -1) {
+		LOG("failed to create new process");
+		close(write_end);
+		return -1;
+	}
+	else if (pid == 0) {
+		close(read_end);
+		dup2(write_end, 1);
+        close(write_end);
+        execl("/bin/sh", "sh", "-c", cmd, NULL);
+        exit(127);
+	}
+
+	close(write_end);
+	return read_end;
+}
+
+int LinuxOpenFileDialog() {
+	return OpenPipe("zenity --file-selection");
+}
+
+int LinuxSaveFileDialog() {
+	return OpenPipe("zenity --file-selection --save");
 }

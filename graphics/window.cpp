@@ -2,7 +2,7 @@
 #define MOUSE_M 					1
 #define MOUSE_R 					2
 
-#if defined(_Win32)
+#if defined(_WIN32)
 #  include "win32window.cpp"
 #  define CursorIcon				LPCSTR
 #  define CUR_MOVE					IDC_SIZEALL	 					
@@ -26,7 +26,7 @@
 #  define OsGetWindowHandle			Win32GetWindowHandle
 #  define OsCreateWindow			Win32CreateWindow
 #  define OsCreateWindowFullScreen	Win32CreateWindowFullScreen
-#  define OsHandleWindowEvents		Win32HandleWindowEvents
+#  define OsProcessWindowEvents		Win32ProcessWindowEvents
 #  define OsSetCursorIcon			Win32SetCursorIcon
 #  define OsExitFullScreen			Win32ExitFullScreen
 #  define OsEnterFullScreen			Win32EnterFullScreen
@@ -51,10 +51,11 @@
 #  define OsGetWindowDimensions		LinuxGetWindowDimensions
 #  define OsCreateWindow			LinuxCreateWindow
 #  define OsCreateWindowFullScreen	LinuxCreateWindowFullScreen
-#  define OsHandleWindowEvents		LinuxHandleWindowEvents
+#  define OsProcessWindowEvents		LinuxProcessWindowEvents
 #  define OsWindowDestroyed			LinuxWindowDestroyed
 #  define OsGetWindowHandle			LinuxGetWindowHandle
 #  define OsSetCursorIcon			LinuxSetCursorIcon
+#  define OsGetCursorPosition 		LinuxGetCursorPosition
 
 #  define CursorIcon				unsigned int
 #  define CUR_MOVE					XC_fleur				
@@ -77,4 +78,7 @@
 #  define IsMouseDown 				LinuxIsMouseDown
 #  define IsKeyDown					LinuxIsKeyDown
 #  define IsKeyPressed				LinuxIsKeyPressed
+
+#  define OsOpenFileDialog			LinuxOpenFileDialog
+#  define OsSaveFileDialog			LinuxSaveFileDialog
 #endif

@@ -54,7 +54,7 @@ void DrawText(Font* font, float32 x, float32 y, String string){
             bakedchar->x1 * ipw,
             bakedchar->y0 * iph};
 
-         DrawImage(font->texture, crop, pos);
+         GfxDrawImage(font->texture, crop, pos);
 
          x += bakedchar->xadvance;
       }
