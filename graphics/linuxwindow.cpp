@@ -18,6 +18,7 @@ struct {
 	Point2i cursorPos;
 	Dimensions2i dim;
 	Window root;
+	unsigned int cursorIcon;
 } window;
 
 void _internalCreateWindow(Window root, const char* title, int width, int height) {
@@ -196,8 +197,10 @@ Dimensions2i LinuxGetWindowDimensions() {
 	return window.dim;
 }
 
-// TODO: preload cursors
+// TODO: preload cursors?
 void LinuxSetCursorIcon(unsigned int shape) {
+	if (shape == window.cursorIcon) return;
+	window.cursorIcon = shape;
 	XDefineCursor(window.display, window.window, XCreateFontCursor(window.display, shape));
 }
 

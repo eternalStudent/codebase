@@ -97,6 +97,8 @@ struct {
 	bool isPressed;
 	bool isBottomRight;
 
+	CursorIcon cursor;
+
 	Arena* arena;
 } ui;
 
@@ -196,18 +198,19 @@ void HandleCursorPosition(Point2i cursorPos){
 		if (element)    ui.originalStyle = element->style;
 	}
 	if (cursorPos.x < ui.windowElement->width-1 && cursorPos.y < ui.windowElement->height-1)
-		OsSetCursorIcon(CUR_ARROW);
+		ui.cursor = CUR_ARROW;
 	if (element) {
 		if(IsInBottomRight(element, cursorPos) && (element->flags & UI_RESIZABLE)){
-			OsSetCursorIcon(CUR_RESIZE);
+			ui.cursor = CUR_RESIZE;
 			ui.isBottomRight = true;
 		}
 		else {
 			if (element->onHover) element->onHover(element);
-			else if (element->flags & UI_CLICKABLE) OsSetCursorIcon(CUR_HAND);
-			else if (element->flags & UI_MOVABLE) OsSetCursorIcon(CUR_MOVE);        
+			else if (element->flags & UI_CLICKABLE) ui.cursor = CUR_HAND;
+			else if (element->flags & UI_MOVABLE) ui.cursor = CUR_MOVE;        
 		}
 	}
+	OsSetCursorIcon(ui.cursor);
 }
 
 void HandleMouseEvent(Point2i cursorPos) {
@@ -314,6 +317,7 @@ void UIInit(Arena* persist, Arena* scratch) {
 	ui.allocator = CreateFixedSize(persist, capacity, sizeof(UIElement));
 	ui.capacity = capacity;
 	ui.arena = scratch;
+	ui.cursor = CUR_ARROW;
 }
 
 void UIRenderElements() {
