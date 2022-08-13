@@ -200,7 +200,7 @@ void Win32SetCursorIcon(LPCSTR icon) {
 }
 
 HANDLE Win32OpenFileDialog() {
-	STR path[MAX_PATH];
+	CHAR path[MAX_PATH];
 	OPENFILENAME dialog = {};
 	dialog.lStructSize = sizeof(OPENFILENAME);
 	path[0] = 0;
@@ -218,7 +218,7 @@ HANDLE Win32OpenFileDialog() {
 }
 
 HANDLE Win32SaveFileDialog() {
-	STR path[MAX_PATH];
+	CHAR path[MAX_PATH];
 	OPENFILENAME dialog = {};
 	dialog.lStructSize = sizeof(OPENFILENAME);
 	path[0] = 0;
