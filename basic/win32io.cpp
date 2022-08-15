@@ -38,7 +38,7 @@ DWORD Win32ReadFile(HANDLE hFile, LPVOID buffer, DWORD maxBytesToRead) {
     return bytesRead;
 }
 
-DWORD Win32WriteFile(HANDLE hFile, LPVOID buffer, DWORD maxBytesToWrite){
+DWORD Win32WriteFile(HANDLE hFile, LPVOID buffer, DWORD maxBytesToWrite) {
     DWORD bytesWritten;
     if (FALSE == WriteFile(hFile, buffer, maxBytesToWrite, &bytesWritten, NULL)) {
         LOG("failed to write to file");

@@ -27,8 +27,7 @@ int main() {
 }
 
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
-void __stdcall WinMainCRTStartup()
-{
+void __stdcall WinMainCRTStartup() {
     ExitProcess(main());
 }
 #endif

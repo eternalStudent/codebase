@@ -36,7 +36,7 @@ struct BMPHeader {
     int32 extra_read;
 };
 
-int32 ParseBMPHeader(byte** data, BMPHeader* info, Image* image){
+int32 ParseBMPHeader(byte** data, BMPHeader* info, Image* image) {
     int32 hsz;
     if (ReadByte(data) != 'B' || ReadByte(data) != 'M') return 0;
     ReadUint32LittleEndian(data); // discard filesize
@@ -129,7 +129,7 @@ int32 ParseBMPHeader(byte** data, BMPHeader* info, Image* image){
 
 #define MAX_DIMENSIONS (1 << 24)
 
-Image BMPLoadImage(Arena* arena, byte* data){
+Image BMPLoadImage(Arena* arena, byte* data) {
     byte pal[256][4];
     int32 psize = 0, i, j, width;
     int32 flip_vertically, pad;

@@ -1,5 +1,3 @@
-#pragma once
-
 #include <gl/GL.h>
 
 typedef char GLchar;

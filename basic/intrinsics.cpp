@@ -1,25 +1,24 @@
 #include <emmintrin.h>
 
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
-#include <intrin.h>
+#  include <intrin.h>
 extern "C" void* memset(void* dst, int src, size_t size);
 extern "C" void* memcpy(void* dst, const void* src, size_t size);
 
 #pragma function(memset)
-extern "C" void* memset(void* dst, int src, size_t size)
-{
+extern "C" void* memset(void* dst, int src, size_t size) {
     __stosb((unsigned char*)dst, (unsigned char)src, size);
     return dst;
 }
+
 #pragma function(memcpy)
-extern "C" void* memcpy(void* dst, const void* src, size_t size)
-{
+extern "C" void* memcpy(void* dst, const void* src, size_t size) {
     __movsb((unsigned char*)dst, (unsigned char*)src, size);
     return dst;
 }
 #else
-#include <memory.h>
-#include <smmintrin.h>
+#  include <memory.h>
+#  include <smmintrin.h>
 #endif
 
 int32 HighBit(uint32 value, int32 onZero) {
@@ -58,7 +57,7 @@ int32 LowBit(uint32 value) {
     if (!(value & 0x00000001)) {n +=  1;}
     return n;
 #endif
- }
+}
 
 int32 BitCount(uint32 value) {
 #if defined(__clang__) || defined(__GNUC__)
