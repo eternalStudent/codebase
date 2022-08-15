@@ -57,7 +57,7 @@ String OsReadAll(File file, Arena* arena) {
 	if (!size) 
 		return {};
 
-	byte* buffer = (byte*)ArenaAlloc(arena, size);
+	byte* buffer = (byte*)ArenaAlloc(arena, size+1);
 	if (!buffer)
 		return {};
 
