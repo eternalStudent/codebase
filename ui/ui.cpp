@@ -6,6 +6,7 @@
 #define UI_HIDDEN			8
 #define UI_CENTER			16
 #define UI_RIGHT			32
+#define UI_CROP 			64
 
 #include "font.cpp"
 
@@ -304,9 +305,11 @@ void RenderElement(UIElement* element) {
 		if (element->borderWidth && element->borderColor) 
 			GfxDrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
 	}
+	if (element->flags & UI_CROP) GfxCropScreen(box.x0, UI_FLIPY(box.y1), box.x1, UI_FLIPY(box.y0));
 	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
 	RenderText(element->text, box.p0);
 	RenderImage(element->image, box.p0);
+	if (element->flags & UI_CROP) GfxClearCrop();
 }
 
 // API
