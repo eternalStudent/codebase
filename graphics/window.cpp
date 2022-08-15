@@ -37,6 +37,7 @@
 #  define IsKeyDown					Win32IsKeyDown
 #  define IsKeyPressed				Win32IsKeyPressed
 #  define IsMouseDown 				Win32IsMouseDown
+#  define OsGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OsWindowDestroyed			Win32WindowDestroyed
 #endif
 

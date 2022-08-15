@@ -1,12 +1,14 @@
 #define UI_FLIPY(y)        (ui.windowElement->height-(y)-1)         
 
-#define UI_MOVABLE			1
-#define UI_RESIZABLE		2
-#define UI_CLICKABLE		4
-#define UI_HIDDEN			8
-#define UI_CENTER			16
-#define UI_RIGHT			32
-#define UI_HIDE_OVERFLOW 	64
+#define UI_MOVABLE			(1 << 0)
+#define UI_RESIZABLE		(1 << 1)
+#define UI_CLICKABLE		(1 << 2)
+#define UI_HIDDEN			(1 << 3)
+#define UI_CENTER			(1 << 4)
+#define UI_RIGHT			(1 << 5)
+#define UI_HIDE_OVERFLOW 	(1 << 6)
+#define UI_SCROLLABLE		((1 << 7) + UI_HIDE_OVERFLOW)
+#define UI_FITTEXT			(1 << 8)
 
 #include "font.cpp"
 
@@ -97,7 +99,6 @@ struct {
 
 	bool isGrabbing;
 	bool isResizing;
-	bool isPressed;
 	bool isBottomRight;
 
 	CursorIcon cursor;
@@ -106,22 +107,19 @@ struct {
 } ui;
 
 Box2i GetAbsolutePosition(UIElement* element) {
-	if (element->parent == NULL) return {0, 0, element->width, element->height};
-	Box2i parent = GetAbsolutePosition(element->parent);
-
-	if (element->flags & UI_RIGHT) {
-		ASSERT(1);
-	}
+	UIElement* parent = element->parent;
+	if (parent == NULL) return {0, 0, element->width, element->height};
+	Box2i parentPos = GetAbsolutePosition(parent);
 
 	return (element->flags & UI_RIGHT)
-		? Box2i{parent.x1 - element->x - element->width, 
-				parent.y0 + element->y, 
-				parent.x1 - element->x,
-				parent.y0 + element->y + element->height}
-		: Box2i{parent.x0 + element->x,
-				parent.y0 + element->y,
-				parent.x0 + element->x + element->width,
-				parent.y0 + element->y + element->height};
+		? Box2i{parentPos.x1 - element->x - parent->scrollPos.x - element->width, 
+				parentPos.y0 + element->y - parent->scrollPos.y, 
+				parentPos.x1 - element->x - parent->scrollPos.x,
+				parentPos.y0 + element->y - parent->scrollPos.y + element->height}
+		: Box2i{parentPos.x0 + element->x - parent->scrollPos.x,
+				parentPos.y0 + element->y - parent->scrollPos.y,
+				parentPos.x0 + element->x - parent->scrollPos.x + element->width,
+				parentPos.y0 + element->y - parent->scrollPos.y + element->height};
 }
 
 bool IsInBottomRight(UIElement* element, Point2i pos) {
@@ -216,6 +214,22 @@ void HandleCursorPosition(Point2i cursorPos){
 	OsSetCursorIcon(ui.cursor);
 }
 
+UIElement* GetScrollableAnscestor(UIElement* e) {
+	while (e && !(e->flags & UI_SCROLLABLE))
+		e = e->parent;
+	return e;
+}
+
+Dimensions2i GetContentDim(UIElement* e) {
+	int32 width = 0;
+	int32 height = 0;
+	LINKEDLIST_FOREACH(e, UIElement, child) {
+		width  = MAX(child->x + child->width, width);
+		height = MAX(child->y + child->height, height);
+	}
+	return {width, height};
+}
+
 void HandleMouseEvent(Point2i cursorPos) {
 	UIElement* element = ui.active;
 	static bool mouseWasDown = false;
@@ -223,7 +237,6 @@ void HandleMouseEvent(Point2i cursorPos) {
 	if (mouseIsDown && !mouseWasDown && element) {
 		MoveToFront(element);
 		if (element->flags & UI_CLICKABLE){
-			ui.isPressed = true;
 			if (element->onClick)
 				element->onClick(element);
 		}
@@ -237,9 +250,20 @@ void HandleMouseEvent(Point2i cursorPos) {
 	else if (!mouseIsDown) {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
-		ui.isPressed = false;
 	}
 	mouseWasDown = mouseIsDown;
+
+	int32 mouseWheelDelta = OsGetMouseWheelDelta();
+	if (mouseWheelDelta) {
+		UIElement* scrollable = GetScrollableAnscestor(element);
+		if (scrollable) {
+			Dimensions2i contentDim = GetContentDim(scrollable);
+			scrollable->scrollPos.y += mouseWheelDelta / 10;
+			if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
+			if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
+				scrollable->scrollPos.y = contentDim.height - scrollable->height;
+		}
+	}
 }
 
 void UpdateActiveElement(Point2i cursorPos) {
@@ -292,9 +316,14 @@ int32 __center(UIElement* element) {
 	return (element->parent->width - element->width)/2;
 }
 
+int32 __fit_text(UIElement* element) {
+	return element->text->x + (int32)(GetTextWidth(element->text->font, element->text->string) + 0.5f);
+}
+
 void RenderElement(UIElement* element) {
 	if (element->flags & UI_HIDDEN) return;
 	if (element->flags & UI_CENTER) element->x = __center(element);
+	if (element->flags & UI_FITTEXT) element->width = __fit_text(element);
 	Box2i box = GetAbsolutePosition(element);
 	Box2 renderBox = Box2{(float32)box.x0, (float32)UI_FLIPY(box.y1), (float32)box.x1, (float32)UI_FLIPY(box.y0)};
 	if (element->radius) {
@@ -307,7 +336,20 @@ void RenderElement(UIElement* element) {
 		if (element->borderWidth && element->borderColor) 
 			GfxDrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
 	}
-	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), box.x1, UI_FLIPY(box.y0));
+	// TODO: this should become its own element
+	if (element->flags & UI_SCROLLABLE) {
+		Dimensions2i contentDim = GetContentDim(element);
+		if (element->height < contentDim.height) {
+			int32 length = (element->height*element->height)/contentDim.height;
+			int32 pos = ((element->height - length)*element->scrollPos.y)/(contentDim.height - element->height); 
+			Box2 elevator = {(float32)box.x1 - 9, 
+				(float32)UI_FLIPY(box.y0 + pos + length), 
+				(float32)box.x1 - 2, 
+				(float32)UI_FLIPY(box.y0 + pos)};
+			GfxDrawBox2Rounded(0x44000000, elevator, 3);
+		}
+	}
+	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), element->width, element->height);
 	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
 	RenderText(element->text, box.p0);
 	RenderImage(element->image, box.p0);

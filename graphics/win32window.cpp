@@ -6,6 +6,7 @@ struct {
 	BYTE mouse[3];
 	BYTE keys_prev[256];
 	BYTE mouse_prev[3];
+	DWORD mouseWheelDelta;
 } _window;
 
 HWND Win32GetWindowHandle() {
@@ -26,6 +27,10 @@ BOOL Win32IsKeyPressed(DWORD key) {
 
 BOOL Win32IsMouseDown(DWORD mouse) {
 	return _window.mouse[mouse] == 1;
+}
+
+DWORD Win32GetMouseWheelDelta() {
+	return _window.mouseWheelDelta;
 }
 
 void Win32ExitFullScreen() {
@@ -109,6 +114,9 @@ LRESULT CALLBACK MainWindowCallback(HWND window, UINT message, WPARAM wParam, LP
 		case WM_RBUTTONUP : {
 			_window.mouse[2] = 0;
 		} break;
+		case WM_MOUSEWHEEL: {
+			_window.mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+		} break;
 	}
 
 	return DefWindowProc(window, message, wParam, lParam);
@@ -187,6 +195,7 @@ void Win32ProcessWindowEvents() {
 	_window.mouse_prev[0] = _window.mouse[0];
 	_window.mouse_prev[1] = _window.mouse[1];
 	_window.mouse_prev[2] = _window.mouse[2];
+	_window.mouseWheelDelta = 0;
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 	{
