@@ -67,7 +67,7 @@ GL_FUNCTIONS(X)
 #undef X
 
 EGLBoolean LinuxOpenGLInit() {
-	WindowHandle handle = OsGetWindowHandle();
+	WindowHandle handle = LinuxGetWindowHandle();
 
 	// initialize EGL
 	EGLDisplay display;

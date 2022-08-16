@@ -174,7 +174,7 @@ BOOL Win32SetPixelFormat(HDC dc) {
 }
 
 BOOL Win32OpenGLInit() {
-	HWND window = OsGetWindowHandle();
+	HWND window = Win32GetWindowHandle();
 	HDC dc = GetDC(window);
 	if (!dc) return FAIL("failed to get DC");
 	if (!Win32SetPixelFormat(dc)) return FALSE;

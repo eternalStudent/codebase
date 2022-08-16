@@ -1,5 +1,3 @@
-#define LOG(text)	MessageBoxA(NULL, text, NULL, 0)
-
 #include "basic/basic.cpp"
 #include "graphics/graphics.cpp"
 #include "ui/ui.cpp"
@@ -12,37 +10,34 @@ int main() {
 	UICreateWindow("OpenGL Window", {512, 512}, RGBA_DARKGREY);
 
 	Font* font = (Font*)ArenaAlloc(&persist, sizeof(Font));
-	*font = LoadFont(&scratch, "..\\AzeretMono-Regular.ttf", 24, 0xffffff);
+	*font = LoadFont(&scratch, "..\\AzeretMono-Regular.ttf", 24);
 
-	UIElement* list = UICreateElement(NULL);
-	list->background = RGBA_LIGHTGREY;
-	list->pos = {200, 200};
-	list->dim = {128, 180};
-	list->flags = UI_MOVABLE | UI_SCROLLABLE;
+	UIElement* e1 = UICreateElement(NULL);
+	e1->background = RGBA_ORANGE;
+	e1->pos = {300, 200};
+	e1->dim = {100, 100};
+	e1->flags = UI_MOVABLE | UI_RESIZABLE;
 
-	const char* str = "item 1item 2item 3item 4item 5item 6item 7";
-	for (int32 i=0; i<7; i++) {
-		UIElement* item = UICreateElement(list);
-		item->background = RGBA_LIGHTGREY;
-		item->pos = {6, i*36+24};
-		item->height = 30;
-		item->flags = UI_FITTEXT;
+	UIElement* e2 = UICreateElement(NULL);
+	e2->background = RGBA_BLUE;
+	e2->pos = {300, 300};
+	e2->dim = {100, 100};
+	e2->flags = UI_MOVABLE | UI_RESIZABLE;
 
-		UIText* text = UICreateText(item);
-		text->string = {(byte*)str+i*6, 6};
-		text->font = font;
-	}
+	UIElement* e3 = UICreateElement(NULL);
+	e3->background = RGBA_GREEN;
+	e3->pos = {200, 200};
+	e3->dim = {100, 100};
+	e3->flags = UI_MOVABLE | UI_RESIZABLE;
 
-	while(!OsWindowDestroyed() && !IsKeyDown(KEY_ESC)) {
+	while(!OSWindowDestroyed() && !OSIsKeyDown(KEY_ESC)) {
 		ArenaFreeAll(&scratch);
-		OsProcessWindowEvents();
+		OSProcessWindowEvents();
 
 		GfxClearScreen();
 
-		UIUpdateElements();
+		UIUpdateActiveElement();
 		UIRenderElements();
-
-		//GfxDrawImage(font->texture, {0, 0, 1, 1}, {0, 0, 128, 128});
 
 		GfxSwapBuffers();
 	}

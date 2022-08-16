@@ -22,23 +22,23 @@
 #  define KEY_RIGHT 				VK_RIGHT		// 0x27
 #  define KEY_DOWN					VK_DOWN			// 0x28
 
-#  define OsGetWindowDimensions 	Win32GetWindowDimensions
-#  define OsGetWindowHandle 		Win32GetWindowHandle
-#  define OsCreateWindow			Win32CreateWindow
-#  define OsCreateWindowFullScreen	Win32CreateWindowFullScreen
-#  define OsProcessWindowEvents 	Win32ProcessWindowEvents
-#  define OsSetCursorIcon			Win32SetCursorIcon
-#  define OsExitFullScreen			Win32ExitFullScreen
-#  define OsEnterFullScreen 		Win32EnterFullScreen
-#  define OsOpenFileDialog			Win32OpenFileDialog
-#  define OsSaveFileDialog			Win32SaveFileDialog
-#  define OsGetCursorPosition 		Win32GetCursorPosition
-#  define IsKeyDown 				Win32IsKeyDown
-#  define IsKeyPressed				Win32IsKeyPressed
-#  define IsMouseDown 				Win32IsMouseDown
-#  define IsMousePressed 			Win32IsMousePressed
-#  define OsGetMouseWheelDelta		Win32GetMouseWheelDelta
-#  define OsWindowDestroyed 		Win32WindowDestroyed
+#  define OSGetWindowDimensions 	Win32GetWindowDimensions
+#  define OSGetWindowHandle 		Win32GetWindowHandle
+#  define OSCreateWindow			Win32CreateWindow
+#  define OSCreateWindowFullScreen	Win32CreateWindowFullScreen
+#  define OSProcessWindowEvents 	Win32ProcessWindowEvents
+#  define OSSetCursorIcon			Win32SetCursorIcon
+#  define OSExitFullScreen			Win32ExitFullScreen
+#  define OSEnterFullScreen 		Win32EnterFullScreen
+#  define OSOpenFileDialog			Win32OpenFileDialog
+#  define OSSaveFileDialog			Win32SaveFileDialog
+#  define OSGetCursorPosition 		Win32GetCursorPosition
+#  define OSIsKeyDown 				Win32IsKeyDown
+#  define OSIsKeyPressed			Win32IsKeyPressed
+#  define OSIsMouseDown 			Win32IsMouseDown
+#  define OSIsMousePressed			Win32IsMousePressed
+#  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
+#  define OSWindowDestroyed 		Win32WindowDestroyed
 #endif
 
 #if defined(__gnu_linux__)
@@ -49,14 +49,14 @@
 #  include <X11/cursorfont.h>
 #  undef Font
 #  include "linuxwindow.cpp"
-#  define OsGetWindowDimensions		LinuxGetWindowDimensions
-#  define OsCreateWindow			LinuxCreateWindow
-#  define OsCreateWindowFullScreen	LinuxCreateWindowFullScreen
-#  define OsProcessWindowEvents		LinuxProcessWindowEvents
-#  define OsWindowDestroyed			LinuxWindowDestroyed
-#  define OsGetWindowHandle			LinuxGetWindowHandle
-#  define OsSetCursorIcon			LinuxSetCursorIcon
-#  define OsGetCursorPosition 		LinuxGetCursorPosition
+#  define OSGetWindowDimensions		LinuxGetWindowDimensions
+#  define OSCreateWindow			LinuxCreateWindow
+#  define OSCreateWindowFullScreen	LinuxCreateWindowFullScreen
+#  define OSProcessWindowEvents		LinuxProcessWindowEvents
+#  define OSWindowDestroyed			LinuxWindowDestroyed
+#  define OSGetWindowHandle			LinuxGetWindowHandle
+#  define OSSetCursorIcon			LinuxSetCursorIcon
+#  define OSGetCursorPosition 		LinuxGetCursorPosition
 
 #  define CursorIcon				unsigned int
 #  define CUR_MOVE					XC_fleur				
@@ -76,10 +76,10 @@
 #  define KEY_RIGHT					(XK_KP_Right     && 0xff)
 #  define KEY_DOWN					(XK_KP_Down      && 0xff)
 
-#  define IsMouseDown 				LinuxIsMouseDown
-#  define IsKeyDown					LinuxIsKeyDown
-#  define IsKeyPressed				LinuxIsKeyPressed
+#  define OSIsMouseDown 			LinuxIsMouseDown
+#  define OSIsKeyDown				LinuxIsKeyDown
+#  define OSIsKeyPressed			LinuxIsKeyPressed
 
-#  define OsOpenFileDialog			LinuxOpenFileDialog
-#  define OsSaveFileDialog			LinuxSaveFileDialog
+#  define OSOpenFileDialog			LinuxOpenFileDialog
+#  define OSSaveFileDialog			LinuxSaveFileDialog
 #endif

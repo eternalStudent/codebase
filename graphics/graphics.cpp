@@ -22,7 +22,7 @@
 #define GfxCropScreen				glScissor
 #define GfxClearCrop				OpenGlClearCrop
 #define GfxSetColor					OpenGLSetColor
-#define GfxSwapBuffers				OsOpenGLSwapBuffers
+#define GfxSwapBuffers				OSOpenGLSwapBuffers
 
 
 TextureId GfxLoadTexture(Arena* arena, const char* filePath, Filter filter) {

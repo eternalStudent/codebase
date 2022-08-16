@@ -63,6 +63,7 @@ struct UIElement {
 		UIStyle style;
 	};
 
+	// TODO: add cursorIcon
 	String name; // NOTE: for debugging
 
 	uint32 flags;
@@ -289,13 +290,13 @@ void UISetWindowElement(uint32 background) {
 }
 
 void UICreateWindow(const char* title, Dimensions2i dimensions, uint32 background) {
-	OsCreateWindow(title, dimensions.width, dimensions.height);
+	OSCreateWindow(title, dimensions.width, dimensions.height);
 	GfxInit(ui.arena);
 	UISetWindowElement(background);
 }
 
 void UICreateWindowFullScreen(const char* title, uint32 background) {
-	OsCreateWindowFullScreen(title);
+	OSCreateWindowFullScreen(title);
 	GfxInit(ui.arena);
 	UISetWindowElement(background);
 }
@@ -347,8 +348,8 @@ UIImage* UICreateImage(UIElement* parent) {
 }
 
 UIElement* UIUpdateActiveElement() {
-	Point2i cursorPos = OsGetCursorPosition();
-	ui.windowElement->dim = OsGetWindowDimensions();
+	Point2i cursorPos = OSGetCursorPosition();
+	ui.windowElement->dim = OSGetWindowDimensions();
 	UIElement* prev = ui.active;
 	
 	if (!ui.isResizing && !ui.isGrabbing) {
@@ -364,19 +365,19 @@ UIElement* UIUpdateActiveElement() {
 	bool isBottomRight = false;
 	if (element) {
 		if(IsInBottomRight(element, cursorPos) && (element->flags & UI_RESIZABLE)) {
-			OsSetCursorIcon(CUR_RESIZE);
+			OSSetCursorIcon(CUR_RESIZE);
 			isBottomRight = true;
 		}
 		else if (element->onHover) element->onHover(element);
-		else if (element->flags & UI_CLICKABLE) OsSetCursorIcon(CUR_HAND);
-		else if (element->flags & UI_MOVABLE) OsSetCursorIcon(CUR_MOVE);
-		else OsSetCursorIcon(CUR_ARROW);
+		else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
+		else if (element->flags & UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
+		else OSSetCursorIcon(CUR_ARROW);
 	}
 	else if (1 < cursorPos.x && cursorPos.x < ui.windowElement->width-1 && 1 < cursorPos.y && cursorPos.y < ui.windowElement->height-1)
-		OsSetCursorIcon(CUR_ARROW);
+		OSSetCursorIcon(CUR_ARROW);
 
 	// Handle mouse pressed
-	if (element && IsMousePressed(MOUSE_L)) {
+	if (element && OSIsMousePressed(MOUSE_L)) {
 		MoveToFront(element);
 		if (element->flags & UI_CLICKABLE) {
 			if (element->onClick)
@@ -394,13 +395,13 @@ UIElement* UIUpdateActiveElement() {
 	}
 	
 	// Handle mouse released
-	if (!IsMouseDown(MOUSE_L)) {
+	if (!OSIsMouseDown(MOUSE_L)) {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
 	}
 
 	// Handle scrolling
-	int32 mouseWheelDelta = OsGetMouseWheelDelta();
+	int32 mouseWheelDelta = OSGetMouseWheelDelta();
 	if (mouseWheelDelta) {
 		UIElement* scrollable = GetScrollableAnscestor(element);
 		if (scrollable) {
@@ -499,7 +500,7 @@ UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str, byte* con
 }
 
 void __move_sideway(UIElement* e) {
-	OsSetCursorIcon(CUR_MOVESIDE);
+	OSSetCursorIcon(CUR_MOVESIDE);
 }
 
 UIElement* UICreateSlider(UIElement* parent, int32 width) {
@@ -522,7 +523,7 @@ UIElement* UICreateSlider(UIElement* parent, int32 width) {
 
 void __hover(UIElement* e) {
 	e->background = RGBA_GREY;
-	OsSetCursorIcon(CUR_HAND);
+	OSSetCursorIcon(CUR_HAND);
 }
 
 UIElement* UICreateButton(UIElement* parent, Dimensions2i dim) {

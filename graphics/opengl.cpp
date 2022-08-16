@@ -1,13 +1,13 @@
 #if defined(_WIN32)
 #  include "win32opengl.cpp"
-#  define OsOpenGLInit			Win32OpenGLInit
-#  define OsOpenGLSwapBuffers	Win32OpenGLSwapBuffers
+#  define OSOpenGLInit			Win32OpenGLInit
+#  define OSOpenGLSwapBuffers	Win32OpenGLSwapBuffers
 #endif
 
 #if defined(__gnu_linux__)
 #  include "linuxopengl.cpp"
-#  define OsOpenGLInit			LinuxOpenGLInit
-#  define OsOpenGLSwapBuffers	LinuxOpenGLSwapBuffers
+#  define OSOpenGLInit			LinuxOpenGLInit
+#  define OSOpenGLSwapBuffers	LinuxOpenGLSwapBuffers
 #endif
 
 struct {
@@ -88,7 +88,7 @@ void OpenGLUpdateTextureData(GLuint texture, int32 xoffset, int32 yoffset, int32
 }
 
 void OpenGLInit(Arena* arena) {
-	OsOpenGLInit();
+	OSOpenGLInit();
 
 	opengl.arena = arena;
 
@@ -173,7 +173,7 @@ void OpenGLSetColor(uint32 rgba) {
 }
 
 void OpenGLClearScreen() {
-	Dimensions2i dim = OsGetWindowDimensions();
+	Dimensions2i dim = OSGetWindowDimensions();
 	glScissor(0, 0, dim.width, dim.height);
 	Color color = RgbaToColor(opengl.rgba);
 	glClearColor(color.r, color.g, color.b, color.a);
@@ -184,7 +184,7 @@ void OpenGLClearScreen() {
 
 Point2 AdjustCoordinates(Point2 p) {
 	// TODO: maybe add these to Window?
-	Dimensions2i dim = OsGetWindowDimensions();
+	Dimensions2i dim = OSGetWindowDimensions();
 	float32 iwidth = 1.0f/dim.width;
 	float32 iheight = 1.0f/dim.height;
 
@@ -504,6 +504,6 @@ void OpenGLDrawCurve4(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Poin
 }
 
 void OpenGlClearCrop() {
-	Dimensions2i dim = OsGetWindowDimensions();
+	Dimensions2i dim = OSGetWindowDimensions();
 	glScissor(0, 0, dim.width, dim.height);
 }
