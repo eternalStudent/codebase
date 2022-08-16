@@ -100,7 +100,6 @@ struct {
 
 	bool isGrabbing;
 	bool isResizing;
-	bool isBottomRight;
 
 	CursorIcon cursor;
 
@@ -188,33 +187,6 @@ void MoveToFront(UIElement* element) {
 	parent->last = element;
 }
 
-void HandleCursorPosition(Point2i cursorPos){
-	UIElement* prev = ui.active;
-	ui.isBottomRight = false;
-	if (!ui.isResizing && !ui.isGrabbing) { // NOTE: this is the reason I keep ui.active
-		ui.active = GetElementByPosition(cursorPos);
-	}
-	UIElement* element = ui.active;
-	if (prev != element) {
-		if (prev)       prev->style = ui.originalStyle;
-		if (element)    ui.originalStyle = element->style;
-	}
-	if (cursorPos.x < ui.windowElement->width-1 && cursorPos.y < ui.windowElement->height-1)
-		ui.cursor = CUR_ARROW;
-	if (element) {
-		if(IsInBottomRight(element, cursorPos) && (element->flags & UI_RESIZABLE)){
-			ui.cursor = CUR_RESIZE;
-			ui.isBottomRight = true;
-		}
-		else {
-			if (element->onHover) element->onHover(element);
-			else if (element->flags & UI_CLICKABLE) ui.cursor = CUR_HAND;
-			else if (element->flags & UI_MOVABLE) ui.cursor = CUR_MOVE;        
-		}
-	}
-	OsSetCursorIcon(ui.cursor);
-}
-
 UIElement* GetScrollableAnscestor(UIElement* e) {
 	while (e && !(e->flags & UI_SCROLLABLE))
 		e = e->parent;
@@ -229,72 +201,6 @@ Dimensions2i GetContentDim(UIElement* e) {
 		height = MAX(child->y + child->height, height);
 	}
 	return {width, height};
-}
-
-void HandleMouseEvent(Point2i cursorPos) {
-	UIElement* element = ui.active;
-	static bool mouseWasDown = false;
-	bool mouseIsDown = IsMouseDown(MOUSE_L);
-	if (mouseIsDown && !mouseWasDown && element) {
-		MoveToFront(element);
-		if (element->flags & UI_CLICKABLE){
-			if (element->onClick)
-				element->onClick(element);
-		}
-		else {
-			if (ui.isBottomRight && (element->flags & UI_RESIZABLE)) ui.isResizing = true;
-			else if (element->flags & UI_MOVABLE) ui.isGrabbing = true;
-			ui.grabPos = cursorPos;
-			ui.originalPos = element->pos;
-		}
-	}
-	else if (!mouseIsDown) {
-		ui.isGrabbing = false;
-		ui.isResizing = false;
-	}
-	mouseWasDown = mouseIsDown;
-
-	int32 mouseWheelDelta = OsGetMouseWheelDelta();
-	if (mouseWheelDelta) {
-		UIElement* scrollable = GetScrollableAnscestor(element);
-		if (scrollable) {
-			Dimensions2i contentDim = GetContentDim(scrollable);
-			scrollable->scrollPos.y += mouseWheelDelta / 10;
-			if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
-			if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
-				scrollable->scrollPos.y = contentDim.height - scrollable->height;
-		}
-	}
-}
-
-void UpdateActiveElement(Point2i cursorPos) {
-	UIElement* element = ui.active;
-	if (!element) return;
-
-	// Handle grabbing
-	if (ui.isGrabbing && 
-			(cursorPos.x != ui.grabPos.x || cursorPos.y != ui.grabPos.y)){
-		int32 newx  = ui.originalPos.x + cursorPos.x - ui.grabPos.x;
-		int32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
-		SetPosition(element, newx, newy);
-		if (element->onMove) element->onMove(element);
-	}
-
-	// Handle resizing
-	if (ui.isResizing) {
-		Point2i relativeCursorPos = GetRelativePosition(cursorPos, element->parent);
-		int32 x0 = MIN(ui.originalPos.x, relativeCursorPos.x);
-		int32 y0 = MIN(ui.originalPos.y, relativeCursorPos.y);
-		int32 x1 = MAX(ui.originalPos.x, relativeCursorPos.x);
-		int32 y1 = MAX(ui.originalPos.y, relativeCursorPos.y);
-
-		element->x = MAX(x0, 0);
-		element->y = MAX(y0, 0);
-		element->width = MIN(x1 - element->x, element->parent->width - element->x);
-		element->height = MIN(y1 - element->y, element->parent->height - element->y);
-
-		if (element->onResize) element->onResize(element);
-	}
 }
 
 void RenderText(UIText* text, Point2i parentPos) {
@@ -440,13 +346,100 @@ UIImage* UICreateImage(UIElement* parent) {
 	return image;
 }
 
-UIElement* UIUpdateElements(){
+UIElement* UIUpdateActiveElement() {
 	Point2i cursorPos = OsGetCursorPosition();
 	ui.windowElement->dim = OsGetWindowDimensions();
-	HandleCursorPosition(cursorPos);
-	HandleMouseEvent(cursorPos);
-	UpdateActiveElement(cursorPos);
-	return ui.active;
+	UIElement* prev = ui.active;
+	
+	if (!ui.isResizing && !ui.isGrabbing) {
+		ui.active = GetElementByPosition(cursorPos);
+	}
+	if (prev != ui.active) {
+		if (prev)       prev->style = ui.originalStyle;
+		if (ui.active)  ui.originalStyle = ui.active->style;
+	}
+	UIElement* element = ui.active;
+
+	// Handle mouse hover
+	bool isBottomRight = false;
+	if (element) {
+		if(IsInBottomRight(element, cursorPos) && (element->flags & UI_RESIZABLE)) {
+			OsSetCursorIcon(CUR_RESIZE);
+			isBottomRight = true;
+		}
+		else if (element->onHover) element->onHover(element);
+		else if (element->flags & UI_CLICKABLE) OsSetCursorIcon(CUR_HAND);
+		else if (element->flags & UI_MOVABLE) OsSetCursorIcon(CUR_MOVE);
+		else OsSetCursorIcon(CUR_ARROW);
+	}
+	else if (1 < cursorPos.x && cursorPos.x < ui.windowElement->width-1 && 1 < cursorPos.y && cursorPos.y < ui.windowElement->height-1)
+		OsSetCursorIcon(CUR_ARROW);
+
+	// Handle mouse pressed
+	if (element && IsMousePressed(MOUSE_L)) {
+		MoveToFront(element);
+		if (element->flags & UI_CLICKABLE) {
+			if (element->onClick)
+				element->onClick(element);
+		}
+		else if (isBottomRight && (element->flags & UI_RESIZABLE)) {
+			ui.isResizing = true;
+			ui.originalPos = element->pos;
+		}
+		else if (element->flags & UI_MOVABLE) {
+			ui.isGrabbing = true;
+			ui.grabPos = cursorPos;
+			ui.originalPos = element->pos;
+		}
+	}
+	
+	// Handle mouse released
+	if (!IsMouseDown(MOUSE_L)) {
+		ui.isGrabbing = false;
+		ui.isResizing = false;
+	}
+
+	// Handle scrolling
+	int32 mouseWheelDelta = OsGetMouseWheelDelta();
+	if (mouseWheelDelta) {
+		UIElement* scrollable = GetScrollableAnscestor(element);
+		if (scrollable) {
+			Dimensions2i contentDim = GetContentDim(scrollable);
+			scrollable->scrollPos.y += mouseWheelDelta / 10;
+			if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
+			if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
+				scrollable->scrollPos.y = contentDim.height - scrollable->height;
+		}
+	}
+
+	// Handle grabbing
+	if (ui.isGrabbing && 
+			(cursorPos.x != ui.grabPos.x || cursorPos.y != ui.grabPos.y)) {
+		ASSERT(element);
+		int32 newx  = ui.originalPos.x + cursorPos.x - ui.grabPos.x;
+		int32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
+		SetPosition(element, newx, newy);
+		if (element->onMove) element->onMove(element);
+	}
+
+	// Handle resizing
+	if (ui.isResizing) {
+		ASSERT(element);
+		Point2i relativeCursorPos = GetRelativePosition(cursorPos, element->parent);
+		int32 x0 = MIN(ui.originalPos.x, relativeCursorPos.x);
+		int32 y0 = MIN(ui.originalPos.y, relativeCursorPos.y);
+		int32 x1 = MAX(ui.originalPos.x, relativeCursorPos.x);
+		int32 y1 = MAX(ui.originalPos.y, relativeCursorPos.y);
+
+		element->x = MAX(x0, 0);
+		element->y = MAX(y0, 0);
+		element->width = MIN(x1 - element->x, element->parent->width - element->x);
+		element->height = MIN(y1 - element->y, element->parent->height - element->y);
+
+		if (element->onResize) element->onResize(element);
+	}
+
+	return element;
 }
 
 void UIDrawLine(Point2i p0, Point2i p1, uint32 rgba, float32 lineWidth) {

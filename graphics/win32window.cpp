@@ -29,6 +29,10 @@ BOOL Win32IsMouseDown(DWORD mouse) {
 	return _window.mouse[mouse] == 1;
 }
 
+BOOL Win32IsMousePressed(DWORD mouse) {
+	return _window.mouse[mouse] == 1 && _window.mouse_prev[mouse] == 0;
+}
+
 DWORD Win32GetMouseWheelDelta() {
 	return _window.mouseWheelDelta;
 }
