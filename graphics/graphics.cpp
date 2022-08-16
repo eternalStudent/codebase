@@ -11,7 +11,7 @@
 #define GfxGenerateTexture			OpenGLGenerateTexture
 #define GfxUpdateTextureData		OpenGLUpdateTextureData
 #define GfxDrawImage				OpenGLDrawImage
-#define GfxDrawImageMono			OpenGLDrawImageMono
+#define GfxDrawText 				OpenGLDrawText
 #define GfxDrawBox2					OpenGLDrawBox2
 #define GfxDrawLine					OpenGLDrawLine
 #define GfxDrawCircle				OpenGLDrawCircle

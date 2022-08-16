@@ -1781,7 +1781,7 @@ void MakeGlyphBitmap(Arena* arena, const FontInfo* info, byte* output,
    MakeGlyphBitmapSubpixel(arena, info, output, out_w, out_h, out_stride, scale_x, scale_y, 0.0f,0.0f, glyph);
 }
 
-Font TTLoadFont(Arena* arena, byte* data, float32 height, uint32 rgb) {
+Font TTLoadFont(Arena* arena, byte* data, float32 height) {
    int32 pw = 512;
    int32 ph = 512;
    int32 first_char = 32;
@@ -1791,8 +1791,8 @@ Font TTLoadFont(Arena* arena, byte* data, float32 height, uint32 rgb) {
    if (!GetFontInfo(&f, data, 0))
       return {};
 
-   byte* mono_bitmap = (byte*)ArenaAlloc(arena, pw*ph);
-   memset(mono_bitmap, 0, pw*ph); // background of 0 around pixels
+   byte* bitmap = (byte*)ArenaAlloc(arena, pw*ph);
+   memset(bitmap, 0, pw*ph); // background of 0 around pixels
    int32 x = 1;
    int32 y = 1;
    int32 bottom_y = 1;
@@ -1813,7 +1813,7 @@ Font TTLoadFont(Arena* arena, byte* data, float32 height, uint32 rgb) {
          return {};
       ASSERT(x + gw < pw);
       ASSERT(y + gh < ph);
-      MakeGlyphBitmap(arena, &f, mono_bitmap + x + y*pw, gw, gh, pw, scale, scale, g);
+      MakeGlyphBitmap(arena, &f, bitmap + x + y*pw, gw, gh, pw, scale, scale, g);
       font.chardata[i].x0 = x;
       font.chardata[i].y0 = y;
       font.chardata[i].x1 = x + gw;
@@ -1826,9 +1826,7 @@ Font TTLoadFont(Arena* arena, byte* data, float32 height, uint32 rgb) {
          bottom_y = y + gh + 1;
    }
 
-   byte* bitmap = ExpandChannels(arena, mono_bitmap, pw*ph, rgb);
-
-   font.texture = GfxGenerateTexture(Image{pw, ph, 4, bitmap}, GFX_SMOOTH);
+   font.texture = GfxGenerateTexture(Image{pw, ph, 1, bitmap}, GFX_SMOOTH);
    font.height = height;
 
    return font;

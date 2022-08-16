@@ -15,13 +15,13 @@ struct Font {
 
 #include "truetype.cpp"
 
-Font LoadFont(Arena* arena, const char* filePath, float32 height, uint32 rgb){
+Font LoadFont(Arena* arena, const char* filePath, float32 height){
    byte* data = OsReadAll(filePath, arena).data;
-   return TTLoadFont(arena, data, height, rgb);
+   return TTLoadFont(arena, data, height);
 }
 
 // NOTE: adopted from stbtt_GetBakedQuad
-void DrawText(Font* font, float32 x, float32 y, String string){
+void RenderText(Font* font, float32 x, float32 y, String string, uint32 color){
    const int32 pw = 512;
    const int32 ph = 512;
    const int32 first_char = 32;
@@ -54,7 +54,7 @@ void DrawText(Font* font, float32 x, float32 y, String string){
             bakedchar->x1 * ipw,
             bakedchar->y0 * iph};
 
-         GfxDrawImage(font->texture, crop, pos);
+         GfxDrawText(font->texture, crop, pos, 0, color);
 
          x += bakedchar->xadvance;
       }

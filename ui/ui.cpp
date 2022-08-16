@@ -18,6 +18,7 @@ struct UIText {
 		struct {int32 x, y;};
 	};
 
+	uint32 color;
 	Font* font;
 	String string;
 };
@@ -301,7 +302,7 @@ void RenderText(UIText* text, Point2i parentPos) {
 
 	float32 x = (float32)(text->pos.x + parentPos.x);
 	float32 y = UI_FLIPY((float32)(text->pos.y + parentPos.y)) - text->font->height;
-	DrawText(text->font, x, y, text->string);
+	RenderText(text->font, x, y, text->string, text->color);
 }
 
 void RenderImage(UIImage* image, Point2i parentPos) {

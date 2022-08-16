@@ -13,7 +13,7 @@
 struct {
 	GLuint drawImage;
 	GLuint drawShape;
-	GLuint drawMono;
+	GLuint drawText;
 	uint32 rgba;
 	Arena* arena;
 } opengl;
@@ -134,7 +134,7 @@ void main()
     color = channel*foreground + (1.0-channel)*background;
 }   
 	)STRING";
-	opengl.drawMono = CreateProgram(vertexSource, fragmentSource);
+	opengl.drawText = CreateProgram(vertexSource, fragmentSource);
 
 	vertexSource = (GLchar*)R"STRING(
 #version 330 core
@@ -236,7 +236,7 @@ void OpenGLDrawImage(GLuint texture, Box2 crop, Box2 pos) {
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawImageMono(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint32 foreground) {
+void OpenGLDrawText(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint32 foreground) {
 	Point2 p0 = AdjustCoordinates(pos.p0);
 	Point2 p1 = AdjustCoordinates(pos.p1);
 
@@ -270,17 +270,17 @@ void OpenGLDrawImageMono(GLuint texture, Box2 crop, Box2 pos, uint32 background,
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float32), NULL);
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glUseProgram(opengl.drawMono);
+	glUseProgram(opengl.drawText);
 	
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glUniform1i(glGetUniformLocation(opengl.drawMono, "image"), 0);
+	glUniform1i(glGetUniformLocation(opengl.drawText, "image"), 0);
 
-	GLint location = glGetUniformLocation(opengl.drawMono, "background");
+	GLint location = glGetUniformLocation(opengl.drawText, "background");
 	Color color = RgbaToColor(background);
 	glUniform4f(location, color.r, color.g, color.b, color.a);
 
-	location = glGetUniformLocation(opengl.drawMono, "foreground");
+	location = glGetUniformLocation(opengl.drawText, "foreground");
 	color = RgbaToColor(foreground);
 	glUniform4f(location, color.r, color.g, color.b, color.a);
 

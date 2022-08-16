@@ -38,12 +38,3 @@ inline Color RgbaToColor(uint32 rgba) {
             color.b/255.0f,
             color.a/255.0f};
 }
-
-byte* ExpandChannels(Arena* arena, byte* buffer, int32 length, uint32 rgb) {
-    uint32* new_buffer = (uint32*)ArenaAlloc(arena, length*4);
-    if (new_buffer == NULL) return NULL;
-    for (int32 i = 0; i < length; i++) {
-        new_buffer[i] = (buffer[i] << 24) | rgb;
-    }
-    return (byte*)new_buffer;
-}
