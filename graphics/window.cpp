@@ -2,15 +2,17 @@
 #define MOUSE_M 					1
 #define MOUSE_R 					2
 
+#define CUR_ARROW 					0
+#define CUR_MOVE					1	 					
+#define CUR_RESIZE					2
+#define CUR_HAND					3
+#define CUR_MOVESIDE				4
+#define CUR_TEXT					5
+
 #if defined(_WIN32)
 #  include "win32window.cpp"
-#  define CursorIcon				LPCSTR
-#  define CUR_MOVE					IDC_SIZEALL	 					
-#  define CUR_ARROW 				IDC_ARROW
-#  define CUR_RESIZE				IDC_SIZENWSE
-#  define CUR_HAND					IDC_HAND
-#  define CUR_MOVESIDE				IDC_SIZEWE
-
+#  define KEY_SHIFT					VK_SHIFT		// 0x10
+#  define KEY_CTRL					VK_CONTROL		// 0x11
 #  define KEY_ESC 					VK_ESCAPE		// 0x1B
 #  define KEY_SPACE 				VK_SPACE		// 0x20
 #  define KEY_PGUP					VK_PRIOR		// 0x21
@@ -21,6 +23,7 @@
 #  define KEY_UP					VK_UP			// 0x26
 #  define KEY_RIGHT 				VK_RIGHT		// 0x27
 #  define KEY_DOWN					VK_DOWN			// 0x28
+#  define KEY_C 					0x43
 
 #  define OSGetWindowDimensions 	Win32GetWindowDimensions
 #  define OSGetWindowHandle 		Win32GetWindowHandle
@@ -37,6 +40,7 @@
 #  define OSIsKeyPressed			Win32IsKeyPressed
 #  define OSIsMouseDown 			Win32IsMouseDown
 #  define OSIsMousePressed			Win32IsMousePressed
+#  define OSIsMouseDoubleClicked	Win32IsMouseDoubleClicked
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OSWindowDestroyed 		Win32WindowDestroyed
 #endif
@@ -57,13 +61,11 @@
 #  define OSGetWindowHandle			LinuxGetWindowHandle
 #  define OSSetCursorIcon			LinuxSetCursorIcon
 #  define OSGetCursorPosition 		LinuxGetCursorPosition
-
-#  define CursorIcon				unsigned int
-#  define CUR_MOVE					XC_fleur				
-#  define CUR_ARROW					XC_left_ptr
-#  define CUR_RESIZE				XC_bottom_left_corner
-#  define CUR_HAND					XC_hand1
-#  define CUR_MOVESIDE				XC_sb_h_double_arrow
+#  define OSIsMouseDown 			LinuxIsMouseDown
+#  define OSIsKeyDown				LinuxIsKeyDown
+#  define OSIsKeyPressed			LinuxIsKeyPressed
+#  define OSOpenFileDialog			LinuxOpenFileDialog
+#  define OSSaveFileDialog			LinuxSaveFileDialog
 
 #  define KEY_ESC 					(XK_Escape       && 0xff)
 #  define KEY_SPACE					(XK_KP_Space     && 0xff)
@@ -75,11 +77,4 @@
 #  define KEY_UP					(XK_KP_Up	     && 0xff)
 #  define KEY_RIGHT					(XK_KP_Right     && 0xff)
 #  define KEY_DOWN					(XK_KP_Down      && 0xff)
-
-#  define OSIsMouseDown 			LinuxIsMouseDown
-#  define OSIsKeyDown				LinuxIsKeyDown
-#  define OSIsKeyPressed			LinuxIsKeyPressed
-
-#  define OSOpenFileDialog			LinuxOpenFileDialog
-#  define OSSaveFileDialog			LinuxSaveFileDialog
 #endif

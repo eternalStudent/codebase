@@ -174,8 +174,8 @@ BOOL Win32SetPixelFormat(HDC dc) {
 }
 
 BOOL Win32OpenGLInit() {
-	HWND window = Win32GetWindowHandle();
-	HDC dc = GetDC(window);
+	HWND windowHandle = Win32GetWindowHandle();
+	HDC dc = GetDC(windowHandle);
 	if (!dc) return FAIL("failed to get DC");
 	if (!Win32SetPixelFormat(dc)) return FALSE;
 	if (!Win32CreateRenderingContext(dc)) return FALSE;
@@ -224,7 +224,7 @@ BOOL Win32OpenGLInit() {
 	if (wglSwapInteravl) wglSwapInteravl(1);
 	else LOG("failed to set swap interval");
 
-	ReleaseDC(window, dc);
+	ReleaseDC(windowHandle, dc);
 
 	return TRUE;
 }

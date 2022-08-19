@@ -18,7 +18,7 @@ struct {
 	Point2i cursorPos;
 	Dimensions2i dim;
 	Window root;
-	unsigned int cursorIcon;
+	Cursor cursors[6];
 } window;
 
 void _internalCreateWindow(Window root, const char* title, int width, int height) {
@@ -43,6 +43,14 @@ void _internalCreateWindow(Window root, const char* title, int width, int height
 
 	// show the window
 	XMapWindow(window.display, window.window);
+
+	// load cursors
+	window.cursors[CUR_ARROW] = XCreateFontCursor(window.display, XC_left_ptr);
+	window.cursors[CUR_MOVE] = XCreateFontCursor(window.display, XC_fleur);	
+	window.cursors[CUR_RESIZE] = XCreateFontCursor(window.display, XC_bottom_left_corner);
+	window.cursors[CUR_HAND] = XCreateFontCursor(window.display, XC_hand1);
+	window.cursors[CUR_MOVESIDE] = XCreateFontCursor(window.display, XC_sb_h_double_arrow);
+	window.cursors[CUR_TEXT] = XCreateFontCursor(window.display, XC_xterm);
 }
 
 void LinuxCreateWindow(const char* title, int width, int height) {
@@ -197,11 +205,8 @@ Dimensions2i LinuxGetWindowDimensions() {
 	return window.dim;
 }
 
-// TODO: preload cursors?
-void LinuxSetCursorIcon(unsigned int shape) {
-	if (shape == window.cursorIcon) return;
-	window.cursorIcon = shape;
-	XDefineCursor(window.display, window.window, XCreateFontCursor(window.display, shape));
+void LinuxSetCursorIcon(int32 icon) {
+	XDefineCursor(window.display, window.window, window.cursors[icon]);
 }
 
 Point2i LinuxGetCursorPosition() {

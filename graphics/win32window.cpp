@@ -3,47 +3,51 @@ struct {
 	Dimensions2i dim;
 	BOOL destroyed;
 	BYTE keys[256];
-	BYTE mouse[3];
+	BYTE mouse[4];
 	BYTE keys_prev[256];
 	BYTE mouse_prev[3];
 	DWORD mouseWheelDelta;
-} _window;
+	HCURSOR cursors[6];
+} window;
 
 HWND Win32GetWindowHandle() {
-	return _window.handle;
+	return window.handle;
 }
 
 Dimensions2i Win32GetWindowDimensions() {
-	return _window.dim;
+	return window.dim;
 }
 
 BOOL Win32IsKeyDown(DWORD key) {
-	return _window.keys[key] == 1;
+	return window.keys[key] == 1;
 }
 
 BOOL Win32IsKeyPressed(DWORD key) {
-	return _window.keys[key] == 1 && _window.keys_prev[key] == 0;
+	return window.keys[key] == 1 && window.keys_prev[key] == 0;
 }
 
 BOOL Win32IsMouseDown(DWORD mouse) {
-	return _window.mouse[mouse] == 1;
+	return window.mouse[mouse] == 1;
 }
 
 BOOL Win32IsMousePressed(DWORD mouse) {
-	return _window.mouse[mouse] == 1 && _window.mouse_prev[mouse] == 0;
+	return window.mouse[mouse] == 1 && window.mouse_prev[mouse] == 0;
+}
+
+BOOL Win32IsMouseDoubleClicked() {
+	return window.mouse[3] == 1;
 }
 
 DWORD Win32GetMouseWheelDelta() {
-	return _window.mouseWheelDelta;
+	return window.mouseWheelDelta;
 }
 
 void Win32ExitFullScreen() {
-	HWND window = _window.handle;
-	DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
-	SetWindowLong(window, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
-	SetWindowPos(window, NULL, 0, 0, 920, 540, SWP_FRAMECHANGED);
-	memset(_window.keys, 0, 256);
-	memset(_window.mouse, 0, 3);
+	DWORD dwStyle = GetWindowLong(window.handle, GWL_STYLE);
+	SetWindowLong(window.handle, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window.handle, NULL, 0, 0, 920, 540, SWP_FRAMECHANGED);
+	memset(window.keys, 0, 256);
+	memset(window.mouse, 0, 3);
 }
 
 BOOL GetPrimaryMonitorRect(RECT* monitorRect){
@@ -61,14 +65,13 @@ BOOL GetPrimaryMonitorRect(RECT* monitorRect){
 }
 
 BOOL Win32EnterFullScreen() {
-	HWND window = _window.handle;
 	RECT monitorRect;
 	if (!GetPrimaryMonitorRect(&monitorRect))
 		return FAIL("failed to get monitor placement");
 
-	DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
-	SetWindowLong(window, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
-	SetWindowPos(window, NULL, 0, 0, monitorRect.right, monitorRect.bottom, SWP_FRAMECHANGED);
+	DWORD dwStyle = GetWindowLong(window.handle, GWL_STYLE);
+	SetWindowLong(window.handle, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+	SetWindowPos(window.handle, NULL, 0, 0, monitorRect.right, monitorRect.bottom, SWP_FRAMECHANGED);
 	return TRUE;
 }
 
@@ -81,58 +84,60 @@ Dimensions2i Win32GetWindowDimensions(HWND window) {
 	return Dimensions2i{width, height};
 }*/
 
-LRESULT CALLBACK MainWindowCallback(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch (message) {
 		case WM_DESTROY: {
-			_window.destroyed = true;
+			window.destroyed = true;
 			return 0;
 		}
 		case WM_SIZE: {
 			UINT width = LOWORD(lParam);
 			UINT height = HIWORD(lParam);
-			_window.dim = {(int32)width, (int32)height};
+			window.dim = {(int32)width, (int32)height};
 		} break;
 		case WM_KEYDOWN: {
 			UINT vkcode = (UINT)wParam;
-			_window.keys[vkcode] = 1;
+			window.keys[vkcode] = 1;
 		} break;
 		case WM_KEYUP: {
 			UINT vkcode = (UINT)wParam;
-			_window.keys[vkcode] = 0;
+			window.keys[vkcode] = 0;
 		} break;
 		case WM_LBUTTONDOWN : {
-			_window.mouse[0] = 1;
+			window.mouse[0] = 1;
 		} break;
 		case WM_LBUTTONUP : {
-			_window.mouse[0] = 0;
+			window.mouse[0] = 0;
 		} break;
 		case WM_MBUTTONDOWN : {
-			_window.mouse[1] = 1;
+			window.mouse[1] = 1;
 		} break;
 		case WM_MBUTTONUP : {
-			_window.mouse[1] = 0;
+			window.mouse[1] = 0;
 		} break;
 		case WM_RBUTTONDOWN : {
-			_window.mouse[2] = 1;
+			window.mouse[2] = 1;
 		} break;
 		case WM_RBUTTONUP : {
-			_window.mouse[2] = 0;
+			window.mouse[2] = 0;
 		} break;
 		case WM_MOUSEWHEEL: {
-			_window.mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+			window.mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+		} break;
+		case WM_LBUTTONDBLCLK: {
+			window.mouse[3] = 1;
 		} break;
 	}
 
-	return DefWindowProc(window, message, wParam, lParam);
+	return DefWindowProc(handle, message, wParam, lParam);
 }
 
 WNDCLASSA CreateWindowClass() {
 	WNDCLASSA windowClass = {};
-	windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
+	windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
 	windowClass.lpfnWndProc = MainWindowCallback;
 	windowClass.hInstance = GetModuleHandle(NULL);
 	windowClass.lpszClassName = "WindowClass";
-	windowClass.hCursor = LoadCursorA(NULL, IDC_ARROW);
 
 	RegisterClassA(&windowClass);
 
@@ -140,12 +145,22 @@ WNDCLASSA CreateWindowClass() {
 }
 
 BOOL Win32WindowDestroyed() {
-	return _window.destroyed;
+	return window.destroyed;
+}
+
+void LoadCursors() {
+	window.cursors[CUR_ARROW] = LoadCursorA(NULL, IDC_ARROW);
+	window.cursors[CUR_MOVE] = LoadCursorA(NULL, IDC_SIZEALL);	
+	window.cursors[CUR_RESIZE] = LoadCursorA(NULL, IDC_SIZENWSE);
+	window.cursors[CUR_HAND] = LoadCursorA(NULL, IDC_HAND);
+	window.cursors[CUR_MOVESIDE] = LoadCursorA(NULL, IDC_SIZEWE);
+	window.cursors[CUR_TEXT] = LoadCursorA(NULL, IDC_IBEAM);
 }
 
 void Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 	WNDCLASSA windowClass = CreateWindowClass();
-	_window = {};
+	window = {};
+	LoadCursors();
 
 	DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
 	RECT rect = {0, 0, width, height};
@@ -153,8 +168,8 @@ void Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 	if (!success)
 		LOG("failed to adjust window size");
 
-	_window.dim = {width, height};
-	_window.handle = CreateWindowExA(0,
+	window.dim = {width, height};
+	window.handle = CreateWindowExA(0,
 		windowClass.lpszClassName, 
 		title,
 		style,
@@ -167,7 +182,8 @@ void Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 
 void Win32CreateWindowFullScreen(LPCSTR title) {
 	WNDCLASSA windowClass = CreateWindowClass();
-	_window = {};
+	window = {};
+	LoadCursors();
 	
 	RECT monitorRect;
 	if (!GetPrimaryMonitorRect(&monitorRect)) {
@@ -178,8 +194,8 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 	LONG width = monitorRect.right - monitorRect.left;
 	LONG height = monitorRect.bottom - monitorRect.top;
 
-	_window.dim = {width, height};
-	_window.handle = CreateWindowExA(0,
+	window.dim = {width, height};
+	window.handle = CreateWindowExA(0,
 		windowClass.lpszClassName, 
 		title,
 		WS_VISIBLE,
@@ -190,16 +206,17 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 		0, 0, windowClass.hInstance, 0);
 	
 	// NOTE: WTF ?!?
-	DWORD dwStyle = GetWindowLong(_window.handle, GWL_STYLE);
-	SetWindowLong(_window.handle, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+	DWORD dwStyle = GetWindowLong(window.handle, GWL_STYLE);
+	SetWindowLong(window.handle, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
 }
 
 void Win32ProcessWindowEvents() {
-	for (int32 i = 0; i < 256; i++) _window.keys_prev[i] = _window.keys[i];
-	_window.mouse_prev[0] = _window.mouse[0];
-	_window.mouse_prev[1] = _window.mouse[1];
-	_window.mouse_prev[2] = _window.mouse[2];
-	_window.mouseWheelDelta = 0;
+	for (int32 i = 0; i < 256; i++) window.keys_prev[i] = window.keys[i];
+	window.mouse_prev[0] = window.mouse[0];
+	window.mouse_prev[1] = window.mouse[1];
+	window.mouse_prev[2] = window.mouse[2];
+	window.mouse[3] = 0;;
+	window.mouseWheelDelta = 0;
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 	{
@@ -208,8 +225,8 @@ void Win32ProcessWindowEvents() {
 	}
 }
 
-void Win32SetCursorIcon(LPCSTR icon) {
-	SetCursor(LoadCursorA(NULL, icon));
+void Win32SetCursorIcon(int32 icon) {
+	SetCursor(window.cursors[icon]);
 }
 
 HANDLE Win32OpenFileDialog() {
@@ -219,7 +236,7 @@ HANDLE Win32OpenFileDialog() {
 	path[0] = 0;
 	dialog.lpstrFile = path;
 	dialog.nMaxFile = MAX_PATH;
-	dialog.hwndOwner = _window.handle;
+	dialog.hwndOwner = window.handle;
 	dialog.Flags = OFN_FILEMUSTEXIST;
 	dialog.Flags |= OFN_NOCHANGEDIR;
 	BOOL success = GetOpenFileName(&dialog);
@@ -237,7 +254,7 @@ HANDLE Win32SaveFileDialog() {
 	path[0] = 0;
 	dialog.lpstrFile = path;
 	dialog.nMaxFile = MAX_PATH;
-	dialog.hwndOwner = _window.handle;
+	dialog.hwndOwner = window.handle;
 	dialog.Flags = OFN_OVERWRITEPROMPT;
 	dialog.Flags |= OFN_NOCHANGEDIR;
 	BOOL success = GetSaveFileName(&dialog);
@@ -249,10 +266,9 @@ HANDLE Win32SaveFileDialog() {
 }
 
 Point2i Win32GetCursorPosition() {
-	HWND window = _window.handle;
 	POINT cursorPos;
 	GetCursorPos(&cursorPos); // relative to screen
 
-	ScreenToClient(window, &cursorPos);
+	ScreenToClient(window.handle, &cursorPos);
 	return Point2i{cursorPos.x, cursorPos.y};
 }

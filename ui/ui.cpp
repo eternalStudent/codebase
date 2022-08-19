@@ -11,6 +11,7 @@
 #define UI_FITTEXT			(1 << 8)
 
 #include "font.cpp"
+#include "clipboard.cpp"
 
 struct UIText {
 	union {
@@ -101,13 +102,17 @@ struct {
 
 	bool isGrabbing;
 	bool isResizing;
+	bool isSelecting;
 
-	CursorIcon cursor;
+	UIText* selected;
+	int32 start;
+	int32 end;
 
 	Arena* arena;
 } ui;
 
 Box2i GetAbsolutePosition(UIElement* element) {
+	if (element == NULL) return {0, 0, ui.windowElement->width, ui.windowElement->height};
 	UIElement* parent = element->parent;
 	if (parent == NULL) return {0, 0, element->width, element->height};
 	Box2i parentPos = GetAbsolutePosition(parent);
@@ -123,9 +128,20 @@ Box2i GetAbsolutePosition(UIElement* element) {
 				parentPos.y0 + element->y - parent->scrollPos.y + element->height};
 }
 
-bool IsInBottomRight(UIElement* element, Point2i pos) {
-	Box2i box = GetAbsolutePosition(element);
+bool IsInBottomRight(Box2i box, Point2i pos) {
 	return box.x1-4 <= pos.x && box.y1-4 <= pos.y;
+}
+
+bool IsInTextBound(UIText* text, Box2i box, Point2i pos) {
+	if (!text) return false;
+	int32 lineCount;
+	Box2i textBox = {
+		box.x0 + text->x, 
+		box.y0 + text->y, 
+		box.x0 + text->x + (int32)(GetTextWidth(text->font, text->string, &lineCount) + 0.5f), 
+		box.y0 + text->y + (int32)(lineCount*text->font->height + 0.5f)
+	};
+	return INSIDE2(textBox, pos);
 }
 
 void SetPosition(UIElement* element, int32 x, int32 y) {
@@ -206,10 +222,64 @@ Dimensions2i GetContentDim(UIElement* e) {
 
 void RenderText(UIText* text, Point2i parentPos) {
 	if (!text) return;
+	String string = text->string;
+	Font* font = text->font;
 
 	float32 x = (float32)(text->pos.x + parentPos.x);
-	float32 y = UI_FLIPY((float32)(text->pos.y + parentPos.y)) - text->font->height;
-	RenderText(text->font, x, y, text->string, text->color);
+	float32 y = UI_FLIPY((float32)(text->pos.y + parentPos.y)) - font->height;
+	RenderText(font, x, y, string, text->color);
+	
+	// Handle selected text
+	if (ui.selected == text) {
+		int32 start = MIN(ui.start, ui.end);
+		int32 end = MAX(ui.start, ui.end);
+		ASSERT(0 <= start && start <= end && end <= string.length);
+		int32 i = 0;
+		float32 x0 = x;
+		float32 y1 = y + font->height - 3;
+
+		while (true) {
+			if (i == start)
+				break;
+			byte b = string.data[i];
+			if (b == 10) {
+        		x0 = x;
+        		y1 -= font->height;
+      		}
+      		else {
+      			ASSERT(32 <= b && b <= 127);
+        		BakedChar* bakedchar = font->chardata + (b - 32);
+         		x0 += bakedchar->xadvance;
+         	}
+      		i++;
+		}
+
+		float32 x1 = x0;
+		while(true) {
+			byte b = string.data[i];
+			if (b == 10 || i == end) {
+				if (start != end)
+					GfxDrawBox2(0x44ffffff, {x0, y1 - font->height, x1, y1});
+				if (i == end) 
+					break;
+				x0 = x;
+				x1 = x;
+				y1 -= font->height;
+			}
+			else {
+				ASSERT(32 <= b && b <= 127);
+        		BakedChar* bakedchar = font->chardata + (b - 32);
+         		x1 += bakedchar->xadvance;
+         	}
+      		i++;
+		}
+		
+		
+		if (ui.start < ui.end)
+			GfxDrawBox2(RGBA_ORANGE, {x1-1, y1 - font->height-2, x1+1, y1+2});
+		else
+			GfxDrawBox2(RGBA_ORANGE, {x0-1, y1 - font->height-2, x0+1, y1+2});
+	}
 }
 
 void RenderImage(UIImage* image, Point2i parentPos) {
@@ -225,7 +295,8 @@ int32 __center(UIElement* element) {
 }
 
 int32 __fit_text(UIElement* element) {
-	return element->text->x + (int32)(GetTextWidth(element->text->font, element->text->string) + 0.5f);
+	int32 lineCount;
+	return element->text->x + (int32)(GetTextWidth(element->text->font, element->text->string, &lineCount) + 0.5f);
 }
 
 void RenderElement(UIElement* element) {
@@ -272,7 +343,6 @@ void UIInit(Arena* persist, Arena* scratch) {
 	ui.allocator = CreateFixedSize(persist, capacity, sizeof(UIElement));
 	ui.capacity = capacity;
 	ui.arena = scratch;
-	ui.cursor = CUR_ARROW;
 }
 
 void UIRenderElements() {
@@ -360,13 +430,19 @@ UIElement* UIUpdateActiveElement() {
 		if (ui.active)  ui.originalStyle = ui.active->style;
 	}
 	UIElement* element = ui.active;
+	Box2i pos = GetAbsolutePosition(element);
 
 	// Handle mouse hover
-	bool isBottomRight = false;
+	bool isInBottomRight = false;
+	bool isInTextBound = false;
 	if (element) {
-		if(IsInBottomRight(element, cursorPos) && (element->flags & UI_RESIZABLE)) {
+		if(IsInBottomRight(pos, cursorPos) && (element->flags & UI_RESIZABLE)) {
 			OSSetCursorIcon(CUR_RESIZE);
-			isBottomRight = true;
+			isInBottomRight = true;
+		}
+		else if (IsInTextBound(element->text, pos, cursorPos)) {
+			OSSetCursorIcon(CUR_TEXT);
+			isInTextBound = true;
 		}
 		else if (element->onHover) element->onHover(element);
 		else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
@@ -377,27 +453,46 @@ UIElement* UIUpdateActiveElement() {
 		OSSetCursorIcon(CUR_ARROW);
 
 	// Handle mouse pressed
-	if (element && OSIsMousePressed(MOUSE_L)) {
-		MoveToFront(element);
-		if (element->flags & UI_CLICKABLE) {
-			if (element->onClick)
-				element->onClick(element);
+	if (OSIsMousePressed(MOUSE_L)) {
+		ui.selected = NULL;
+		if (element) {
+			MoveToFront(element);
+			if (element->flags & UI_CLICKABLE) {
+				if (element->onClick)
+					element->onClick(element);
+			}
+			else if (isInTextBound) {
+				float32 x_end = (float32)(cursorPos.x - (pos.x0 + element->text->x));
+				float32 y_end = (float32)(cursorPos.y - (pos.y0 + element->text->y + element->text->font->height));
+				ui.end = GetCharIndex(element->text->font, element->text->string, x_end, y_end);
+				ui.start = ui.end;
+				ui.selected = element->text;
+				ui.isSelecting = true;
+			}
+			else if (isInBottomRight && (element->flags & UI_RESIZABLE)) {
+				ui.isResizing = true;
+				ui.originalPos = element->pos;
+			}
+			else if (element->flags & UI_MOVABLE) {
+				ui.isGrabbing = true;
+				ui.grabPos = cursorPos;
+				ui.originalPos = element->pos;
+			}
 		}
-		else if (isBottomRight && (element->flags & UI_RESIZABLE)) {
-			ui.isResizing = true;
-			ui.originalPos = element->pos;
-		}
-		else if (element->flags & UI_MOVABLE) {
-			ui.isGrabbing = true;
-			ui.grabPos = cursorPos;
-			ui.originalPos = element->pos;
-		}
+	}
+
+	// Handle double click
+	if (element && OSIsMouseDoubleClicked() && isInTextBound) {
+		ui.selected = element->text;
+		ui.end = (int32)element->text->string.length;
+		ui.start = 0;
 	}
 	
 	// Handle mouse released
 	if (!OSIsMouseDown(MOUSE_L)) {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
+		ui.isSelecting = false;
 	}
 
 	// Handle scrolling
@@ -406,7 +501,7 @@ UIElement* UIUpdateActiveElement() {
 		UIElement* scrollable = GetScrollableAnscestor(element);
 		if (scrollable) {
 			Dimensions2i contentDim = GetContentDim(scrollable);
-			scrollable->scrollPos.y += mouseWheelDelta / 10;
+			scrollable->scrollPos.y += mouseWheelDelta;
 			if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
 			if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
 				scrollable->scrollPos.y = contentDim.height - scrollable->height;
@@ -438,6 +533,39 @@ UIElement* UIUpdateActiveElement() {
 		element->height = MIN(y1 - element->y, element->parent->height - element->y);
 
 		if (element->onResize) element->onResize(element);
+	}
+
+	// Handle text selection
+	if (ui.isSelecting) {
+		ASSERT(element && element->text);
+		float32 x_end = (float32)(cursorPos.x - (pos.x0 + element->text->x));
+		float32 y_end = (float32)(cursorPos.y - (pos.y0 + element->text->y + element->text->font->height));
+		ui.end = GetCharIndex(element->text->font, element->text->string, x_end, y_end);
+	}
+
+	// Handle arrow keys
+	if (OSIsKeyPressed(KEY_LEFT)) {
+		if (ui.selected) {
+			ui.end = MAX(0, ui.end - 1);
+			if (!OSIsKeyDown(KEY_SHIFT))
+				ui.start = ui.end;
+		}
+	}
+	if (OSIsKeyPressed(KEY_RIGHT)) {
+		if (ui.selected) {
+			ui.end = MIN(ui.end + 1, (int32)ui.selected->string.length);
+			if (!OSIsKeyDown(KEY_SHIFT))
+				ui.start = ui.end;
+		}
+	}
+
+	// Handle copy
+	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C) && ui.selected) {
+		String string = ui.selected->string;
+		int32 start = MIN(ui.start, ui.end);
+		int32 end = MAX(ui.start, ui.end);
+		String sub = {string.data + start, end - start};
+		OSCopyToClipboard(sub);
 	}
 
 	return element;
@@ -473,7 +601,9 @@ void __toggle(UIElement* e) {
 
 UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str, byte* context) {
 	UIElement* wrapper = UICreateElement(parent);
-	wrapper->width = 37+(int32)GetTextWidth(font, str);
+	int32 lineCount;
+	wrapper->width = 37+(int32)GetTextWidth(font, str, &lineCount);
+	// TODO: handle line count
 	wrapper->height = 24;
 	wrapper->name = STR("wrapper");
 
