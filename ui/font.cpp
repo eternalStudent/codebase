@@ -61,18 +61,21 @@ void RenderText(Font* font, float32 x, float32 y, String string, uint32 color){
    }
 }
 
+float32 GetCharWidth(Font* font, byte b) {
+   BakedChar* bakedchar = font->chardata + (b - 32);
+   return bakedchar->xadvance;
+}
+
 float32 GetTextWidth(Font* font, String string, int32* lineCount) {
+   *lineCount = 1;
    if (string.length == 0) return 0.0f;
    int32 first_char = 32;
    int32 last_char = 128;
-   float32 max = 0;
    float32 x = 0;
-   *lineCount = 1;
 
    for (int32 i=0; i<string.length; i++) {
       byte b = string.data[i];
       if (b == 10) {
-         max = MAX(max, x);
          x = 0;
          *lineCount = *lineCount + 1;
       }
@@ -82,7 +85,27 @@ float32 GetTextWidth(Font* font, String string, int32* lineCount) {
       }
    }
 
-   return MAX(max, x);
+   return x;
+}
+
+float32 GetTextLineWidth(Font* font, String string) {
+   if (string.length == 0) return 0.0f;
+   int32 first_char = 32;
+   int32 last_char = 128;
+   float32 x = 0;
+
+   for (int32 i=0; i<string.length; i++) {
+      byte b = string.data[i];
+      if (b == 10) {
+         x = 0;
+      }
+      if (b >= first_char && b < last_char) {
+         BakedChar* bakedchar = font->chardata + (b - first_char);
+         x += bakedchar->xadvance;
+      }
+   }
+
+   return x;
 }
 
 int32 GetCharIndex(Font* font, String string, float32 x_end, float32 y_end) {
@@ -104,5 +127,5 @@ int32 GetCharIndex(Font* font, String string, float32 x_end, float32 y_end) {
       }
    }
 
-   return (int32)string.length;
+   return -1;
 }

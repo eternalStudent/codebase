@@ -243,3 +243,12 @@ int LinuxOpenFileDialog() {
 int LinuxSaveFileDialog() {
 	return OpenPipe("zenity --file-selection --save");
 }
+
+// NOTE: untested
+void LinuxCopyToClipboard(String str) {
+	XChangeProperty(window.display, window.root, XA_CUT_BUFFER0, XA_STRING, 8, PropModeReplace, str.data, str.length);
+
+	if (XGetSelectionOwner(window.display, XA_PRIMARY) != window.window) {
+		XSetSelectionOwner(window.display, XA_PRIMARY, window.window, CurrentTime);
+	}
+}

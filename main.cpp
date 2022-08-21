@@ -13,26 +13,54 @@ int main() {
 	*font = LoadFont(&scratch, "..\\AzeretMono-Regular.ttf", 24);
 
 	UIElement* e1 = UICreateElement(NULL);
-	e1->background = RGBA_ORANGE;
-	e1->pos = {300, 200};
-	e1->dim = {100, 100};
-	e1->flags = UI_MOVABLE | UI_RESIZABLE;
+	e1->pos = {12, 12};
+	e1->dim = {200, 200};
+	e1->flags = UI_HIDE_OVERFLOW;
+	e1->borderWidth = 1;
+	e1->borderColor = RGBA_WHITE;
+	UIText* text1 = UICreateText(e1);
+	text1->font = font;
+	text1->color = RGBA_WHITE;
+	text1->string = STR(R"STRING(Lorem ipsum dolor sit amet, 
+consectetur adipiscing elit, 
+sed do eiusmod tempor incididunt 
+ut labore et dolore magna aliqua. 
+Ut enim ad minim veniam, quis nostrud 
+exercitation ullamco laboris nisi ut 
+aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit
+in voluptate velit esse cillum dolore
+eu fugiat nulla pariatur. Excepteur
+sint occaecat cupidatat non proident, 
+sunt in culpa qui officia deserunt
+mollit anim id est laborum.)STRING");
 
-	UIElement* e2 = UICreateElement(NULL);
-	e2->background = RGBA_BLUE;
-	e2->pos = {300, 300};
-	e2->dim = {100, 100};
-	e2->flags = UI_MOVABLE | UI_RESIZABLE;
+	UIElement* debug1 = UICreateElement(NULL);
+	debug1->pos = {12, 300};
+	debug1->flags = UI_MOVABLE;
+	debug1->background = 0x33ffffff;
+	UIText* debugText1 = UICreateText(debug1);
+	debugText1->font = font;
+	debugText1->color = RGBA_WHITE;
 
-	UIElement* e3 = UICreateElement(NULL);
-	e3->background = RGBA_GREEN;
-	e3->pos = {200, 200};
-	e3->dim = {100, 100};
-	e3->flags = UI_MOVABLE | UI_RESIZABLE;
+	UIElement* debug2 = UICreateElement(NULL);
+	debug2->pos = {12, 324};
+	debug2->flags = UI_MOVABLE;
+	debug2->background = 0x33ffffff;
+	UIText* debugText2 = UICreateText(debug2);
+	debugText2->font = font;
+	debugText2->color = RGBA_WHITE;
+
+	byte buffer[10] = {};
 
 	while(!OSWindowDestroyed() && !OSIsKeyDown(KEY_ESC)) {
 		ArenaFreeAll(&scratch);
 		OSProcessWindowEvents();
+
+		int32 length1 = Int32ToDecimal(ui.start, buffer);
+		debugText1->string = {(byte*)buffer, length1};
+		int32 length2 = Int32ToDecimal(ui.end, buffer + length1);
+		debugText2->string = {(byte*)buffer+length1, length2};
 
 		GfxClearScreen();
 

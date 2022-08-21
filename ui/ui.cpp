@@ -11,7 +11,6 @@
 #define UI_FITTEXT			(1 << 8)
 
 #include "font.cpp"
-#include "clipboard.cpp"
 
 struct UIText {
 	union {
@@ -22,6 +21,8 @@ struct UIText {
 	uint32 color;
 	Font* font;
 	String string;
+
+	Point2i scrollPos;
 };
 
 struct UIStyle {
@@ -104,7 +105,7 @@ struct {
 	bool isResizing;
 	bool isSelecting;
 
-	UIText* selected;
+	UIElement* selected;
 	int32 start;
 	int32 end;
 
@@ -132,16 +133,20 @@ bool IsInBottomRight(Box2i box, Point2i pos) {
 	return box.x1-4 <= pos.x && box.y1-4 <= pos.y;
 }
 
-bool IsInTextBound(UIText* text, Box2i box, Point2i pos) {
-	if (!text) return false;
-	int32 lineCount;
+int32 IsInTextBound(UIText* text, Box2i box, Point2i pos) {
+	if (!text) return -1;
+	float32 x_end = (float32)(pos.x - (box.x0 + text->x) + text->scrollPos.x);
+	float32 y_end = (float32)(pos.y - (box.y0 + text->y + text->font->height) + text->scrollPos.y);
+	return GetCharIndex(text->font, text->string, x_end, y_end);
+	
+	/*int32 lineCount;
 	Box2i textBox = {
-		box.x0 + text->x, 
+		box.x0 + text->x - text->scrollPos.x, 
 		box.y0 + text->y, 
-		box.x0 + text->x + (int32)(GetTextWidth(text->font, text->string, &lineCount) + 0.5f), 
+		box.x0 + text->x - text->scrollPos.x + (int32)(GetTextWidth(text->font, text->string, &lineCount) + 0.5f), 
 		box.y0 + text->y + (int32)(lineCount*text->font->height + 0.5f)
 	};
-	return INSIDE2(textBox, pos);
+	return INSIDE2(textBox, pos);*/
 }
 
 void SetPosition(UIElement* element, int32 x, int32 y) {
@@ -225,12 +230,12 @@ void RenderText(UIText* text, Point2i parentPos) {
 	String string = text->string;
 	Font* font = text->font;
 
-	float32 x = (float32)(text->pos.x + parentPos.x);
-	float32 y = UI_FLIPY((float32)(text->pos.y + parentPos.y)) - font->height;
+	float32 x = (float32)(text->pos.x + parentPos.x - text->scrollPos.x);
+	float32 y = (float32)(UI_FLIPY(text->pos.y + parentPos.y + font->height - text->scrollPos.y));
 	RenderText(font, x, y, string, text->color);
 	
 	// Handle selected text
-	if (ui.selected == text) {
+	if (ui.selected && ui.selected->text == text) {
 		int32 start = MIN(ui.start, ui.end);
 		int32 end = MAX(ui.start, ui.end);
 		ASSERT(0 <= start && start <= end && end <= string.length);
@@ -246,8 +251,7 @@ void RenderText(UIText* text, Point2i parentPos) {
         		x0 = x;
         		y1 -= font->height;
       		}
-      		else {
-      			ASSERT(32 <= b && b <= 127);
+      		else if (32 <= b && b <= 127) {
         		BakedChar* bakedchar = font->chardata + (b - 32);
          		x0 += bakedchar->xadvance;
          	}
@@ -266,8 +270,7 @@ void RenderText(UIText* text, Point2i parentPos) {
 				x1 = x;
 				y1 -= font->height;
 			}
-			else {
-				ASSERT(32 <= b && b <= 127);
+			else if (32 <= b && b <= 127) {
         		BakedChar* bakedchar = font->chardata + (b - 32);
          		x1 += bakedchar->xadvance;
          	}
@@ -417,6 +420,45 @@ UIImage* UICreateImage(UIElement* parent) {
 	return image;
 }
 
+void UpdateTextScrollPos() {
+	UIText* text = ui.selected->text;
+	int32 elementWidth = ui.selected->width;
+	int32 elementHeight = ui.selected->height;
+	Font* font = text->font;
+	String string = text->string;
+	int32 lineCount;
+
+	String sub = {string.data, ui.end};
+	float32 textLineWidth = GetTextWidth(font, sub, &lineCount);
+	ASSERT(lineCount);
+	float32 nextLetter = 0.0f;
+	if (ui.end < string.length) {
+		byte b = string.data[ui.end + 1];
+		if (b == 10) b = 32;
+		nextLetter = GetCharWidth(font, string.data[ui.end + 1]);
+	}
+
+	int32 posRelativeToElement = text->x + (int32)(textLineWidth + nextLetter + 0.5f);
+	if (elementWidth < posRelativeToElement - text->scrollPos.x) {
+		text->scrollPos.x = posRelativeToElement - elementWidth; 
+	}
+
+	sub = {string.data, MAX(0, ui.end - 1)};
+	textLineWidth = GetTextLineWidth(font, sub);
+	posRelativeToElement = text->x + (int32)(textLineWidth + 0.5f);
+	if (posRelativeToElement < text->scrollPos.x) {
+		text->scrollPos.x = MAX(posRelativeToElement, 0);
+	}
+
+	if (elementHeight < lineCount*font->height - text->scrollPos.y) {
+		text->scrollPos.y = (int32)((lineCount + 0.5)*font->height + 0.5f) - elementHeight;
+	}
+
+	if ((lineCount - 1)*font->height < text->scrollPos.y) {
+		text->scrollPos.y = MAX((int32)((lineCount - 1)*font->height + 0.5f), 0);
+	}
+}
+
 UIElement* UIUpdateActiveElement() {
 	Point2i cursorPos = OSGetCursorPosition();
 	ui.windowElement->dim = OSGetWindowDimensions();
@@ -435,14 +477,15 @@ UIElement* UIUpdateActiveElement() {
 	// Handle mouse hover
 	bool isInBottomRight = false;
 	bool isInTextBound = false;
+	int32 textIndex = -1;
 	if (element) {
+		textIndex = IsInTextBound(element->text, pos, cursorPos);
 		if(IsInBottomRight(pos, cursorPos) && (element->flags & UI_RESIZABLE)) {
 			OSSetCursorIcon(CUR_RESIZE);
 			isInBottomRight = true;
 		}
-		else if (IsInTextBound(element->text, pos, cursorPos)) {
+		else if (textIndex != -1) {
 			OSSetCursorIcon(CUR_TEXT);
-			isInTextBound = true;
 		}
 		else if (element->onHover) element->onHover(element);
 		else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
@@ -461,12 +504,10 @@ UIElement* UIUpdateActiveElement() {
 				if (element->onClick)
 					element->onClick(element);
 			}
-			else if (isInTextBound) {
-				float32 x_end = (float32)(cursorPos.x - (pos.x0 + element->text->x));
-				float32 y_end = (float32)(cursorPos.y - (pos.y0 + element->text->y + element->text->font->height));
-				ui.end = GetCharIndex(element->text->font, element->text->string, x_end, y_end);
+			else if (textIndex != -1) {
+				ui.end = textIndex;
 				ui.start = ui.end;
-				ui.selected = element->text;
+				ui.selected = element;
 				ui.isSelecting = true;
 			}
 			else if (isInBottomRight && (element->flags & UI_RESIZABLE)) {
@@ -483,7 +524,7 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle double click
 	if (element && OSIsMouseDoubleClicked() && isInTextBound) {
-		ui.selected = element->text;
+		ui.selected = element;
 		ui.end = (int32)element->text->string.length;
 		ui.start = 0;
 	}
@@ -537,31 +578,95 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle text selection
 	if (ui.isSelecting) {
-		ASSERT(element && element->text);
-		float32 x_end = (float32)(cursorPos.x - (pos.x0 + element->text->x));
-		float32 y_end = (float32)(cursorPos.y - (pos.y0 + element->text->y + element->text->font->height));
-		ui.end = GetCharIndex(element->text->font, element->text->string, x_end, y_end);
+		if (element && element->text) {
+			ASSERT(element == ui.selected && textIndex != -1);
+			ui.end = textIndex;
+		}
+		else {
+			Box2i selectedPos = GetAbsolutePosition(ui.selected);
+			if (cursorPos.x < selectedPos.x1) {
+				ui.end = MAX(ui.end - 1, 0);
+				UpdateTextScrollPos();
+			}
+			if (selectedPos.x1 < cursorPos.x) {
+				if (ui.end < ui.selected->text->string.length && ui.selected->text->string.data[ui.end + 1] != 10) {
+					ui.end++;
+					UpdateTextScrollPos();
+				}
+			}
+		}
 	}
 
 	// Handle arrow keys
-	if (OSIsKeyPressed(KEY_LEFT)) {
-		if (ui.selected) {
-			ui.end = MAX(0, ui.end - 1);
-			if (!OSIsKeyDown(KEY_SHIFT))
-				ui.start = ui.end;
+	static int32 leftKeyCount = 0;
+	if (OSIsKeyPressed(KEY_LEFT) || OSIsKeyDown(KEY_LEFT)) {
+		if (leftKeyCount == 0) {
+			leftKeyCount = 6;
+			if (ui.selected) {
+				ui.end = MAX(0, ui.end - 1);
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				UpdateTextScrollPos();
+			}
 		}
+		else leftKeyCount--;
 	}
-	if (OSIsKeyPressed(KEY_RIGHT)) {
-		if (ui.selected) {
-			ui.end = MIN(ui.end + 1, (int32)ui.selected->string.length);
-			if (!OSIsKeyDown(KEY_SHIFT))
-				ui.start = ui.end;
+	static int32 rightKeyCount = 0;
+	if (OSIsKeyDown(KEY_RIGHT)) {
+		if (OSIsKeyPressed(KEY_RIGHT) || rightKeyCount == 0) {
+			rightKeyCount = 6;
+			if (ui.selected) {
+				String string = ui.selected->text->string;
+				ui.end = MIN(ui.end + 1, (int32)string.length);
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				UpdateTextScrollPos();
+			}
 		}
+		else rightKeyCount--;
+	}
+	static int32 upKeyCount = 0;
+	if (OSIsKeyDown(KEY_UP)) {
+		if (OSIsKeyPressed(KEY_UP) || upKeyCount == 0) {
+			upKeyCount = 6;
+			if (ui.selected) {
+				String string = ui.selected->text->string;
+				Font* font = ui.selected->text->font;
+				int32 lineCount;
+				float32 width = GetTextWidth(font, {string.data, ui.end}, &lineCount);
+				ui.end = GetCharIndex(font, string, width, font->height*(lineCount-2));
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				UpdateTextScrollPos();
+			}
+		}
+		else upKeyCount--;
+	}
+	static int32 downKeyCount = 0;
+	if (OSIsKeyDown(KEY_DOWN)) {
+		if (OSIsKeyPressed(KEY_DOWN) || downKeyCount == 0) {
+			downKeyCount = 6;
+			if (ui.selected) {
+				String string = ui.selected->text->string;
+				Font* font = ui.selected->text->font;
+				int32 lineCount;
+				float32 width = GetTextWidth(font, {string.data, ui.end}, &lineCount);
+				ui.end = GetCharIndex(font, string, width, font->height*(lineCount));
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				UpdateTextScrollPos();
+			}
+		}
+		else downKeyCount--;
 	}
 
 	// Handle copy
 	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C) && ui.selected) {
-		String string = ui.selected->string;
+		String string = ui.selected->text->string;
 		int32 start = MIN(ui.start, ui.end);
 		int32 end = MAX(ui.start, ui.end);
 		String sub = {string.data + start, end - start};

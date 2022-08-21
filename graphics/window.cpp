@@ -43,6 +43,8 @@
 #  define OSIsMouseDoubleClicked	Win32IsMouseDoubleClicked
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OSWindowDestroyed 		Win32WindowDestroyed
+
+#  define OSCopyToClipboard 		Win32CopyToClipboard
 #endif
 
 #if defined(__gnu_linux__)
@@ -66,6 +68,8 @@
 #  define OSIsKeyPressed			LinuxIsKeyPressed
 #  define OSOpenFileDialog			LinuxOpenFileDialog
 #  define OSSaveFileDialog			LinuxSaveFileDialog
+
+#  define OSCopyToClipboard 		LinuxCopyToClipboard
 
 #  define KEY_ESC 					(XK_Escape       && 0xff)
 #  define KEY_SPACE					(XK_KP_Space     && 0xff)
