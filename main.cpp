@@ -15,13 +15,12 @@ int main() {
 	UIElement* e1 = UICreateElement(NULL);
 	e1->pos = {12, 12};
 	e1->dim = {200, 200};
-	e1->flags = UI_HIDE_OVERFLOW;
+	e1->flags = UI_SCROLLABLE;
 	e1->borderWidth = 1;
 	e1->borderColor = RGBA_WHITE;
-	UIText* text1 = UICreateText(e1);
-	text1->font = font;
-	text1->color = RGBA_WHITE;
-	text1->string = STR(R"STRING(Lorem ipsum dolor sit amet, 
+	e1->text.font = font;
+	e1->text.color = RGBA_WHITE;
+	e1->text.string = STR(R"STRING(Lorem ipsum dolor sit amet, 
 consectetur adipiscing elit, 
 sed do eiusmod tempor incididunt 
 ut labore et dolore magna aliqua. 
@@ -35,21 +34,36 @@ sint occaecat cupidatat non proident,
 sunt in culpa qui officia deserunt
 mollit anim id est laborum.)STRING");
 
+	byte itemsbuf[] = "item 1item 2item 3item 4item 5item 6item 7";
+	UIElement* list = UICreateElement(NULL);
+	list->dim = {120, 100};
+	list->pos = {12, 224};
+	list->flags = UI_SCROLLABLE;
+	list->borderWidth = 1;
+	list->borderColor = RGBA_WHITE;
+	for(int32 i = 0; i < 7; i++){
+		UIElement* item = UICreateElement(list);
+		item->pos = {12, 24*i + 12};
+		item->dim = {120, 42};
+		item->text.font = font;
+		item->text.string = {itemsbuf+ 6*i, 6};
+		item->text.color = RGBA_WHITE;
+	}
+
+
 	UIElement* debug1 = UICreateElement(NULL);
-	debug1->pos = {12, 300};
+	debug1->pos = {12, 430};
 	debug1->flags = UI_MOVABLE;
 	debug1->background = 0x33ffffff;
-	UIText* debugText1 = UICreateText(debug1);
-	debugText1->font = font;
-	debugText1->color = RGBA_WHITE;
+	debug1->text.font = font;
+	debug1->text.color = RGBA_WHITE;
 
 	UIElement* debug2 = UICreateElement(NULL);
-	debug2->pos = {12, 324};
+	debug2->pos = {12, 454};
 	debug2->flags = UI_MOVABLE;
 	debug2->background = 0x33ffffff;
-	UIText* debugText2 = UICreateText(debug2);
-	debugText2->font = font;
-	debugText2->color = RGBA_WHITE;
+	debug2->text.font = font;
+	debug2->text.color = RGBA_WHITE;
 
 	byte buffer[10] = {};
 
@@ -58,9 +72,9 @@ mollit anim id est laborum.)STRING");
 		OSProcessWindowEvents();
 
 		int32 length1 = Int32ToDecimal(ui.start, buffer);
-		debugText1->string = {(byte*)buffer, length1};
+		debug1->text.string = {(byte*)buffer, length1};
 		int32 length2 = Int32ToDecimal(ui.end, buffer + length1);
-		debugText2->string = {(byte*)buffer+length1, length2};
+		debug2->text.string = {(byte*)buffer+length1, length2};
 
 		GfxClearScreen();
 

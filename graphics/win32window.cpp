@@ -7,6 +7,7 @@ struct {
 	BYTE keys_prev[256];
 	BYTE mouse_prev[3];
 	DWORD mouseWheelDelta;
+	DWORD mouseHWheelDelta;
 	HCURSOR cursors[6];
 } window;
 
@@ -40,6 +41,10 @@ BOOL Win32IsMouseDoubleClicked() {
 
 DWORD Win32GetMouseWheelDelta() {
 	return window.mouseWheelDelta;
+}
+
+DWORD Win32GetMouseHWheelDelta() {
+	return window.mouseHWheelDelta;
 }
 
 void Win32ExitFullScreen() {
@@ -123,6 +128,9 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		} break;
 		case WM_MOUSEWHEEL: {
 			window.mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+		} break;
+		case WM_MOUSEHWHEEL: {
+			window.mouseHWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 		} break;
 		case WM_LBUTTONDBLCLK: {
 			window.mouse[3] = 1;

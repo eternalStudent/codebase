@@ -13,16 +13,9 @@
 #include "font.cpp"
 
 struct UIText {
-	union {
-		Point2i pos;
-		struct {int32 x, y;};
-	};
-
 	uint32 color;
 	Font* font;
 	String string;
-
-	Point2i scrollPos;
 };
 
 struct UIStyle {
@@ -81,7 +74,7 @@ struct UIElement {
 	UIElement* next;
 	UIElement* prev;
 
-	UIText* text;
+	UIText text;
 	UIImage* image;
 	opaque64 context;
 
@@ -133,20 +126,12 @@ bool IsInBottomRight(Box2i box, Point2i pos) {
 	return box.x1-4 <= pos.x && box.y1-4 <= pos.y;
 }
 
-int32 IsInTextBound(UIText* text, Box2i box, Point2i pos) {
-	if (!text) return -1;
-	float32 x_end = (float32)(pos.x - (box.x0 + text->x) + text->scrollPos.x);
-	float32 y_end = (float32)(pos.y - (box.y0 + text->y + text->font->height) + text->scrollPos.y);
-	return GetCharIndex(text->font, text->string, x_end, y_end);
-	
-	/*int32 lineCount;
-	Box2i textBox = {
-		box.x0 + text->x - text->scrollPos.x, 
-		box.y0 + text->y, 
-		box.x0 + text->x - text->scrollPos.x + (int32)(GetTextWidth(text->font, text->string, &lineCount) + 0.5f), 
-		box.y0 + text->y + (int32)(lineCount*text->font->height + 0.5f)
-	};
-	return INSIDE2(textBox, pos);*/
+int32 IsInTextBound(UIElement* textElement, Box2i box, Point2i pos) {
+	UIText text = textElement->text;
+	if (!text.string.length) return -1;
+	float32 x_end = (float32)(pos.x - box.x0 + textElement->scrollPos.x);
+	float32 y_end = (float32)(pos.y - (box.y0 + text.font->height) + textElement->scrollPos.y);
+	return GetCharIndex(text.font, text.string, x_end, y_end);
 }
 
 void SetPosition(UIElement* element, int32 x, int32 y) {
@@ -218,6 +203,11 @@ UIElement* GetScrollableAnscestor(UIElement* e) {
 Dimensions2i GetContentDim(UIElement* e) {
 	int32 width = 0;
 	int32 height = 0;
+	if (e->text.string.length) {
+		int32 lineCount;
+		width = (int32)(GetTextWidth(e->text.font, e->text.string, &lineCount) + 0.5f); // Change to max
+		height = (int32)((lineCount+0.5)*e->text.font->height + 0.5f);
+	}
 	LINKEDLIST_FOREACH(e, UIElement, child) {
 		width  = MAX(child->x + child->width, width);
 		height = MAX(child->y + child->height, height);
@@ -225,17 +215,18 @@ Dimensions2i GetContentDim(UIElement* e) {
 	return {width, height};
 }
 
-void RenderText(UIText* text, Point2i parentPos) {
-	if (!text) return;
-	String string = text->string;
-	Font* font = text->font;
+void RenderText(UIElement* textElement, Point2i parentPos) {
+	UIText text = textElement->text;
+	if (!text.string.length) return;
+	String string = text.string;
+	Font* font = text.font;
 
-	float32 x = (float32)(text->pos.x + parentPos.x - text->scrollPos.x);
-	float32 y = (float32)(UI_FLIPY(text->pos.y + parentPos.y + font->height - text->scrollPos.y));
-	RenderText(font, x, y, string, text->color);
+	float32 x = (float32)(parentPos.x - textElement->scrollPos.x);
+	float32 y = (float32)(UI_FLIPY(parentPos.y + font->height - textElement->scrollPos.y));
+	RenderText(font, x, y, string, text.color);
 	
 	// Handle selected text
-	if (ui.selected && ui.selected->text == text) {
+	if (ui.selected && ui.selected == textElement) {
 		int32 start = MIN(ui.start, ui.end);
 		int32 end = MAX(ui.start, ui.end);
 		ASSERT(0 <= start && start <= end && end <= string.length);
@@ -299,7 +290,7 @@ int32 __center(UIElement* element) {
 
 int32 __fit_text(UIElement* element) {
 	int32 lineCount;
-	return element->text->x + (int32)(GetTextWidth(element->text->font, element->text->string, &lineCount) + 0.5f);
+	return (int32)(GetTextWidth(element->text.font, element->text.string, &lineCount) + 0.5f);
 }
 
 void RenderElement(UIElement* element) {
@@ -333,7 +324,7 @@ void RenderElement(UIElement* element) {
 	}
 	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), element->width, element->height);
 	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
-	RenderText(element->text, box.p0);
+	RenderText(element, box.p0);
 	RenderImage(element->image, box.p0);
 	if (element->flags & UI_HIDE_OVERFLOW) GfxClearCrop();
 }
@@ -350,7 +341,7 @@ void UIInit(Arena* persist, Arena* scratch) {
 
 void UIRenderElements() {
 	LINKEDLIST_FOREACH(ui.windowElement, UIElement, child) RenderElement(child);
-	RenderText(ui.windowElement->text, {0, 0});
+	RenderText(ui.windowElement, {0, 0});
 	RenderImage(ui.windowElement->image, {0, 0});	
 }
 
@@ -392,19 +383,8 @@ void UIDestroyElement(UIElement* element) {
 	LINKEDLIST_REMOVE(element->parent, element);
 	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
 
-	FixedSizeFree(&ui.allocator, element->text);
 	FixedSizeFree(&ui.allocator, element->image);
 	FixedSizeFree(&ui.allocator, element);
-}
-
-UIText* UICreateText(UIElement* parent) {
-	if (ui.elementCount == ui.capacity) return NULL;
-	UIText* text = (UIText*)FixedSizeAlloc(&ui.allocator);
-	ui.elementCount++;
-
-	if (parent) parent->text = text;
-	else ui.windowElement->text = text;
-	return text;
 }
 
 UIImage* UICreateImage(UIElement* parent) {
@@ -421,11 +401,11 @@ UIImage* UICreateImage(UIElement* parent) {
 }
 
 void UpdateTextScrollPos() {
-	UIText* text = ui.selected->text;
+	UIText text = ui.selected->text;
 	int32 elementWidth = ui.selected->width;
 	int32 elementHeight = ui.selected->height;
-	Font* font = text->font;
-	String string = text->string;
+	Font* font = text.font;
+	String string = text.string;
 	int32 lineCount;
 
 	String sub = {string.data, ui.end};
@@ -438,24 +418,24 @@ void UpdateTextScrollPos() {
 		nextLetter = GetCharWidth(font, string.data[ui.end + 1]);
 	}
 
-	int32 posRelativeToElement = text->x + (int32)(textLineWidth + nextLetter + 0.5f);
-	if (elementWidth < posRelativeToElement - text->scrollPos.x) {
-		text->scrollPos.x = posRelativeToElement - elementWidth; 
+	int32 posRelativeToElement = (int32)(textLineWidth + nextLetter + 0.5f);
+	if (elementWidth < posRelativeToElement - ui.selected->scrollPos.x) {
+		ui.selected->scrollPos.x = posRelativeToElement - elementWidth; 
 	}
 
 	sub = {string.data, MAX(0, ui.end - 1)};
 	textLineWidth = GetTextLineWidth(font, sub);
-	posRelativeToElement = text->x + (int32)(textLineWidth + 0.5f);
-	if (posRelativeToElement < text->scrollPos.x) {
-		text->scrollPos.x = MAX(posRelativeToElement, 0);
+	posRelativeToElement = (int32)(textLineWidth + 0.5f);
+	if (posRelativeToElement < ui.selected->scrollPos.x) {
+		ui.selected->scrollPos.x = MAX(posRelativeToElement, 0);
 	}
 
-	if (elementHeight < lineCount*font->height - text->scrollPos.y) {
-		text->scrollPos.y = (int32)((lineCount + 0.5)*font->height + 0.5f) - elementHeight;
+	if (elementHeight < lineCount*font->height - ui.selected->scrollPos.y) {
+		ui.selected->scrollPos.y = (int32)((lineCount + 0.5)*font->height + 0.5f) - elementHeight;
 	}
 
-	if ((lineCount - 1)*font->height < text->scrollPos.y) {
-		text->scrollPos.y = MAX((int32)((lineCount - 1)*font->height + 0.5f), 0);
+	if ((lineCount - 1)*font->height < ui.selected->scrollPos.y) {
+		ui.selected->scrollPos.y = MAX((int32)((lineCount - 1)*font->height + 0.5f), 0);
 	}
 }
 
@@ -479,7 +459,7 @@ UIElement* UIUpdateActiveElement() {
 	bool isInTextBound = false;
 	int32 textIndex = -1;
 	if (element) {
-		textIndex = IsInTextBound(element->text, pos, cursorPos);
+		textIndex = IsInTextBound(element, pos, cursorPos);
 		if(IsInBottomRight(pos, cursorPos) && (element->flags & UI_RESIZABLE)) {
 			OSSetCursorIcon(CUR_RESIZE);
 			isInBottomRight = true;
@@ -525,7 +505,7 @@ UIElement* UIUpdateActiveElement() {
 	// Handle double click
 	if (element && OSIsMouseDoubleClicked() && isInTextBound) {
 		ui.selected = element;
-		ui.end = (int32)element->text->string.length;
+		ui.end = (int32)element->text.string.length;
 		ui.start = 0;
 	}
 	
@@ -538,14 +518,25 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle scrolling
 	int32 mouseWheelDelta = OSGetMouseWheelDelta();
-	if (mouseWheelDelta) {
+	int32 mouseHWheelDelta = OSGetMouseHWheelDelta();
+	if (mouseWheelDelta || mouseHWheelDelta) {
 		UIElement* scrollable = GetScrollableAnscestor(element);
 		if (scrollable) {
 			Dimensions2i contentDim = GetContentDim(scrollable);
-			scrollable->scrollPos.y += mouseWheelDelta;
-			if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
-			if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
-				scrollable->scrollPos.y = contentDim.height - scrollable->height;
+
+			if (mouseWheelDelta) {
+				scrollable->scrollPos.y -= mouseWheelDelta;
+				if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
+				if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
+					scrollable->scrollPos.y = contentDim.height - scrollable->height;
+			}
+
+			if (mouseHWheelDelta) {
+				scrollable->scrollPos.x += mouseHWheelDelta;
+				if (scrollable->scrollPos.x < 0) scrollable->scrollPos.x = 0;
+				if (scrollable->scrollPos.x > contentDim.width - scrollable->width)
+					scrollable->scrollPos.x = contentDim.width - scrollable->width;
+			}
 		}
 	}
 
@@ -578,7 +569,7 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle text selection
 	if (ui.isSelecting) {
-		if (element && element->text) {
+		if (element && element->text.string.length) {
 			ASSERT(element == ui.selected && textIndex != -1);
 			ui.end = textIndex;
 		}
@@ -589,7 +580,7 @@ UIElement* UIUpdateActiveElement() {
 				UpdateTextScrollPos();
 			}
 			if (selectedPos.x1 < cursorPos.x) {
-				if (ui.end < ui.selected->text->string.length && ui.selected->text->string.data[ui.end + 1] != 10) {
+				if (ui.end < ui.selected->text.string.length && ui.selected->text.string.data[ui.end + 1] != 10) {
 					ui.end++;
 					UpdateTextScrollPos();
 				}
@@ -617,7 +608,7 @@ UIElement* UIUpdateActiveElement() {
 		if (OSIsKeyPressed(KEY_RIGHT) || rightKeyCount == 0) {
 			rightKeyCount = 6;
 			if (ui.selected) {
-				String string = ui.selected->text->string;
+				String string = ui.selected->text.string;
 				ui.end = MIN(ui.end + 1, (int32)string.length);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
@@ -632,11 +623,12 @@ UIElement* UIUpdateActiveElement() {
 		if (OSIsKeyPressed(KEY_UP) || upKeyCount == 0) {
 			upKeyCount = 6;
 			if (ui.selected) {
-				String string = ui.selected->text->string;
-				Font* font = ui.selected->text->font;
+				String string = ui.selected->text.string;
+				Font* font = ui.selected->text.font;
 				int32 lineCount;
 				float32 width = GetTextWidth(font, {string.data, ui.end}, &lineCount);
-				ui.end = GetCharIndex(font, string, width, font->height*(lineCount-2));
+				int32 end = GetCharIndex(font, string, width, font->height*(lineCount-2));
+				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
@@ -650,11 +642,12 @@ UIElement* UIUpdateActiveElement() {
 		if (OSIsKeyPressed(KEY_DOWN) || downKeyCount == 0) {
 			downKeyCount = 6;
 			if (ui.selected) {
-				String string = ui.selected->text->string;
-				Font* font = ui.selected->text->font;
+				String string = ui.selected->text.string;
+				Font* font = ui.selected->text.font;
 				int32 lineCount;
 				float32 width = GetTextWidth(font, {string.data, ui.end}, &lineCount);
-				ui.end = GetCharIndex(font, string, width, font->height*(lineCount));
+				int32 end = GetCharIndex(font, string, width, font->height*(lineCount));
+				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
@@ -666,7 +659,7 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle copy
 	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C) && ui.selected) {
-		String string = ui.selected->text->string;
+		String string = ui.selected->text.string;
 		int32 start = MIN(ui.start, ui.end);
 		int32 end = MAX(ui.start, ui.end);
 		String sub = {string.data + start, end - start};
@@ -726,10 +719,10 @@ UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str, byte* con
 	check->context.p = context;
 	check->name = STR("check");
 
-	UIText* text = UICreateText(wrapper);
-	text->pos = {37, -4};
-	text->font = font;
-	text->string = str;
+	UIElement* textElement = UICreateElement(wrapper);
+	textElement->pos = {37, -4};
+	textElement->text.font = font;
+	textElement->text.string = str;
 
 	return wrapper;
 }
@@ -820,10 +813,10 @@ UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* 
 	header->background = RGBA_LIGHTGREY;
 	header->name = STR("tab header");
 
-	UIText* text = UICreateText(header);
-    text->string = title;
-    text->x = 3;
-    text->font = font;
+	UIElement* textElement = UICreateElement(header);
+    textElement->text.string = title;
+    textElement->x = 3;
+    textElement->text.font = font;
 
     UIElement* body = UICreateElement(header);
     body->x = -header->x;

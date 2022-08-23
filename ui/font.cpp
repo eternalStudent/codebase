@@ -66,6 +66,7 @@ float32 GetCharWidth(Font* font, byte b) {
    return bakedchar->xadvance;
 }
 
+// TODO: return a Box2
 float32 GetTextWidth(Font* font, String string, int32* lineCount) {
    *lineCount = 1;
    if (string.length == 0) return 0.0f;

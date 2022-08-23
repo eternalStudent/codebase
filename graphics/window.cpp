@@ -42,6 +42,7 @@
 #  define OSIsMousePressed			Win32IsMousePressed
 #  define OSIsMouseDoubleClicked	Win32IsMouseDoubleClicked
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
+#  define OSGetMouseHWheelDelta 	Win32GetMouseHWheelDelta
 #  define OSWindowDestroyed 		Win32WindowDestroyed
 
 #  define OSCopyToClipboard 		Win32CopyToClipboard
