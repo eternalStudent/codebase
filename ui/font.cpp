@@ -13,6 +13,18 @@ struct Font {
    float32 height;
 };
 
+struct Text {
+   Font* font;
+   String string;
+   uint32 color;
+};
+
+struct TextMetrics {
+   float32 maxx;
+   float32 endx;
+   float32 endy;
+};
+
 #include "truetype.cpp"
 
 Font LoadFont(Arena* arena, const char* filePath, float32 height){
@@ -21,12 +33,16 @@ Font LoadFont(Arena* arena, const char* filePath, float32 height){
 }
 
 // NOTE: adopted from stbtt_GetBakedQuad
-void RenderText(Font* font, float32 x, float32 y, String string, uint32 color){
+void RenderText(Text text, float32 x, float32 y){
    const int32 pw = 512;
    const int32 ph = 512;
    const int32 first_char = 32;
    const int32 last_char = 128;
    const float32 original_x = x;
+
+   Font* font = text.font;
+   String string = text.string;
+   uint32 color = text.color;
 
    for (int32 i=0; i<string.length; i++) {
       byte b = string.data[i];
@@ -62,58 +78,48 @@ void RenderText(Font* font, float32 x, float32 y, String string, uint32 color){
 }
 
 float32 GetCharWidth(Font* font, byte b) {
-   BakedChar* bakedchar = font->chardata + (b - 32);
-   return bakedchar->xadvance;
+   int32 first_char = 32;
+   int32 last_char = 127;
+
+   if (b == 9) return font->chardata[0].xadvance * 4;
+   if (first_char <= b && b <= last_char) {
+      BakedChar* bakedchar = font->chardata + (b - first_char);
+      return bakedchar->xadvance;
+   }
+   return 0.0f;
 }
 
-// TODO: return a Box2
-float32 GetTextWidth(Font* font, String string, int32* lineCount) {
-   *lineCount = 1;
-   if (string.length == 0) return 0.0f;
-   int32 first_char = 32;
-   int32 last_char = 128;
-   float32 x = 0;
+TextMetrics GetTextMetrics(Text text) {
+   String string = text.string;
+   Font* font = text.font;
 
-   for (int32 i=0; i<string.length; i++) {
+   if (string.length == 0) return {};
+   
+   float32 maxx = 0;
+   float32 x = 0;
+   float32 y = font->height * 1.5f;
+
+   for (int32 i = 0; i < string.length; i++) {
       byte b = string.data[i];
       if (b == 10) {
+         maxx = MAX(maxx, x);
          x = 0;
-         *lineCount = *lineCount + 1;
+         y += font->height;
       }
-      if (b >= first_char && b < last_char) {
-         BakedChar* bakedchar = font->chardata + (b - first_char);
-         x += bakedchar->xadvance;
-      }
+      x += GetCharWidth(font, b);
    }
 
-   return x;
+   maxx = MAX(x, maxx);
+   return {maxx, x, y};
 }
 
-float32 GetTextLineWidth(Font* font, String string) {
-   if (string.length == 0) return 0.0f;
-   int32 first_char = 32;
-   int32 last_char = 128;
-   float32 x = 0;
-
-   for (int32 i=0; i<string.length; i++) {
-      byte b = string.data[i];
-      if (b == 10) {
-         x = 0;
-      }
-      if (b >= first_char && b < last_char) {
-         BakedChar* bakedchar = font->chardata + (b - first_char);
-         x += bakedchar->xadvance;
-      }
-   }
-
-   return x;
-}
-
-int32 GetCharIndex(Font* font, String string, float32 x_end, float32 y_end) {
+int32 GetCharIndex(Text text, float32 x_end, float32 y_end) {
    int32 first_char = 32;
    int32 last_char = 128;
    float32 x = 0;
    float32 y = 0;
+   Font* font = text.font;
+   String string = text.string;
 
    for (int32 i=0; i<string.length; i++) {
       byte b = string.data[i];

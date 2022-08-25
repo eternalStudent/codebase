@@ -12,12 +12,6 @@
 
 #include "font.cpp"
 
-struct UIText {
-	uint32 color;
-	Font* font;
-	String string;
-};
-
 struct UIStyle {
 	float32 radius;
 	uint32 background;
@@ -74,7 +68,7 @@ struct UIElement {
 	UIElement* next;
 	UIElement* prev;
 
-	UIText text;
+	Text text;
 	UIImage* image;
 	opaque64 context;
 
@@ -127,11 +121,11 @@ bool IsInBottomRight(Box2i box, Point2i pos) {
 }
 
 int32 IsInTextBound(UIElement* textElement, Box2i box, Point2i pos) {
-	UIText text = textElement->text;
+	Text text = textElement->text;
 	if (!text.string.length) return -1;
 	float32 x_end = (float32)(pos.x - box.x0 + textElement->scrollPos.x);
 	float32 y_end = (float32)(pos.y - (box.y0 + text.font->height) + textElement->scrollPos.y);
-	return GetCharIndex(text.font, text.string, x_end, y_end);
+	return GetCharIndex(text, x_end, y_end);
 }
 
 void SetPosition(UIElement* element, int32 x, int32 y) {
@@ -204,9 +198,9 @@ Dimensions2i GetContentDim(UIElement* e) {
 	int32 width = 0;
 	int32 height = 0;
 	if (e->text.string.length) {
-		int32 lineCount;
-		width = (int32)(GetTextWidth(e->text.font, e->text.string, &lineCount) + 0.5f); // Change to max
-		height = (int32)((lineCount+0.5)*e->text.font->height + 0.5f);
+		TextMetrics metrics = GetTextMetrics(e->text);
+		width = (int32)(metrics.maxx + 0.5f);
+		height = (int32)(metrics.endy + 0.5f);
 	}
 	LINKEDLIST_FOREACH(e, UIElement, child) {
 		width  = MAX(child->x + child->width, width);
@@ -216,14 +210,14 @@ Dimensions2i GetContentDim(UIElement* e) {
 }
 
 void RenderText(UIElement* textElement, Point2i parentPos) {
-	UIText text = textElement->text;
+	Text text = textElement->text;
 	if (!text.string.length) return;
 	String string = text.string;
 	Font* font = text.font;
 
 	float32 x = (float32)(parentPos.x - textElement->scrollPos.x);
 	float32 y = (float32)(UI_FLIPY(parentPos.y + font->height - textElement->scrollPos.y));
-	RenderText(font, x, y, string, text.color);
+	RenderText(text, x, y);
 	
 	// Handle selected text
 	if (ui.selected && ui.selected == textElement) {
@@ -289,8 +283,7 @@ int32 __center(UIElement* element) {
 }
 
 int32 __fit_text(UIElement* element) {
-	int32 lineCount;
-	return (int32)(GetTextWidth(element->text.font, element->text.string, &lineCount) + 0.5f);
+	return (int32)(GetTextMetrics(element->text).maxx + 0.05f);
 }
 
 void RenderElement(UIElement* element) {
@@ -401,16 +394,15 @@ UIImage* UICreateImage(UIElement* parent) {
 }
 
 void UpdateTextScrollPos() {
-	UIText text = ui.selected->text;
+	Text text = ui.selected->text;
 	int32 elementWidth = ui.selected->width;
 	int32 elementHeight = ui.selected->height;
 	Font* font = text.font;
 	String string = text.string;
-	int32 lineCount;
 
 	String sub = {string.data, ui.end};
-	float32 textLineWidth = GetTextWidth(font, sub, &lineCount);
-	ASSERT(lineCount);
+	TextMetrics metrics = GetTextMetrics({font, sub, 0});
+	float32 textLineWidth = metrics.endx;
 	float32 nextLetter = 0.0f;
 	if (ui.end < string.length) {
 		byte b = string.data[ui.end + 1];
@@ -424,18 +416,18 @@ void UpdateTextScrollPos() {
 	}
 
 	sub = {string.data, MAX(0, ui.end - 1)};
-	textLineWidth = GetTextLineWidth(font, sub);
+	textLineWidth = GetTextMetrics({font, sub, 0}).endx;
 	posRelativeToElement = (int32)(textLineWidth + 0.5f);
 	if (posRelativeToElement < ui.selected->scrollPos.x) {
 		ui.selected->scrollPos.x = MAX(posRelativeToElement, 0);
 	}
 
-	if (elementHeight < lineCount*font->height - ui.selected->scrollPos.y) {
-		ui.selected->scrollPos.y = (int32)((lineCount + 0.5)*font->height + 0.5f) - elementHeight;
+	if (elementHeight < metrics.endy - ui.selected->scrollPos.y) {
+		ui.selected->scrollPos.y = (int32)(metrics.endy + 0.5f) - elementHeight;
 	}
 
-	if ((lineCount - 1)*font->height < ui.selected->scrollPos.y) {
-		ui.selected->scrollPos.y = MAX((int32)((lineCount - 1)*font->height + 0.5f), 0);
+	if (metrics.endy - font->height < ui.selected->scrollPos.y) {
+		ui.selected->scrollPos.y = MAX((int32)(metrics.endy - font->height + 0.5f), 0);
 	}
 }
 
@@ -625,9 +617,8 @@ UIElement* UIUpdateActiveElement() {
 			if (ui.selected) {
 				String string = ui.selected->text.string;
 				Font* font = ui.selected->text.font;
-				int32 lineCount;
-				float32 width = GetTextWidth(font, {string.data, ui.end}, &lineCount);
-				int32 end = GetCharIndex(font, string, width, font->height*(lineCount-2));
+				TextMetrics metrics = GetTextMetrics({font, {string.data, ui.end}, 0});
+				int32 end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 2.5f*font->height);
 				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
@@ -644,9 +635,8 @@ UIElement* UIUpdateActiveElement() {
 			if (ui.selected) {
 				String string = ui.selected->text.string;
 				Font* font = ui.selected->text.font;
-				int32 lineCount;
-				float32 width = GetTextWidth(font, {string.data, ui.end}, &lineCount);
-				int32 end = GetCharIndex(font, string, width, font->height*(lineCount));
+				TextMetrics metrics = GetTextMetrics({font, {string.data, ui.end}, 0});
+				int32 end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 0.5f*font->height);
 				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
@@ -697,11 +687,9 @@ void __toggle(UIElement* e) {
 	ui.originalStyle = e->style;
 }
 
-UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str, byte* context) {
+UIElement* UICreateCheckbox(UIElement* parent, Text text, byte* context) {
 	UIElement* wrapper = UICreateElement(parent);
-	int32 lineCount;
-	wrapper->width = 37+(int32)GetTextWidth(font, str, &lineCount);
-	// TODO: handle line count
+	wrapper->width = 37+(int32)(GetTextMetrics(text).maxx + 0.5f);
 	wrapper->height = 24;
 	wrapper->name = STR("wrapper");
 
@@ -721,8 +709,7 @@ UIElement* UICreateCheckbox(UIElement* parent, Font* font, String str, byte* con
 
 	UIElement* textElement = UICreateElement(wrapper);
 	textElement->pos = {37, -4};
-	textElement->text.font = font;
-	textElement->text.string = str;
+	textElement->text = text;
 
 	return wrapper;
 }
@@ -833,3 +820,8 @@ void UISetActiveTab(UIElement* active) {
 	MoveToFront(active->parent);
 	__choose(active->parent);
 }
+
+/*UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim) {
+	UIElement* container = UICreateElement(parent);
+
+}*/
