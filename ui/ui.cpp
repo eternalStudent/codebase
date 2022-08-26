@@ -150,12 +150,20 @@ void SetPosition(UIElement* element, int32 x, int32 y) {
 	}
 }
 
+bool IsAncestorHidden(UIElement* e) {
+	while (e) {
+		if (e->flags & UI_HIDDEN) return true;
+		e = e->parent;
+	}
+	return false;
+}
+
 UIElement* GetElementByPosition(Point2i p) {
 	UIElement* element = ui.windowElement;
 	while (element->last) element = element->last;
 
 	while (element) {
-		if (!(element->flags & UI_HIDDEN)) {
+		if (!IsAncestorHidden(element)) {
 			Box2i b = GetAbsolutePosition(element);
 			if (INSIDE2(b, p)) break;
 		}
@@ -459,12 +467,12 @@ UIElement* UIUpdateActiveElement() {
 			OSSetCursorIcon(CUR_RESIZE);
 			isInBottomRight = true;
 		}
-		else if (textIndex != -1) {
-			OSSetCursorIcon(CUR_TEXT);
-		}
 		else if (element->onHover) element->onHover(element);
 		else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
 		else if (element->flags & UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
+		else if (textIndex != -1) {
+			OSSetCursorIcon(CUR_TEXT);
+		}
 		else OSSetCursorIcon(CUR_ARROW);
 	}
 	else if (1 < cursorPos.x && cursorPos.x < ui.windowElement->width-1 && 1 < cursorPos.y && cursorPos.y < ui.windowElement->height-1)
@@ -739,8 +747,13 @@ UIElement* UICreateSlider(UIElement* parent, int32 width) {
 	return slider;
 }
 
-void __hover(UIElement* e) {
+void __hover1(UIElement* e) {
 	e->background = RGBA_GREY;
+	OSSetCursorIcon(CUR_HAND);
+}
+
+void __hover2(UIElement* e) {
+	e->background = RGBA_LIGHTGREY;
 	OSSetCursorIcon(CUR_HAND);
 }
 
@@ -751,7 +764,7 @@ UIElement* UICreateButton(UIElement* parent, Dimensions2i dim) {
 	button->radius = 12.0f;
 	button->borderWidth = 1;
 	button->borderColor = RGBA_WHITE;
-	button->onHover = __hover;
+	button->onHover = __hover1;
 	button->flags = UI_CLICKABLE;
 	button->name = STR("button");
 	return button;
@@ -761,7 +774,7 @@ void __choose(UIElement* e) {
 	UIElement* parent = e->parent;
 	LINKEDLIST_FOREACH(parent, UIElement, child) {
 		child->background = RGBA_LIGHTGREY;
-		child->onHover = __hover;
+		child->onHover = __hover1;
 	}
 	e->background = RGBA_DARKGREY;
 	e->onHover = NULL;
@@ -798,7 +811,7 @@ UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* 
 	header->dim = dim;
 	header->radius = 3;
 	header->flags = UI_CLICKABLE | UI_SHUFFLEABLE;
-	header->onHover = __hover;
+	header->onHover = __hover1;
 	header->onClick = __choose;
 	header->background = RGBA_LIGHTGREY;
 	header->name = STR("tab header");
@@ -841,10 +854,12 @@ UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim, Point2i po
 	UIElement* container = UICreateElement(parent);
 	container->dim = {dim.width + 15, dim.height};
 	container->pos = pos;
+	container->name = STR("scrolling pane container");
 
 	UIElement* pane = UICreateElement(container);
 	pane->dim = dim;
 	pane->flags = UI_SCROLLABLE;
+	pane->name = STR("scrolling pane");
 
 	UIElement* scrollBar = UICreateElement(container);
 	scrollBar->x = dim.width + 4;
@@ -852,6 +867,7 @@ UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim, Point2i po
 	scrollBar->dim = {7, dim.height - 12};
 	scrollBar->background = 0x33ffffff;
 	scrollBar->radius = 3.0f;
+	scrollBar->name = STR("scroll bar");
 
 	UIElement* elevator = UICreateElement(scrollBar);
 	elevator->dim = {7, 14};
@@ -860,6 +876,68 @@ UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim, Point2i po
 	elevator->onMove = __scroll;
 	elevator->background = 0x33ffffff;
 	elevator->radius = 3.0f;
+	elevator->name = STR("elevator");
 
 	return pane;
+}
+
+void __display_or_hide(UIElement* e) {
+	UIElement* element = e->next;
+	if (element->flags & UI_HIDDEN)
+		element->flags &= ~UI_HIDDEN;
+	else
+		element->flags |= UI_HIDDEN;
+}
+
+UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, Text text) {
+	UIElement* container = UICreateElement(parent);
+	container->dim = dim;
+	container->pos = pos;
+	container->name = STR("dropdown container");
+
+	UIElement* dropdown = UICreateElement(container);
+	dropdown->dim = dim;
+	dropdown->flags = UI_CLICKABLE;
+	dropdown->onClick = __display_or_hide;
+	dropdown->background = RGBA_GREY;
+	dropdown->name = STR("dropdown");
+
+	UIElement* textElement = UICreateElement(dropdown);
+	textElement->x = 5;
+	textElement->text = text;
+
+	UIElement* hidden = UICreateScrollingPane(container, {dim.width, 100}, {0, dim.height});
+	hidden->parent->flags |= UI_HIDDEN;
+	hidden->background = RGBA_GREY;
+
+	return dropdown;
+}
+
+void __select(UIElement* e) {
+	UIElement* list = e->parent;
+	UIElement* listContainer = list->parent;
+	UIElement* dropdown = listContainer->parent;
+	UIElement* visible = dropdown->first;
+
+	visible->first->text.string = e->first->text.string;
+
+	listContainer->flags |= UI_HIDDEN;
+}
+
+UIElement* UIAddItem(UIElement* dropdown, Text text) {
+	UIElement* list = dropdown->next->first;
+	UIElement* last = list->last;
+
+	UIElement* item = UICreateElement(list);
+	item->dim = dropdown->dim;
+	if (last) item->y = last->y + last->height;
+	item->flags = UI_CLICKABLE;
+	item->onClick = __select;
+	item->onHover = __hover2;
+
+	UIElement* textElement = UICreateElement(item);
+	textElement->x = 5;
+	textElement->text = text;
+
+	return item;
 }

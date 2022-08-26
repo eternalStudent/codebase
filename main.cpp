@@ -32,16 +32,10 @@ sunt in culpa qui officia deserunt
 mollit anim id est laborum.)STRING");
 
 	byte itemsbuf[] = "item 1item 2item 3item 4item 5item 6item 7";
-	UIElement* list = UICreateScrollingPane(NULL, {100, 100}, {12, 224});
-	list->borderWidth = 1;
-	list->borderColor = RGBA_WHITE;
-	for(int32 i = 0; i < 7; i++){
-		UIElement* item = UICreateElement(list);
-		item->pos = {6, 24*i + 6};
-		item->dim = {120, 42};
-		item->text.font = font;
-		item->text.string = {itemsbuf+ 6*i, 6};
-		item->text.color = RGBA_WHITE;
+	UIElement* dropdown = UICreateDropdown(NULL, {120, 36}, {12, 224}, {font, STR("Select"), RGBA_WHITE});
+	
+	for(int32 i = 0; i < 7; i++) {
+		UIAddItem(dropdown, {font, {itemsbuf+ 6*i, 6}, RGBA_WHITE});
 	}
 
 	while(!OSWindowDestroyed() && !OSIsKeyDown(KEY_ESC)) {

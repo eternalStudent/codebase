@@ -226,6 +226,7 @@ void Win32ProcessWindowEvents() {
 	window.mouse_prev[2] = window.mouse[2];
 	window.mouse[3] = 0;;
 	window.mouseWheelDelta = 0;
+	window.mouseHWheelDelta = 0;
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 	{
