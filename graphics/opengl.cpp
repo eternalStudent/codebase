@@ -325,6 +325,41 @@ void OpenGLDrawBox2(uint32 rgba, Box2 pos) {
 	glDeleteBuffers(1, &buffersHandle);
 }
 
+void OpenGLDrawTriangle(uint32 rgba, Triangle triangle) {
+	Point2 p0 = AdjustCoordinates(triangle.p0);
+	Point2 p1 = AdjustCoordinates(triangle.p1);
+	Point2 p2 = AdjustCoordinates(triangle.p2);
+
+	float32 vertices[] = {
+		p0.x, p0.y,
+		p1.x, p1.y,
+		p2.x, p2.y
+	};
+
+	GLsizeiptr size = sizeof(vertices);
+	GLuint buffersHandle;
+	glGenBuffers(1, &buffersHandle);
+	glBindBuffer(GL_ARRAY_BUFFER, buffersHandle);
+	glBufferData(GL_ARRAY_BUFFER, size, vertices, GL_STATIC_DRAW);
+
+	GLuint verticesHandle;
+	glGenVertexArrays(1, &verticesHandle);
+	glBindVertexArray(verticesHandle);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float32), NULL);
+
+	GLint location = glGetUniformLocation(opengl.drawShape, "color");
+	Color color = RgbaToColor(rgba);
+	glUseProgram(opengl.drawShape);
+	glUniform4f(location, color.r, color.g, color.b, color.a);
+
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
+
+	glDeleteVertexArrays(1, &verticesHandle);
+	glDeleteBuffers(1, &buffersHandle);
+}
+
 void OpenGLDrawLine(uint32 rgba, float32 lineWidth, Line2 line) {
 	ArenaAlign(opengl.arena, 4);
 	float32* vertices = (float32*)ArenaAlloc(opengl.arena, 2*line.count*sizeof(float32));

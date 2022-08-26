@@ -31,12 +31,9 @@ sint occaecat cupidatat non proident,
 sunt in culpa qui officia deserunt
 mollit anim id est laborum.)STRING");
 
+	UIElement* dropdown = UICreateDropdown(NULL, {98, 36}, {12, 224}, {font, STR("Select"), RGBA_WHITE});
 	byte itemsbuf[] = "item 1item 2item 3item 4item 5item 6item 7";
-	UIElement* dropdown = UICreateDropdown(NULL, {120, 36}, {12, 224}, {font, STR("Select"), RGBA_WHITE});
-	
-	for(int32 i = 0; i < 7; i++) {
-		UIAddItem(dropdown, {font, {itemsbuf+ 6*i, 6}, RGBA_WHITE});
-	}
+	for(int32 i = 0; i < 7; i++) UIAddItem(dropdown, {font, {itemsbuf+ 6*i, 6}, RGBA_WHITE});
 
 	while(!OSWindowDestroyed() && !OSIsKeyDown(KEY_ESC)) {
 		ArenaFreeAll(&scratch);

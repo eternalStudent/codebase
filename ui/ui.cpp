@@ -40,6 +40,15 @@ struct UIImage {
 	Box2 crop;
 };
 
+struct UITrinagle {
+	union {
+		struct {int32 x0, y0;};
+		Point2i pos;
+	};
+	uint32 color;
+	int32 direction; // 0 - no triangle 1 - left, 2 - right, 3 - up, 4 - down
+};
+
 struct UIElement {
 	union {
 		struct {int32 x, y, width, height;};
@@ -75,6 +84,7 @@ struct UIElement {
 
 	Text text;
 	UIImage* image;
+	UITrinagle chevron;
 	opaque64 context;
 
 	Point2i scrollPos;
@@ -222,14 +232,14 @@ Dimensions2i GetContentDim(UIElement* e) {
 	return {width, height};
 }
 
-void RenderText(UIElement* textElement, Point2i parentPos) {
+void RenderText(UIElement* textElement, Point2i pos) {
 	Text text = textElement->text;
 	if (!text.string.length) return;
 	String string = text.string;
 	Font* font = text.font;
 
-	float32 x = (float32)(parentPos.x - textElement->scrollPos.x);
-	float32 y = (float32)(UI_FLIPY(parentPos.y + font->height - textElement->scrollPos.y));
+	float32 x = (float32)(pos.x - textElement->scrollPos.x);
+	float32 y = (float32)(UI_FLIPY(pos.y + font->height - textElement->scrollPos.y));
 	RenderText(text, x, y);
 	
 	// Handle selected text
@@ -291,6 +301,43 @@ void RenderImage(UIImage* image, Point2i parentPos) {
 	GfxDrawImage(image->atlas, image->crop, renderBox);
 }
 
+void RenderTriangle(UITrinagle chevron, Point2i pos) {
+	if (chevron.direction == 0) return;
+
+	float32 x0 = (float32)(chevron.pos.x + pos.x);
+	float32 y0 = (float32)(chevron.pos.y + pos.y);
+	Triangle triangle = {};
+	if (chevron.direction == 1) {
+		triangle = {
+			{x0, UI_FLIPY(y0 + 5.0f)},
+			{x0 + 5.0f, UI_FLIPY(y0)},
+			{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
+		};
+	}
+	else if (chevron.direction == 2) {
+		triangle = {
+			{x0, UI_FLIPY(y0)},
+			{x0 + 9.0f, UI_FLIPY(y0)},
+			{x0 + 9.0f, UI_FLIPY(y0 + 5.0f)}
+		};
+	}
+	else if (chevron.direction == 3) {
+		triangle = {
+			{x0 + 5.0f, UI_FLIPY(y0)},
+			{x0, UI_FLIPY(y0 + 9.0f)},
+			{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
+		};
+	}
+	else if (chevron.direction == 4) {
+		triangle = {
+			{x0, UI_FLIPY(y0)},
+			{x0 + 9.0f, UI_FLIPY(y0)},
+			{x0 + 5.0f, UI_FLIPY(y0 + 9.0f)}
+		};
+	}
+	GfxDrawTriangle(chevron.color, triangle);
+}
+
 int32 __center(UIElement* element) {
 	return (element->parent->width - element->width)/2;
 }
@@ -329,6 +376,7 @@ void RenderElement(UIElement* element) {
 	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), element->width, element->height);
 	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
 	RenderText(element, box.p0);
+	RenderTriangle(element->chevron, box.p0);
 	if (element->flags & UI_HIDE_OVERFLOW) GfxClearCrop();
 }
 
@@ -883,10 +931,14 @@ UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim, Point2i po
 
 void __display_or_hide(UIElement* e) {
 	UIElement* element = e->next;
-	if (element->flags & UI_HIDDEN)
+	if (element->flags & UI_HIDDEN) {
 		element->flags &= ~UI_HIDDEN;
-	else
+		e->chevron.direction = 3;
+	}
+	else {
 		element->flags |= UI_HIDDEN;
+		e->chevron.direction = 4;
+	}
 }
 
 UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, Text text) {
@@ -901,6 +953,9 @@ UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, Te
 	dropdown->onClick = __display_or_hide;
 	dropdown->background = RGBA_GREY;
 	dropdown->name = STR("dropdown");
+	dropdown->chevron.direction = 4;
+	dropdown->chevron.pos = {dim.width + 3, 15};
+	dropdown->chevron.color = RGBA_WHITE;
 
 	UIElement* textElement = UICreateElement(dropdown);
 	textElement->x = 5;
@@ -922,6 +977,7 @@ void __select(UIElement* e) {
 	visible->first->text.string = e->first->text.string;
 
 	listContainer->flags |= UI_HIDDEN;
+	visible->chevron.direction = 4;
 }
 
 UIElement* UIAddItem(UIElement* dropdown, Text text) {

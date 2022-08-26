@@ -12,16 +12,17 @@
 #define GfxUpdateTextureData		OpenGLUpdateTextureData
 #define GfxDrawImage				OpenGLDrawImage
 #define GfxDrawText 				OpenGLDrawText
-#define GfxDrawBox2					OpenGLDrawBox2
-#define GfxDrawLine					OpenGLDrawLine
+#define GfxDrawBox2 				OpenGLDrawBox2
+#define GfxDrawTriangle 			OpenGLDrawTriangle
+#define GfxDrawLine 				OpenGLDrawLine
 #define GfxDrawCircle				OpenGLDrawCircle
-#define GfxDrawDisc					OpenGLDrawDisc
+#define GfxDrawDisc 				OpenGLDrawDisc
 #define GfxDrawCurve3				OpenGLDrawCurve3
 #define GfxDrawCurve4				OpenGLDrawCurve4
-#define GfxClearScreen 				OpenGLClearScreen
+#define GfxClearScreen				OpenGLClearScreen
 #define GfxCropScreen				glScissor
 #define GfxClearCrop				OpenGlClearCrop
-#define GfxSetColor					OpenGLSetColor
+#define GfxSetColor 				OpenGLSetColor
 #define GfxSwapBuffers				OSOpenGLSwapBuffers
 
 

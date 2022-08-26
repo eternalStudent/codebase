@@ -62,13 +62,19 @@ struct Line2 {
     int32 count;
 };
 
+struct Triangle {
+    Point2 p0;
+    Point2 p1;
+    Point2 p2;
+};
+
+#include "trigonometry.cpp"
+
 struct Sphere2 {
     Point2 center;
     float32 radius;
 };
 typedef Sphere2 Ball2;
-
-#include "trigonometry.cpp"
 
 Point2 PointOnSphere(Sphere2 sphere, float32 rad) {
     return {sphere.radius*cos(rad) + sphere.center.x, 
