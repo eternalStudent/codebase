@@ -8,7 +8,7 @@ struct {
 	BYTE mouse_prev[3];
 	DWORD mouseWheelDelta;
 	DWORD mouseHWheelDelta;
-	HCURSOR cursors[6];
+	HCURSOR cursors[7];
 } window;
 
 HWND Win32GetWindowHandle() {
@@ -162,6 +162,7 @@ void LoadCursors() {
 	window.cursors[CUR_RESIZE] = LoadCursorA(NULL, IDC_SIZENWSE);
 	window.cursors[CUR_HAND] = LoadCursorA(NULL, IDC_HAND);
 	window.cursors[CUR_MOVESIDE] = LoadCursorA(NULL, IDC_SIZEWE);
+	window.cursors[CUR_MOVEUPDN] = LoadCursorA(NULL, IDC_SIZENS);
 	window.cursors[CUR_TEXT] = LoadCursorA(NULL, IDC_IBEAM);
 }
 

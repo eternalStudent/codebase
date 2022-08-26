@@ -134,5 +134,5 @@ int32 GetCharIndex(Text text, float32 x_end, float32 y_end) {
       }
    }
 
-   return -1;
+   return (int32)string.length;
 }

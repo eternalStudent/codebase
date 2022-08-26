@@ -7,7 +7,8 @@
 #define CUR_RESIZE					2
 #define CUR_HAND					3
 #define CUR_MOVESIDE				4
-#define CUR_TEXT					5
+#define CUR_MOVEUPDN				5
+#define CUR_TEXT					6
 
 #if defined(_WIN32)
 #  include "win32window.cpp"

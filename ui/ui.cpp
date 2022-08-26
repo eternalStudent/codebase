@@ -2,13 +2,18 @@
 
 #define UI_MOVABLE			(1 << 0)
 #define UI_RESIZABLE		(1 << 1)
-#define UI_CLICKABLE		(1 << 2)
-#define UI_HIDDEN			(1 << 3)
-#define UI_CENTER			(1 << 4)
-#define UI_RIGHT			(1 << 5)
-#define UI_HIDE_OVERFLOW 	(1 << 6)
-#define UI_SCROLLABLE		((1 << 7) + UI_HIDE_OVERFLOW)
-#define UI_FITTEXT			(1 << 8)
+#define UI_SHUFFLEABLE		(1 << 2)
+#define UI_CLICKABLE		(1 << 3)
+#define UI_HIDE_OVERFLOW 	(1 << 4)
+#define UI_SCROLLABLE		((1 << 5) + UI_HIDE_OVERFLOW)
+
+#define UI_HIDDEN			(1 << 6)
+#define UI_CENTER			(1 << 7)
+#define UI_RIGHT			(1 << 8)
+
+#define UI_FIT_CONTENT		(1 << 9)
+
+#define UI_ELEVATOR 		(1 << 10)
 
 #include "font.cpp"
 
@@ -102,8 +107,8 @@ struct {
 Box2i GetAbsolutePosition(UIElement* element) {
 	if (element == NULL) return {0, 0, ui.windowElement->width, ui.windowElement->height};
 	UIElement* parent = element->parent;
-	if (parent == NULL) return {0, 0, element->width, element->height};
 	Box2i parentPos = GetAbsolutePosition(parent);
+	if (parent == NULL) parent = ui.windowElement;
 
 	return (element->flags & UI_RIGHT)
 		? Box2i{parentPos.x1 - element->x - parent->scrollPos.x - element->width, 
@@ -171,7 +176,7 @@ Point2i GetRelativePosition(Point2i cursorPos, UIElement* element) {
 	return {cursorPos.x - absolute.x0, cursorPos.y - absolute.y0};
 }
 
-void MoveToFront(UIElement* element) {
+void BringToFront(UIElement* element) {
 	if (element->parent->last == element) return;
 
 	UIElement* parent = element->parent;
@@ -282,15 +287,25 @@ int32 __center(UIElement* element) {
 	return (element->parent->width - element->width)/2;
 }
 
-int32 __fit_text(UIElement* element) {
-	return (int32)(GetTextMetrics(element->text).maxx + 0.05f);
-}
-
 void RenderElement(UIElement* element) {
 	if (element->flags & UI_HIDDEN) return;
 	if (element->flags & UI_CENTER) element->x = __center(element);
-	if (element->flags & UI_FITTEXT) element->width = __fit_text(element);
+	if (element->flags & UI_FIT_CONTENT) element->dim = GetContentDim(element);
+	if (element->flags & UI_ELEVATOR) {
+		UIElement* scrollBar = element->parent;
+		UIElement* pane = scrollBar->prev;
+		Dimensions2i contentDim = GetContentDim(pane);
+
+		float32 length = (float32)(pane->height*scrollBar->height)/(float32)contentDim.height;
+		float32 pos = (float32)((scrollBar->height - length)*pane->scrollPos.y)/(float32)(contentDim.height - pane->height); 
+
+		element->height = (int32)length;
+		element->y = (int32)pos;
+	}
 	Box2i box = GetAbsolutePosition(element);
+
+	RenderImage(element->image, box.p0);
+
 	Box2 renderBox = Box2{(float32)box.x0, (float32)UI_FLIPY(box.y1), (float32)box.x1, (float32)UI_FLIPY(box.y0)};
 	if (element->radius) {
 		GfxDrawBox2Rounded(element->background, renderBox, element->radius);
@@ -302,23 +317,10 @@ void RenderElement(UIElement* element) {
 		if (element->borderWidth && element->borderColor) 
 			GfxDrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
 	}
-	// TODO: this should become its own element
-	if (element->flags & UI_SCROLLABLE) {
-		Dimensions2i contentDim = GetContentDim(element);
-		if (element->height < contentDim.height) {
-			int32 length = (element->height*element->height)/contentDim.height;
-			int32 pos = ((element->height - length)*element->scrollPos.y)/(contentDim.height - element->height); 
-			Box2 elevator = {(float32)box.x1 - 9, 
-				(float32)UI_FLIPY(box.y0 + pos + length), 
-				(float32)box.x1 - 2, 
-				(float32)UI_FLIPY(box.y0 + pos)};
-			GfxDrawBox2Rounded(0x44000000, elevator, 3);
-		}
-	}
+
 	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), element->width, element->height);
 	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
 	RenderText(element, box.p0);
-	RenderImage(element->image, box.p0);
 	if (element->flags & UI_HIDE_OVERFLOW) GfxClearCrop();
 }
 
@@ -333,9 +335,9 @@ void UIInit(Arena* persist, Arena* scratch) {
 }
 
 void UIRenderElements() {
+	RenderImage(ui.windowElement->image, {0, 0});
 	LINKEDLIST_FOREACH(ui.windowElement, UIElement, child) RenderElement(child);
-	RenderText(ui.windowElement, {0, 0});
-	RenderImage(ui.windowElement->image, {0, 0});	
+	RenderText(ui.windowElement, {0, 0});	
 }
 
 void UISetWindowElement(uint32 background) {
@@ -367,6 +369,7 @@ UIElement* UICreateElement(UIElement* parent) {
 	if (parent == NULL) parent = ui.windowElement;
 	LINKEDLIST_ADD(parent, element);
 	element->parent = parent;
+
 	return element;
 }
 
@@ -427,7 +430,7 @@ void UpdateTextScrollPos() {
 	}
 
 	if (metrics.endy - font->height < ui.selected->scrollPos.y) {
-		ui.selected->scrollPos.y = MAX((int32)(metrics.endy - font->height + 0.5f), 0);
+		ui.selected->scrollPos.y = MAX((int32)(metrics.endy - 1.5f*font->height + 0.5f), 0);
 	}
 }
 
@@ -471,7 +474,7 @@ UIElement* UIUpdateActiveElement() {
 	if (OSIsMousePressed(MOUSE_L)) {
 		ui.selected = NULL;
 		if (element) {
-			MoveToFront(element);
+			if (element->flags & UI_SHUFFLEABLE) BringToFront(element);
 			if (element->flags & UI_CLICKABLE) {
 				if (element->onClick)
 					element->onClick(element);
@@ -794,7 +797,7 @@ UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* 
 	header->x = last ? last->x+last->width+1 : 24;
 	header->dim = dim;
 	header->radius = 3;
-	header->flags = UI_CLICKABLE;
+	header->flags = UI_CLICKABLE | UI_SHUFFLEABLE;
 	header->onHover = __hover;
 	header->onClick = __choose;
 	header->background = RGBA_LIGHTGREY;
@@ -817,11 +820,46 @@ UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* 
 }
 
 void UISetActiveTab(UIElement* active) {
-	MoveToFront(active->parent);
+	BringToFront(active->parent);
 	__choose(active->parent);
 }
 
-/*UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim) {
-	UIElement* container = UICreateElement(parent);
+void __scroll(UIElement* e) {
+	OSSetCursorIcon(CUR_ARROW);
+	UIElement* scrollBar = e->parent;
+	UIElement* pane = scrollBar->prev;
+	Dimensions2i contentDim = GetContentDim(pane);
+	float32 y = (float32)((contentDim.height - pane->height)*e->y)/(float32)(scrollBar->height - e->height); 
+	pane->scrollPos.y = (int32)y;
+}
 
-}*/
+void __arrow(UIElement* e) {
+	OSSetCursorIcon(CUR_ARROW);
+}
+
+UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim, Point2i pos) {
+	UIElement* container = UICreateElement(parent);
+	container->dim = {dim.width + 15, dim.height};
+	container->pos = pos;
+
+	UIElement* pane = UICreateElement(container);
+	pane->dim = dim;
+	pane->flags = UI_SCROLLABLE;
+
+	UIElement* scrollBar = UICreateElement(container);
+	scrollBar->x = dim.width + 4;
+	scrollBar->y = 6;
+	scrollBar->dim = {7, dim.height - 12};
+	scrollBar->background = 0x33ffffff;
+	scrollBar->radius = 3.0f;
+
+	UIElement* elevator = UICreateElement(scrollBar);
+	elevator->dim = {7, 14};
+	elevator->flags = UI_MOVABLE | UI_ELEVATOR;
+	elevator->onHover = __arrow;
+	elevator->onMove = __scroll;
+	elevator->background = 0x33ffffff;
+	elevator->radius = 3.0f;
+
+	return pane;
+}

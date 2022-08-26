@@ -18,7 +18,7 @@ struct {
 	Point2i cursorPos;
 	Dimensions2i dim;
 	Window root;
-	Cursor cursors[6];
+	Cursor cursors[7];
 } window;
 
 void _internalCreateWindow(Window root, const char* title, int width, int height) {
@@ -50,6 +50,7 @@ void _internalCreateWindow(Window root, const char* title, int width, int height
 	window.cursors[CUR_RESIZE] = XCreateFontCursor(window.display, XC_bottom_left_corner);
 	window.cursors[CUR_HAND] = XCreateFontCursor(window.display, XC_hand1);
 	window.cursors[CUR_MOVESIDE] = XCreateFontCursor(window.display, XC_sb_h_double_arrow);
+	window.cursors[CUR_MOVEUPDN] = XCreateFontCursor(window.display, XC_sb_v_double_arrow);
 	window.cursors[CUR_TEXT] = XCreateFontCursor(window.display, XC_xterm);
 }
 
