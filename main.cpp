@@ -7,10 +7,13 @@ int main() {
 	Arena persist = CreateArena(1024*1024);
 
 	UIInit(&persist, &scratch);
-	UICreateWindow("OpenGL Window", {512, 512}, RGBA_DARKGREY);
+	UICreateWindow("OpenGL Window", {512, 768}, RGBA_DARKGREY);
 
 	Font* font = (Font*)ArenaAlloc(&persist, sizeof(Font));
-	*font = LoadFont(&scratch, "..\\AzeretMono-Regular.ttf", 24);
+	*font = LoadFont(&scratch, "..\\consola.ttf", 24);
+
+	Font* smallf = (Font*)ArenaAlloc(&persist, sizeof(Font));
+	*smallf = LoadFont(&scratch, "..\\consola.ttf", 18);
 
 	UIElement* e1 = UICreateScrollingPane(NULL, {200, 200}, {12, 12});
 	e1->borderWidth = 1;
@@ -33,7 +36,44 @@ mollit anim id est laborum.)STRING");
 
 	UIElement* dropdown = UICreateDropdown(NULL, {98, 36}, {12, 224}, {font, STR("Select"), RGBA_WHITE});
 	byte itemsbuf[] = "item 1item 2item 3item 4item 5item 6item 7";
-	for(int32 i = 0; i < 7; i++) UIAddItem(dropdown, {font, {itemsbuf+ 6*i, 6}, RGBA_WHITE});
+	for (int32 i = 0; i < 7; i++) UIAddDropdownItem(dropdown, {font, {itemsbuf+ 6*i, 6}, RGBA_WHITE});
+
+	UIElement* root = UICreateTreeItem(NULL, {48, 24});
+	root->pos = {12, 300};
+	UIElement* textElement = UICreateElement(root);
+	textElement->x = 18;
+	textElement->text = {smallf, STR("root"), RGBA_WHITE};
+
+	UIElement* item1 = UICreateTreeItem(root, {48, 24});
+	textElement = UICreateElement(item1);
+	textElement->x = 18;
+	textElement->text = {smallf, STR("item 1"), RGBA_WHITE};
+
+	UIElement* item2 = UICreateTreeItem(root, {48, 24});
+	textElement = UICreateElement(item2);
+	textElement->x = 18;
+	textElement->text = {smallf, STR("item 2"), RGBA_WHITE};
+
+	UIElement* apple = UICreateTreeItem(item1, {48, 24});
+	textElement = UICreateElement(apple);
+	textElement->x = 18;
+	textElement->text = {smallf, STR("apple"), RGBA_WHITE};
+
+	UIElement* orange = UICreateTreeItem(item1, {48, 24});
+	textElement = UICreateElement(orange);
+	textElement->x = 18;
+	textElement->text = {smallf, STR("orange"), RGBA_WHITE};
+
+	UIElement* abc = UICreateTreeItem(item2, {48, 24});
+	textElement = UICreateElement(abc);
+	textElement->x = 18;
+	textElement->text = {smallf, STR("abc"), RGBA_WHITE};
+
+	UIElement* xyz = UICreateTreeItem(item2, {48, 24});
+	textElement = UICreateElement(xyz);
+	textElement->x = 18;
+	textElement->text = {smallf, STR("xyz"), RGBA_WHITE};
+
 
 	while(!OSWindowDestroyed() && !OSIsKeyDown(KEY_ESC)) {
 		ArenaFreeAll(&scratch);

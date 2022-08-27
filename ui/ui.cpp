@@ -14,6 +14,7 @@
 #define UI_FIT_CONTENT		(1 << 9)
 
 #define UI_ELEVATOR 		(1 << 10)
+#define UI_BRING_PARENT_TO_FRONT	(1 << 11)
 
 #include "font.cpp"
 
@@ -317,8 +318,8 @@ void RenderTriangle(UITrinagle chevron, Point2i pos) {
 	else if (chevron.direction == 2) {
 		triangle = {
 			{x0, UI_FLIPY(y0)},
-			{x0 + 9.0f, UI_FLIPY(y0)},
-			{x0 + 9.0f, UI_FLIPY(y0 + 5.0f)}
+			{x0 + 9.0f, UI_FLIPY(y0 + 5.0f)},
+			{x0, UI_FLIPY(y0 + 9.0f)}
 		};
 	}
 	else if (chevron.direction == 3) {
@@ -507,7 +508,6 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle mouse hover
 	bool isInBottomRight = false;
-	bool isInTextBound = false;
 	int32 textIndex = -1;
 	if (element) {
 		textIndex = IsInTextBound(element, pos, cursorPos);
@@ -531,6 +531,7 @@ UIElement* UIUpdateActiveElement() {
 		ui.selected = NULL;
 		if (element) {
 			if (element->flags & UI_SHUFFLEABLE) BringToFront(element);
+			if (element->flags & UI_BRING_PARENT_TO_FRONT) BringToFront(element->parent);
 			if (element->flags & UI_CLICKABLE) {
 				if (element->onClick)
 					element->onClick(element);
@@ -554,7 +555,7 @@ UIElement* UIUpdateActiveElement() {
 	}
 
 	// Handle double click
-	if (element && OSIsMouseDoubleClicked() && isInTextBound) {
+	if (element && OSIsMouseDoubleClicked() && textIndex != -1) {
 		ui.selected = element;
 		ui.end = (int32)element->text.string.length;
 		ui.start = 0;
@@ -620,22 +621,29 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle text selection
 	if (ui.isSelecting) {
+		static int32 selectionCount = 0;
 		if (element && element->text.string.length) {
+			selectionCount = 0;
 			ASSERT(element == ui.selected && textIndex != -1);
 			ui.end = textIndex;
 		}
 		else {
-			Box2i selectedPos = GetAbsolutePosition(ui.selected);
-			if (cursorPos.x < selectedPos.x1) {
-				ui.end = MAX(ui.end - 1, 0);
-				UpdateTextScrollPos();
-			}
-			if (selectedPos.x1 < cursorPos.x) {
-				if (ui.end < ui.selected->text.string.length && ui.selected->text.string.data[ui.end + 1] != 10) {
-					ui.end++;
+			if (selectionCount == 0) {
+				selectionCount = 6;
+				Box2i selectedPos = GetAbsolutePosition(ui.selected);
+				if (cursorPos.x < selectedPos.x1) {
+					ui.end = MAX(ui.end - 1, 0);
 					UpdateTextScrollPos();
 				}
+				if (selectedPos.x1 < cursorPos.x) {
+					if (ui.end < ui.selected->text.string.length && ui.selected->text.string.data[ui.end + 1] != 10) {
+						ui.end++;
+						UpdateTextScrollPos();
+					}
+				}
+				// TODO: handle ups and downs
 			}
+			else selectionCount--;
 		}
 	}
 
@@ -949,7 +957,7 @@ UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, Te
 
 	UIElement* dropdown = UICreateElement(container);
 	dropdown->dim = dim;
-	dropdown->flags = UI_CLICKABLE;
+	dropdown->flags = UI_CLICKABLE | UI_BRING_PARENT_TO_FRONT;
 	dropdown->onClick = __display_or_hide;
 	dropdown->background = RGBA_GREY;
 	dropdown->name = STR("dropdown");
@@ -980,7 +988,7 @@ void __select(UIElement* e) {
 	visible->chevron.direction = 4;
 }
 
-UIElement* UIAddItem(UIElement* dropdown, Text text) {
+UIElement* UIAddDropdownItem(UIElement* dropdown, Text text) {
 	UIElement* list = dropdown->next->first;
 	UIElement* last = list->last;
 
@@ -994,6 +1002,64 @@ UIElement* UIAddItem(UIElement* dropdown, Text text) {
 	UIElement* textElement = UICreateElement(item);
 	textElement->x = 5;
 	textElement->text = text;
+
+	return item;
+}
+
+void __expnad_or_collapse(UIElement* e) {
+	int32 height = 0;
+	UIElement* children = e->first;
+	if (e->parent != ui.windowElement) {
+		LINKEDLIST_FOREACH(children, UIElement, child) height += child->height;
+	}
+	if (e->chevron.direction == 2) {
+		e->first->flags &= ~UI_HIDDEN;
+		e->chevron.direction = 4;
+		if (e->parent != ui.windowElement) {
+			e = e->next;
+			while (e) {
+				e->y += height;
+				e = e-> next;
+			}
+		}
+	}
+	else if (e->chevron.direction == 4) {
+		e->first->flags |= UI_HIDDEN;
+		e->chevron.direction = 2;
+		if (e->parent != ui.windowElement) {
+			e = e->next;
+			while (e) {
+				e->y -= height;
+				e = e-> next;
+			}
+		}
+	}
+}
+
+UIElement* UICreateTreeItem(UIElement* parent, Dimensions2i dim) {
+	UIElement* item;
+	if (parent) {
+		UIElement* last = parent->first->last;
+		item = UICreateElement(parent->first);
+		item->x = parent->x + 12;
+		item->y = last ? last->y + last->height : parent->height;
+		UIElement* e = parent->next;
+		while (e) {
+			e->y += dim.height;
+			e = e->next;
+		}
+	}
+	else {
+		item = UICreateElement(NULL);
+	}
+	item->chevron = {{3, 9}, RGBA_WHITE, 4};
+	item->dim = dim;
+	item->flags = UI_CLICKABLE;
+	item->onHover = __arrow;
+	item->onClick = __expnad_or_collapse;
+
+	UIElement* children = UICreateElement(item);
+	children->name = STR("children");
 
 	return item;
 }
