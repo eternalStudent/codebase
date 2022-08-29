@@ -657,7 +657,7 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
 
       case 0x0C: { // two-byte escape
          float32 dx1, dx2, dx3, dx4, dx5, dx6, dy1, dy2, dy3, dy4, dy5, dy6;
-         float32 dx, dy;
+         float32 dx, dy, absdx, absdy;
          int32 b1 = ReadByte(&data);
          switch (b1) {
          // @TODO These "flex" implementations ignore the flex-depth and resolution,
@@ -724,7 +724,9 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
             dx6 = dy6 = s[10];
             dx = dx1+dx2+dx3+dx4+dx5;
             dy = dy1+dy2+dy3+dy4+dy5;
-            if (fabs(dx) > fabs(dy))
+            absdx = ABS(dx);
+            absdy = ABS(dy);
+            if (absdx > absdy)
                dy6 = -dy;
             else
                dx6 = -dx;
@@ -1293,7 +1295,7 @@ void fill_active_edges_new(float32 *scanline, float32 *scanline_fill,
                }
                y_crossing += dy * (x2 - (x1+1));
 
-               ASSERT(fabs(area) <= 1.01f);
+               ASSERT(ABS(area) <= 1.01f);
 
                scanline[x2] += area + sign * (1-((x2-x2)+(x_bottom-x2))/2) * (sy1-y_crossing);
 
@@ -1437,7 +1439,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
             int32 m;
             sum += scanline2[i];
             k = scanline[i] + sum;
-            k = (float32) fabs(k)*255 + 0.5f;
+            k = (float32) ABS(k)*255 + 0.5f;
             m = (int32) k;
             if (m > 255) m = 255;
             result->data[j*result->channels + i] = (byte) m;

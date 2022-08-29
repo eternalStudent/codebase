@@ -146,7 +146,7 @@ inline int32 BoolToAnsi(bool b, void* str){
 
 struct String {
 	byte* data;
-	int64 length;
+	ssize length;
 };
 
 #define STR(x) String{((byte*)x), (sizeof(x)-1)}
@@ -155,19 +155,19 @@ struct String {
 
 bool StringEquals(String str1, String str2) {
 	if (str1.length != str2.length) return false;
-	for (int64 i = 0; i < str1.length; i++)
+	for (ssize i = 0; i < str1.length; i++)
 		if (str1.data[i] != str2.data[i]) return false;
 	return true;
 }
 
-int32 StringSplit(String text, String separator, String* buffer) {
-	int32 j = 0;
+ssize StringSplit(String text, String separator, String* buffer) {
+	ssize j = 0;
 	buffer[0].data = text.data;
-	for (int32 i = 0; i < text.length - separator.length;) {
+	for (ssize i = 0; i < text.length - separator.length;) {
 		if (StringEquals({text.data+i, separator.length}, separator)) {
 			buffer[j].length = text.data+i - buffer[j].data;
 			j++;
-			i+=(int32)separator.length;
+			i+=(ssize)separator.length;
 			buffer[j].data = text.data+i;
 		}
 		else i++;
@@ -178,8 +178,8 @@ int32 StringSplit(String text, String separator, String* buffer) {
 
 int64 ParseInt64(String str) {
 	int64 result = 0;
-	int32 start = str.data[0] == '-' ? 1 : 0;
-	for (int32 i = start; i < str.length; i++) {
+	ssize start = str.data[0] == '-' ? 1 : 0;
+	for (ssize i = start; i < str.length; i++) {
 		char c = str.data[i];
 		result *= 10;
 		result += c-'0';
@@ -190,9 +190,9 @@ int64 ParseInt64(String str) {
 
 float64 ParseFloat64(String str) {
 	float64 result = 0.0;
-	int32 start = str.data[0] == '-' ? 1 : 0;
+	ssize start = str.data[0] == '-' ? 1 : 0;
 	bool radix = false;
-	for (int32 i = start; i < str.length; i++) {
+	for (ssize i = start; i < str.length; i++) {
 		char c = str.data[i];
 		char digit = c-'0';
 		if (c == '.') {
@@ -201,7 +201,7 @@ float64 ParseFloat64(String str) {
 		}
 		if (c == 'e' || c == 'E') {
 			String exp;
-			int32 j = str.data[i+1] == '+' ? i+2 : i+1;
+			ssize j = str.data[i+1] == '+' ? i+2 : i+1;
 			exp.data = &str.data[j];
 			exp.length = str.length - j;
 			result *= pow10((int32)ParseInt64(exp));

@@ -94,10 +94,10 @@ inline float64 ReadFloat64BigEndian(byte** data) {
 struct Stream {
    	byte* begin;
    	byte* current;
-   	int64 length;
+   	ssize length;
 };
 
-inline Stream CreateNewStream(byte* data, int64 length) {
+inline Stream CreateNewStream(byte* data, ssize length) {
    	Stream stream;
    	stream.begin = data;
    	stream.current = data;
@@ -105,21 +105,21 @@ inline Stream CreateNewStream(byte* data, int64 length) {
    	return stream;
 }
 
-inline int64 GetPosition(Stream* data) {
-   	return (int64)(data->begin - data->current);
+inline ssize GetPosition(Stream* data) {
+   	return (ssize)(data->begin - data->current);
 }
 
-inline int64 GetPosition(Stream data) {
-   	return (int64)(data.begin - data.current);
+inline ssize GetPosition(Stream data) {
+   	return (ssize)(data.begin - data.current);
 }
 
-inline void Seek(Stream* data, int64 offset) {
+inline void Seek(Stream* data, ssize offset) {
    	ASSERT(!(offset > data->length || offset < 0));
    	data->current = (offset > data->length || offset < 0) ? 
    		data->begin+data->length : data->begin+offset;
 }
 
-inline void Skip(Stream* data, int64 distance) {
+inline void Skip(Stream* data, ssize distance) {
    	Skip(&(data->current), distance);
 }
 
@@ -148,7 +148,7 @@ inline uint32 ReadUint32BigEndian(Stream* data) {
    	return ReadUint32BigEndian(&(data->current));
 }
 
-inline Stream Subrange(const Stream* data, int64 offset, int64 length) {
+inline Stream Subrange(const Stream* data, ssize offset, ssize length) {
    	if (offset < 0 || length < 0 || offset > data->length || length > data->length - offset) 
    		return {};
    	return CreateNewStream(data->begin + offset, length);

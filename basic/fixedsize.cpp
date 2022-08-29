@@ -1,15 +1,15 @@
 struct FixedSize {
 	void* buffer; // mainy for debugging
 	void* next;
-	int32 size;
+	ssize size;
 };
 
-void FixedSizeInit(FixedSize* allocator, byte* buffer, int32 cap, int32 size) {
+void FixedSizeInit(FixedSize* allocator, byte* buffer, ssize cap, ssize size) {
 	allocator->buffer = buffer;
 	allocator->next = buffer;
 	allocator->size = size;
 
-	for (int64 i = 0; i < cap-2; i++) {
+	for (ssize i = 0; i < cap-2; i++) {
 		*(void**)buffer = (void*)(buffer + size);
 		buffer = *(byte**)buffer;
 	}

@@ -44,7 +44,7 @@ void RenderText(Text text, float32 x, float32 y){
    String string = text.string;
    uint32 color = text.color;
 
-   for (int32 i=0; i<string.length; i++) {
+   for (ssize i=0; i<string.length; i++) {
       byte b = string.data[i];
       if (b == 10) {
          y -= font->height;
@@ -99,7 +99,7 @@ TextMetrics GetTextMetrics(Text text) {
    float32 x = 0;
    float32 y = font->height * 1.5f;
 
-   for (int32 i = 0; i < string.length; i++) {
+   for (ssize i = 0; i < string.length; i++) {
       byte b = string.data[i];
       if (b == 10) {
          maxx = MAX(maxx, x);
@@ -113,7 +113,7 @@ TextMetrics GetTextMetrics(Text text) {
    return {maxx, x, y};
 }
 
-int32 GetCharIndex(Text text, float32 x_end, float32 y_end) {
+ssize GetCharIndex(Text text, float32 x_end, float32 y_end) {
    int32 first_char = 32;
    int32 last_char = 128;
    float32 x = 0;
@@ -121,7 +121,7 @@ int32 GetCharIndex(Text text, float32 x_end, float32 y_end) {
    Font* font = text.font;
    String string = text.string;
 
-   for (int32 i=0; i<string.length; i++) {
+   for (ssize i=0; i<string.length; i++) {
       byte b = string.data[i];
       if (b == 10) {
          y += font->height;
@@ -134,5 +134,5 @@ int32 GetCharIndex(Text text, float32 x_end, float32 y_end) {
       }
    }
 
-   return (int32)string.length;
+   return string.length;
 }

@@ -5,6 +5,7 @@ typedef unsigned char byte;
 typedef int16_t int16;
 typedef int32_t int32;
 typedef int64_t int64;
+typedef ptrdiff_t ssize;
 
 #define MAX_INT16 0x7fff
 #define MAX_INT32 0x7fffffff
@@ -76,11 +77,4 @@ float64 pow10(int32 n) {
 		return tab[n];
 	m = n/2;
 	return pow10(m)*pow10(n-m);
-}
-
-float64 fabs(float64 value) {
-	union {uint64 u; float64 f;} data;
-  	data.f = value;
-  	data.u &= ~0x8000000000000000;
-  	return data.f;
 }

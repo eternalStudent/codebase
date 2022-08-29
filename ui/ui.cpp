@@ -109,8 +109,8 @@ struct {
 	bool isSelecting;
 
 	UIElement* selected;
-	int32 start;
-	int32 end;
+	ssize start;
+	ssize end;
 
 	Arena* arena;
 } ui;
@@ -136,7 +136,7 @@ bool IsInBottomRight(Box2i box, Point2i pos) {
 	return box.x1-4 <= pos.x && box.y1-4 <= pos.y;
 }
 
-int32 IsInTextBound(UIElement* textElement, Box2i box, Point2i pos) {
+ssize IsInTextBound(UIElement* textElement, Box2i box, Point2i pos) {
 	Text text = textElement->text;
 	if (!text.string.length) return -1;
 	float32 x_end = (float32)(pos.x - box.x0 + textElement->scrollPos.x);
@@ -245,10 +245,10 @@ void RenderText(UIElement* textElement, Point2i pos) {
 	
 	// Handle selected text
 	if (ui.selected && ui.selected == textElement) {
-		int32 start = MIN(ui.start, ui.end);
-		int32 end = MAX(ui.start, ui.end);
+		ssize start = MIN(ui.start, ui.end);
+		ssize end = MAX(ui.start, ui.end);
 		ASSERT(0 <= start && start <= end && end <= string.length);
-		int32 i = 0;
+		ssize i = 0;
 		float32 x0 = x;
 		float32 y1 = y + font->height - 3;
 
@@ -508,7 +508,7 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle mouse hover
 	bool isInBottomRight = false;
-	int32 textIndex = -1;
+	ssize textIndex = -1;
 	if (element) {
 		textIndex = IsInTextBound(element, pos, cursorPos);
 		if(IsInBottomRight(pos, cursorPos) && (element->flags & UI_RESIZABLE)) {
@@ -557,7 +557,7 @@ UIElement* UIUpdateActiveElement() {
 	// Handle double click
 	if (element && OSIsMouseDoubleClicked() && textIndex != -1) {
 		ui.selected = element;
-		ui.end = (int32)element->text.string.length;
+		ui.end = element->text.string.length;
 		ui.start = 0;
 	}
 	
@@ -668,7 +668,7 @@ UIElement* UIUpdateActiveElement() {
 			rightKeyCount = 6;
 			if (ui.selected) {
 				String string = ui.selected->text.string;
-				ui.end = MIN(ui.end + 1, (int32)string.length);
+				ui.end = MIN(ui.end + 1, string.length);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
@@ -685,7 +685,7 @@ UIElement* UIUpdateActiveElement() {
 				String string = ui.selected->text.string;
 				Font* font = ui.selected->text.font;
 				TextMetrics metrics = GetTextMetrics({font, {string.data, ui.end}, 0});
-				int32 end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 2.5f*font->height);
+				ssize end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 2.5f*font->height);
 				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
@@ -703,7 +703,7 @@ UIElement* UIUpdateActiveElement() {
 				String string = ui.selected->text.string;
 				Font* font = ui.selected->text.font;
 				TextMetrics metrics = GetTextMetrics({font, {string.data, ui.end}, 0});
-				int32 end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 0.5f*font->height);
+				ssize end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 0.5f*font->height);
 				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
@@ -717,8 +717,8 @@ UIElement* UIUpdateActiveElement() {
 	// Handle copy
 	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C) && ui.selected) {
 		String string = ui.selected->text.string;
-		int32 start = MIN(ui.start, ui.end);
-		int32 end = MAX(ui.start, ui.end);
+		ssize start = MIN(ui.start, ui.end);
+		ssize end = MAX(ui.start, ui.end);
 		String sub = {string.data + start, end - start};
 		OSCopyToClipboard(sub);
 	}

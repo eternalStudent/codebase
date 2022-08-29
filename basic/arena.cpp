@@ -1,10 +1,10 @@
 struct Arena {
 	byte* buffer;
-	int64 ptr;			// base-address realtive to the buffer
-	int64 capacity;
+	ssize ptr;			// base-address realtive to the buffer
+	ssize capacity;
 };
 
-void ArenaInit(Arena* arena, void* buffer, int64 capacity) {
+void ArenaInit(Arena* arena, void* buffer, ssize capacity) {
 	arena->ptr = 0;
 	arena->buffer = (byte*)buffer;
 	arena->capacity = capacity;
@@ -16,7 +16,7 @@ void ArenaAlign(Arena* arena, int32 divisibility) {
 	if (modulo != 0) arena->ptr += (divisibility - modulo);
 }
 
-byte* ArenaAlloc(Arena* arena, int64 size) {
+byte* ArenaAlloc(Arena* arena, ssize size) {
 	if (size == 0) return NULL;
 
 	if (arena->capacity < arena->ptr+size) return NULL;
