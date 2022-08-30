@@ -251,3 +251,43 @@ void PushInt32(StringBuilder* builder, int32 i) {
 void PushFloat32(StringBuilder* builder, float32 f, int32 precision) {
 	builder->ptr += Float32ToDecimal(f, precision, builder->ptr);
 }
+
+// StringList
+//------------
+
+struct StringNode {
+	String string;
+	StringNode* prev;
+	StringNode* next;
+};
+
+struct StringList {
+	StringNode* first;
+	StringNode* last;
+	ssize totalLength;
+};
+
+StringList CreateStringList(String string, StringNode* node) {
+	*node = {string, NULL, NULL};
+	return {node, node, string.length};
+}
+
+/*void InsertString(StringList* list, StringNode* node, ssize i) {
+	ASSERT(i < list->totalLength);
+	ssize j = 0;
+	LINKEDLIST_FOREACH(list, StringNode, current) {
+		ssize length = current->string.length;
+		if (i == j + length) {
+			LINKEDLIST_ADD_AFTER(current, node);
+			break;
+		}
+		else if (i < j + length) {
+			ssize k = i-j;
+
+			break;
+		}
+		else {
+			j += length;
+		}
+	}
+}*/

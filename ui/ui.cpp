@@ -30,6 +30,12 @@ union UIBox {
 	struct {Point2i pos; Dimensions2i dim;};
 };
 
+struct UIText {
+	Font* font;
+	String string;
+	uint32 color;
+};
+
 struct UIImage {
 	union {
 		struct {int32 x, y, width, height;};
@@ -41,13 +47,20 @@ struct UIImage {
 	Box2 crop;
 };
 
-struct UITrinagle {
+#define UI_LEFT_POINTING_TRIANGLE 		1
+#define UI_RIGHT_POINTING_TRIANGLE		2
+#define UI_UP_POINTING_TRIANGLE 		3
+#define UI_DOWN_POINTING_TRIANGLE 		4
+#define UI_SQUARE 						5
+#define UI_BULLET 						6
+
+struct UISymbol {
 	union {
 		struct {int32 x0, y0;};
 		Point2i pos;
 	};
 	uint32 color;
-	int32 direction; // 0 - no triangle 1 - left, 2 - right, 3 - up, 4 - down
+	int32 type;
 };
 
 struct UIElement {
@@ -83,9 +96,9 @@ struct UIElement {
 	UIElement* next;
 	UIElement* prev;
 
-	Text text;
+	UIText text;
 	UIImage* image;
-	UITrinagle chevron;
+	UISymbol symbol;
 	opaque64 context;
 
 	Point2i scrollPos;
@@ -93,8 +106,7 @@ struct UIElement {
 
 struct {
 	FixedSize allocator;
-	int32 capacity;
-	int32 elementCount;
+	Arena* scratch;
 
 	UIStyle originalStyle;
 
@@ -111,8 +123,6 @@ struct {
 	UIElement* selected;
 	ssize start;
 	ssize end;
-
-	Arena* arena;
 } ui;
 
 Box2i GetAbsolutePosition(UIElement* element) {
@@ -137,11 +147,12 @@ bool IsInBottomRight(Box2i box, Point2i pos) {
 }
 
 ssize IsInTextBound(UIElement* textElement, Box2i box, Point2i pos) {
-	Text text = textElement->text;
+	UIText text = textElement->text;
 	if (!text.string.length) return -1;
 	float32 x_end = (float32)(pos.x - box.x0 + textElement->scrollPos.x);
 	float32 y_end = (float32)(pos.y - (box.y0 + text.font->height) + textElement->scrollPos.y);
-	return GetCharIndex(text, x_end, y_end);
+	StringNode node;
+	return GetCharIndex(text.font, CreateStringList(text.string, &node), x_end, y_end);
 }
 
 void SetPosition(UIElement* element, int32 x, int32 y) {
@@ -222,7 +233,9 @@ Dimensions2i GetContentDim(UIElement* e) {
 	int32 width = 0;
 	int32 height = 0;
 	if (e->text.string.length) {
-		TextMetrics metrics = GetTextMetrics(e->text);
+		StringNode node = {e->text.string, NULL, NULL};
+		StringList list = {&node, &node, e->text.string.length};
+		TextMetrics metrics = GetTextMetrics(e->text.font, list);
 		width = (int32)(metrics.maxx + 0.5f);
 		height = (int32)(metrics.endy + 0.5f);
 	}
@@ -234,14 +247,16 @@ Dimensions2i GetContentDim(UIElement* e) {
 }
 
 void RenderText(UIElement* textElement, Point2i pos) {
-	Text text = textElement->text;
+	UIText text = textElement->text;
 	if (!text.string.length) return;
 	String string = text.string;
 	Font* font = text.font;
 
 	float32 x = (float32)(pos.x - textElement->scrollPos.x);
 	float32 y = (float32)(UI_FLIPY(pos.y + font->height - textElement->scrollPos.y));
-	RenderText(text, x, y);
+	StringNode node = {string, NULL, NULL};
+	StringList list = {&node, &node, string.length};
+	RenderText(font, list, x, y, text.color);
 	
 	// Handle selected text
 	if (ui.selected && ui.selected == textElement) {
@@ -302,41 +317,43 @@ void RenderImage(UIImage* image, Point2i parentPos) {
 	GfxDrawImage(image->atlas, image->crop, renderBox);
 }
 
-void RenderTriangle(UITrinagle chevron, Point2i pos) {
-	if (chevron.direction == 0) return;
+void RenderSymbol(UISymbol symbol, Point2i pos) {
+	if (symbol.type == 0) return;
 
-	float32 x0 = (float32)(chevron.pos.x + pos.x);
-	float32 y0 = (float32)(chevron.pos.y + pos.y);
-	Triangle triangle = {};
-	if (chevron.direction == 1) {
-		triangle = {
+	float32 x0 = (float32)(symbol.pos.x + pos.x);
+	float32 y0 = (float32)(symbol.pos.y + pos.y);
+	if (symbol.type == UI_LEFT_POINTING_TRIANGLE) {
+		Triangle triangle = {
 			{x0, UI_FLIPY(y0 + 5.0f)},
 			{x0 + 5.0f, UI_FLIPY(y0)},
 			{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
 		};
+		GfxDrawTriangle(symbol.color, triangle);
 	}
-	else if (chevron.direction == 2) {
-		triangle = {
+	else if (symbol.type == UI_RIGHT_POINTING_TRIANGLE) {
+		Triangle triangle = {
 			{x0, UI_FLIPY(y0)},
 			{x0 + 9.0f, UI_FLIPY(y0 + 5.0f)},
 			{x0, UI_FLIPY(y0 + 9.0f)}
 		};
+		GfxDrawTriangle(symbol.color, triangle);
 	}
-	else if (chevron.direction == 3) {
-		triangle = {
+	else if (symbol.type == UI_UP_POINTING_TRIANGLE) {
+		Triangle triangle = {
 			{x0 + 5.0f, UI_FLIPY(y0)},
 			{x0, UI_FLIPY(y0 + 9.0f)},
 			{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
 		};
+		GfxDrawTriangle(symbol.color, triangle);
 	}
-	else if (chevron.direction == 4) {
-		triangle = {
+	else if (symbol.type == UI_DOWN_POINTING_TRIANGLE) {
+		Triangle triangle = {
 			{x0, UI_FLIPY(y0)},
 			{x0 + 9.0f, UI_FLIPY(y0)},
 			{x0 + 5.0f, UI_FLIPY(y0 + 9.0f)}
 		};
+		GfxDrawTriangle(symbol.color, triangle);
 	}
-	GfxDrawTriangle(chevron.color, triangle);
 }
 
 int32 __center(UIElement* element) {
@@ -377,7 +394,7 @@ void RenderElement(UIElement* element) {
 	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), element->width, element->height);
 	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
 	RenderText(element, box.p0);
-	RenderTriangle(element->chevron, box.p0);
+	RenderSymbol(element->symbol, box.p0);
 	if (element->flags & UI_HIDE_OVERFLOW) GfxClearCrop();
 }
 
@@ -387,8 +404,7 @@ void RenderElement(UIElement* element) {
 void UIInit(Arena* persist, Arena* scratch) {
 	int32 capacity = 200;
 	ui.allocator = CreateFixedSize(persist, capacity, sizeof(UIElement));
-	ui.capacity = capacity;
-	ui.arena = scratch;
+	ui.scratch = scratch;
 }
 
 void UIRenderElements() {
@@ -398,7 +414,6 @@ void UIRenderElements() {
 }
 
 void UISetWindowElement(uint32 background) {
-	ui.elementCount = 1;
 	ui.windowElement = (UIElement*)FixedSizeAlloc(&ui.allocator);
 	ui.windowElement->pos = {0, 0};
 	ui.windowElement->background = background;
@@ -407,21 +422,19 @@ void UISetWindowElement(uint32 background) {
 
 void UICreateWindow(const char* title, Dimensions2i dimensions, uint32 background) {
 	OSCreateWindow(title, dimensions.width, dimensions.height);
-	GfxInit(ui.arena);
+	GfxInit(ui.scratch);
 	UISetWindowElement(background);
 }
 
 void UICreateWindowFullScreen(const char* title, uint32 background) {
 	OSCreateWindowFullScreen(title);
-	GfxInit(ui.arena);
+	GfxInit(ui.scratch);
 	UISetWindowElement(background);
 }
 
 UIElement* UICreateElement(UIElement* parent) {
-	if (ui.elementCount == ui.capacity) return NULL;
 	UIElement* element = (UIElement*)FixedSizeAlloc(&ui.allocator);
-
-	ui.elementCount++;
+	ASSERT(element != NULL);
 
 	if (parent == NULL) parent = ui.windowElement;
 	LINKEDLIST_ADD(parent, element);
@@ -431,8 +444,6 @@ UIElement* UICreateElement(UIElement* parent) {
 }
 
 void UIDestroyElement(UIElement* element) {
-	ui.elementCount--;
-
 	LINKEDLIST_REMOVE(element->parent, element);
 	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
 
@@ -441,9 +452,8 @@ void UIDestroyElement(UIElement* element) {
 }
 
 UIImage* UICreateImage(UIElement* parent) {
-	if (ui.elementCount == ui.capacity) return NULL;
 	UIImage* image = (UIImage*)FixedSizeAlloc(&ui.allocator);
-	ui.elementCount++;
+	ASSERT(image != NULL);
 
 	if (parent) {
 		parent->image = image;
@@ -454,14 +464,16 @@ UIImage* UICreateImage(UIElement* parent) {
 }
 
 void UpdateTextScrollPos() {
-	Text text = ui.selected->text;
+	UIText text = ui.selected->text;
 	int32 elementWidth = ui.selected->width;
 	int32 elementHeight = ui.selected->height;
 	Font* font = text.font;
 	String string = text.string;
 
 	String sub = {string.data, ui.end};
-	TextMetrics metrics = GetTextMetrics({font, sub, 0});
+	StringNode node;
+	StringList list = CreateStringList(sub, &node);
+	TextMetrics metrics = GetTextMetrics(font, list);
 	float32 textLineWidth = metrics.endx;
 	float32 nextLetter = 0.0f;
 	if (ui.end < string.length) {
@@ -476,7 +488,8 @@ void UpdateTextScrollPos() {
 	}
 
 	sub = {string.data, MAX(0, ui.end - 1)};
-	textLineWidth = GetTextMetrics({font, sub, 0}).endx;
+	list = CreateStringList(sub, &node);
+	textLineWidth = GetTextMetrics(font, list).endx;
 	posRelativeToElement = (int32)(textLineWidth + 0.5f);
 	if (posRelativeToElement < ui.selected->scrollPos.x) {
 		ui.selected->scrollPos.x = MAX(posRelativeToElement, 0);
@@ -684,8 +697,10 @@ UIElement* UIUpdateActiveElement() {
 			if (ui.selected) {
 				String string = ui.selected->text.string;
 				Font* font = ui.selected->text.font;
-				TextMetrics metrics = GetTextMetrics({font, {string.data, ui.end}, 0});
-				ssize end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 2.5f*font->height);
+				StringNode node;
+				StringList list = CreateStringList({string.data, ui.end}, &node);
+				TextMetrics metrics = GetTextMetrics(font, list);
+				ssize end = GetCharIndex(font, list, metrics.endx, metrics.endy - 2.5f*font->height);
 				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
@@ -702,8 +717,10 @@ UIElement* UIUpdateActiveElement() {
 			if (ui.selected) {
 				String string = ui.selected->text.string;
 				Font* font = ui.selected->text.font;
-				TextMetrics metrics = GetTextMetrics({font, {string.data, ui.end}, 0});
-				ssize end = GetCharIndex(ui.selected->text, metrics.endx, metrics.endy - 0.5f*font->height);
+				StringNode node;
+				StringList list = CreateStringList({string.data, ui.end}, &node);
+				TextMetrics metrics = GetTextMetrics(font, list);
+				ssize end = GetCharIndex(font, list, metrics.endx, metrics.endy - 0.5f*font->height);
 				if (end != -1) ui.end = end;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
@@ -754,9 +771,9 @@ void __toggle(UIElement* e) {
 	ui.originalStyle = e->style;
 }
 
-UIElement* UICreateCheckbox(UIElement* parent, Text text, byte* context) {
+UIElement* UICreateCheckbox(UIElement* parent, UIText text, byte* context) {
 	UIElement* wrapper = UICreateElement(parent);
-	wrapper->width = 37+(int32)(GetTextMetrics(text).maxx + 0.5f);
+	wrapper->flags = UI_FIT_CONTENT;
 	wrapper->height = 24;
 	wrapper->name = STR("wrapper");
 
@@ -941,15 +958,15 @@ void __display_or_hide(UIElement* e) {
 	UIElement* element = e->next;
 	if (element->flags & UI_HIDDEN) {
 		element->flags &= ~UI_HIDDEN;
-		e->chevron.direction = 3;
+		e->symbol.type = 3;
 	}
 	else {
 		element->flags |= UI_HIDDEN;
-		e->chevron.direction = 4;
+		e->symbol.type = 4;
 	}
 }
 
-UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, Text text) {
+UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, UIText text) {
 	UIElement* container = UICreateElement(parent);
 	container->dim = dim;
 	container->pos = pos;
@@ -961,9 +978,9 @@ UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, Te
 	dropdown->onClick = __display_or_hide;
 	dropdown->background = RGBA_GREY;
 	dropdown->name = STR("dropdown");
-	dropdown->chevron.direction = 4;
-	dropdown->chevron.pos = {dim.width + 3, 15};
-	dropdown->chevron.color = RGBA_WHITE;
+	dropdown->symbol.type = 4;
+	dropdown->symbol.pos = {dim.width + 3, 15};
+	dropdown->symbol.color = RGBA_WHITE;
 
 	UIElement* textElement = UICreateElement(dropdown);
 	textElement->x = 5;
@@ -985,10 +1002,10 @@ void __select(UIElement* e) {
 	visible->first->text.string = e->first->text.string;
 
 	listContainer->flags |= UI_HIDDEN;
-	visible->chevron.direction = 4;
+	visible->symbol.type = 4;
 }
 
-UIElement* UIAddDropdownItem(UIElement* dropdown, Text text) {
+UIElement* UIAddDropdownItem(UIElement* dropdown, UIText text) {
 	UIElement* list = dropdown->next->first;
 	UIElement* last = list->last;
 
@@ -1012,9 +1029,9 @@ void __expnad_or_collapse(UIElement* e) {
 	if (e->parent != ui.windowElement) {
 		LINKEDLIST_FOREACH(children, UIElement, child) height += child->height;
 	}
-	if (e->chevron.direction == 2) {
+	if (e->symbol.type == 2) {
 		e->first->flags &= ~UI_HIDDEN;
-		e->chevron.direction = 4;
+		e->symbol.type = 4;
 		if (e->parent != ui.windowElement) {
 			e = e->next;
 			while (e) {
@@ -1023,9 +1040,9 @@ void __expnad_or_collapse(UIElement* e) {
 			}
 		}
 	}
-	else if (e->chevron.direction == 4) {
+	else if (e->symbol.type == 4) {
 		e->first->flags |= UI_HIDDEN;
-		e->chevron.direction = 2;
+		e->symbol.type = 2;
 		if (e->parent != ui.windowElement) {
 			e = e->next;
 			while (e) {
@@ -1048,11 +1065,12 @@ UIElement* UICreateTreeItem(UIElement* parent, Dimensions2i dim) {
 			e->y += dim.height;
 			e = e->next;
 		}
+		parent->symbol.type = 4;
 	}
 	else {
 		item = UICreateElement(NULL);
 	}
-	item->chevron = {{3, 9}, RGBA_WHITE, 4};
+	item->symbol = {{3, 9}, RGBA_WHITE, 0};
 	item->dim = dim;
 	item->flags = UI_CLICKABLE;
 	item->onHover = __arrow;

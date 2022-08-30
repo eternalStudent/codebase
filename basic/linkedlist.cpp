@@ -3,6 +3,10 @@
 											(n)->prev=(list)->last;\
 											(list)->last=(n);}while(0)
 
+#define LINKEDLIST_ADD_AFTER(m, n) 			do{(n)->prev=(m);(n)->next=(m)->next;\
+											if ((m)->next){(m)->next->prev=(n)};\
+											(m)->next=(n);}while(0)
+
 #define LINKEDLIST_REMOVE(list, n)			do{if ((n)->prev) (n)->prev->next = (n)->next;\
 											else (list)->first = (n)->next;\
 											if ((n)->next) (n)->next->prev = (n)->prev;\

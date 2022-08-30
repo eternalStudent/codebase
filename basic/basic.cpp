@@ -1,7 +1,7 @@
 #include "numbers.cpp"
 #include "intrinsics.cpp"
-#include "string.cpp"
 #include "linkedlist.cpp"
+#include "string.cpp"
 
 #if defined(_WIN32)
 #  include <Windows.h>
