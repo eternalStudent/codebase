@@ -37,12 +37,6 @@ struct UIText {
 };
 
 struct UIImage {
-	union {
-		struct {int32 x, y, width, height;};
-		struct {Point2i pos; Dimensions2i dim;};
-		UIBox box;
-	};
-
 	TextureId atlas;
 	Box2 crop;
 };
@@ -80,7 +74,7 @@ struct UIElement {
 		UIStyle style;
 	};
 
-	// TODO: add cursorIcon
+	// TODO: add cursorIcon?
 	String name; // NOTE: for debugging
 
 	uint32 flags;
@@ -97,7 +91,7 @@ struct UIElement {
 	UIElement* prev;
 
 	UIText text;
-	UIImage* image;
+	UIImage image;
 	UISymbol symbol;
 	opaque64 context;
 
@@ -287,7 +281,7 @@ void RenderText(UIElement* textElement, Point2i pos) {
 			byte b = string.data[i];
 			if (b == 10 || i == end) {
 				if (start != end)
-					GfxDrawBox2(0x44ffffff, {x0, y1 - font->height, x1, y1});
+					GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
 				if (i == end) 
 					break;
 				x0 = x;
@@ -303,18 +297,22 @@ void RenderText(UIElement* textElement, Point2i pos) {
 		
 		
 		if (ui.start < ui.end)
-			GfxDrawBox2(RGBA_ORANGE, {x1-1, y1 - font->height-2, x1+1, y1+2});
+			GfxDrawBox2({x1-1, y1 - font->height-2, x1+1, y1+2}, RGBA_ORANGE);
 		else
-			GfxDrawBox2(RGBA_ORANGE, {x0-1, y1 - font->height-2, x0+1, y1+2});
+			GfxDrawBox2({x0-1, y1 - font->height-2, x0+1, y1+2}, RGBA_ORANGE);
 	}
 }
 
-void RenderImage(UIImage* image, Point2i parentPos) {
-	if (!image) return;
+void RenderImage(UIElement* imageElement, Point2i pos) {
+	UIImage image = imageElement->image;
+	if (!image.atlas) return;
 
-	Point2i p0 = MOVE2(image->pos, parentPos);
-	Box2 renderBox = Box2{(float32)p0.x, (float32)UI_FLIPY(p0.y+image->height), (float32)(p0.x+image->width), (float32)UI_FLIPY(p0.y)};
-	GfxDrawImage(image->atlas, image->crop, renderBox);
+	Box2 renderBox = Box2{
+		(float32)pos.x, 
+		(float32)UI_FLIPY(pos.y+imageElement->height), 
+		(float32)(pos.x+imageElement->width), 
+		(float32)UI_FLIPY(pos.y)};
+	GfxDrawImage(image.atlas, image.crop, renderBox);
 }
 
 void RenderSymbol(UISymbol symbol, Point2i pos) {
@@ -322,37 +320,45 @@ void RenderSymbol(UISymbol symbol, Point2i pos) {
 
 	float32 x0 = (float32)(symbol.pos.x + pos.x);
 	float32 y0 = (float32)(symbol.pos.y + pos.y);
-	if (symbol.type == UI_LEFT_POINTING_TRIANGLE) {
-		Triangle triangle = {
-			{x0, UI_FLIPY(y0 + 5.0f)},
-			{x0 + 5.0f, UI_FLIPY(y0)},
-			{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
-		};
-		GfxDrawTriangle(symbol.color, triangle);
-	}
-	else if (symbol.type == UI_RIGHT_POINTING_TRIANGLE) {
-		Triangle triangle = {
-			{x0, UI_FLIPY(y0)},
-			{x0 + 9.0f, UI_FLIPY(y0 + 5.0f)},
-			{x0, UI_FLIPY(y0 + 9.0f)}
-		};
-		GfxDrawTriangle(symbol.color, triangle);
-	}
-	else if (symbol.type == UI_UP_POINTING_TRIANGLE) {
-		Triangle triangle = {
-			{x0 + 5.0f, UI_FLIPY(y0)},
-			{x0, UI_FLIPY(y0 + 9.0f)},
-			{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
-		};
-		GfxDrawTriangle(symbol.color, triangle);
-	}
-	else if (symbol.type == UI_DOWN_POINTING_TRIANGLE) {
-		Triangle triangle = {
-			{x0, UI_FLIPY(y0)},
-			{x0 + 9.0f, UI_FLIPY(y0)},
-			{x0 + 5.0f, UI_FLIPY(y0 + 9.0f)}
-		};
-		GfxDrawTriangle(symbol.color, triangle);
+	switch (symbol.type) {
+		case UI_LEFT_POINTING_TRIANGLE: {
+			GfxDrawTriangle(
+				{
+					{x0, UI_FLIPY(y0 + 5.0f)},
+					{x0 + 5.0f, UI_FLIPY(y0)},
+					{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
+				}, symbol.color);
+		} break;
+		case UI_RIGHT_POINTING_TRIANGLE: {
+			GfxDrawTriangle(
+				{
+					{x0, UI_FLIPY(y0)},
+					{x0 + 9.0f, UI_FLIPY(y0 + 5.0f)},
+					{x0, UI_FLIPY(y0 + 9.0f)}
+				}, symbol.color);
+		} break;
+		case UI_UP_POINTING_TRIANGLE: {
+			GfxDrawTriangle(
+				{
+					{x0 + 5.0f, UI_FLIPY(y0)},
+					{x0, UI_FLIPY(y0 + 9.0f)},
+					{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
+				}, symbol.color);
+		} break;
+		case UI_DOWN_POINTING_TRIANGLE: {
+			GfxDrawTriangle(
+				{
+					{x0, UI_FLIPY(y0)},
+					{x0 + 9.0f, UI_FLIPY(y0)},
+					{x0 + 5.0f, UI_FLIPY(y0 + 9.0f)}
+				}, symbol.color);
+		} break;
+		case UI_SQUARE: {
+			GfxDrawBox2({x0, UI_FLIPY(y0 + 9.0f), x0 + 9.0f, UI_FLIPY(y0)}, symbol.color);
+		} break;
+		case UI_BULLET: {
+			GfxDrawDisc({{x0, UI_FLIPY(y0 + 5.0f)}, 5.0f}, symbol.color, 0, 360);
+		} break;
 	}
 }
 
@@ -377,18 +383,18 @@ void RenderElement(UIElement* element) {
 	}
 	Box2i box = GetAbsolutePosition(element);
 
-	RenderImage(element->image, box.p0);
+	RenderImage(element, box.p0);
 
 	Box2 renderBox = Box2{(float32)box.x0, (float32)UI_FLIPY(box.y1), (float32)box.x1, (float32)UI_FLIPY(box.y0)};
 	if (element->radius) {
-		GfxDrawBox2Rounded(element->background, renderBox, element->radius);
+		GfxDrawBox2Rounded(renderBox, element->radius, element->background);
 		if (element->borderWidth && element->borderColor) 
-			GfxDrawBox2RoundedLines(element->borderColor, element->borderWidth, renderBox, element->radius);
+			GfxDrawBox2RoundedLines(renderBox, element->radius, element->borderWidth, element->borderColor);
 	}
 	else {
-		GfxDrawBox2(element->background, renderBox);
+		GfxDrawBox2(renderBox, element->background);
 		if (element->borderWidth && element->borderColor) 
-			GfxDrawBox2Lines(element->borderColor, element->borderWidth, renderBox);
+			GfxDrawBox2Lines(renderBox, element->borderWidth, element->borderColor);
 	}
 
 	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), element->width, element->height);
@@ -408,7 +414,7 @@ void UIInit(Arena* persist, Arena* scratch) {
 }
 
 void UIRenderElements() {
-	RenderImage(ui.windowElement->image, {0, 0});
+	RenderImage(ui.windowElement, {0, 0});
 	LINKEDLIST_FOREACH(ui.windowElement, UIElement, child) RenderElement(child);
 	RenderText(ui.windowElement, {0, 0});	
 }
@@ -447,20 +453,7 @@ void UIDestroyElement(UIElement* element) {
 	LINKEDLIST_REMOVE(element->parent, element);
 	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
 
-	FixedSizeFree(&ui.allocator, element->image);
 	FixedSizeFree(&ui.allocator, element);
-}
-
-UIImage* UICreateImage(UIElement* parent) {
-	UIImage* image = (UIImage*)FixedSizeAlloc(&ui.allocator);
-	ASSERT(image != NULL);
-
-	if (parent) {
-		parent->image = image;
-		image->dim = parent->dim;
-	}
-	else ui.windowElement->image = image;
-	return image;
 }
 
 void UpdateTextScrollPos() {
@@ -746,7 +739,7 @@ UIElement* UIUpdateActiveElement() {
 void UIDrawLine(Point2i p0, Point2i p1, uint32 rgba, float32 lineWidth) {
 	Point2 points[2] = {{(float32)p0.x, (float32)UI_FLIPY(p0.y)}, {(float32)p1.x, (float32)UI_FLIPY(p1.y)}};
 	Line2 line = {points, 2};
-	GfxDrawLine(rgba, lineWidth, line);
+	GfxDrawLine(line, lineWidth, rgba);
 }
 
 Box2i UIGetAbsolutePosition(UIElement* element) {
@@ -772,12 +765,12 @@ void __toggle(UIElement* e) {
 }
 
 UIElement* UICreateCheckbox(UIElement* parent, UIText text, byte* context) {
-	UIElement* wrapper = UICreateElement(parent);
-	wrapper->flags = UI_FIT_CONTENT;
-	wrapper->height = 24;
-	wrapper->name = STR("wrapper");
+	UIElement* container = UICreateElement(parent);
+	container->flags = UI_FIT_CONTENT;
+	container->height = 24;
+	container->name = STR("container");
 
-	UIElement* checkbox = UICreateElement(wrapper);
+	UIElement* checkbox = UICreateElement(container);
 	checkbox->dim = {24, 24};
 	checkbox->background = RGBA_LIGHTGREY;
 	checkbox->radius = 6;
@@ -791,11 +784,11 @@ UIElement* UICreateCheckbox(UIElement* parent, UIText text, byte* context) {
 	check->context.p = context;
 	check->name = STR("check");
 
-	UIElement* textElement = UICreateElement(wrapper);
+	UIElement* textElement = UICreateElement(container);
 	textElement->pos = {37, -4};
 	textElement->text = text;
 
-	return wrapper;
+	return container;
 }
 
 void __move_sideway(UIElement* e) {
@@ -843,7 +836,7 @@ UIElement* UICreateButton(UIElement* parent, Dimensions2i dim) {
 	return button;
 }
 
-void __choose(UIElement* e) {
+void __switch(UIElement* e) {
 	UIElement* parent = e->parent;
 	LINKEDLIST_FOREACH(parent, UIElement, child) {
 		child->background = RGBA_LIGHTGREY;
@@ -854,23 +847,13 @@ void __choose(UIElement* e) {
 	ui.originalStyle = e->style;
 }
 
-void __fit(UIElement* e) {
-	LINKEDLIST_FOREACH(e, UIElement, child) {
-		Dimensions2i dim = child->dim;
-		UIElement* body = child->first;
-		body->height = e->height - (dim.height+1);
-    	body->width = e->width-2;
-	}
-}
-
 UIElement* UICreateTabControl(UIElement* parent, Dimensions2i dim) {
 	UIElement* control = UICreateElement(parent);
 	control->dim = dim;
 	control->background = RGBA_LIGHTGREY;
-	control->flags = UI_MOVABLE | UI_RESIZABLE;
+	control->flags = UI_MOVABLE | UI_RESIZABLE | UI_FIT_CONTENT;
 	control->borderColor = RGBA_WHITE;
 	control->borderWidth = 1;
-	control->onResize = __fit;
 	control->name = STR("tab control");
 
 	return control;
@@ -885,7 +868,7 @@ UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* 
 	header->radius = 3;
 	header->flags = UI_CLICKABLE | UI_SHUFFLEABLE;
 	header->onHover = __hover1;
-	header->onClick = __choose;
+	header->onClick = __switch;
 	header->background = RGBA_LIGHTGREY;
 	header->name = STR("tab header");
 
@@ -907,7 +890,7 @@ UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* 
 
 void UISetActiveTab(UIElement* active) {
 	BringToFront(active->parent);
-	__choose(active->parent);
+	__switch(active->parent);
 }
 
 void __scroll(UIElement* e) {

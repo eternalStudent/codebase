@@ -290,7 +290,7 @@ void OpenGLDrawText(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawBox2(uint32 rgba, Box2 pos) {
+void OpenGLDrawBox2(Box2 pos, uint32 rgba) {
 	Point2 p0 = AdjustCoordinates(pos.p0);
 	Point2 p1 = AdjustCoordinates(pos.p1);
 
@@ -325,7 +325,7 @@ void OpenGLDrawBox2(uint32 rgba, Box2 pos) {
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawTriangle(uint32 rgba, Triangle triangle) {
+void OpenGLDrawTriangle(Triangle triangle, uint32 rgba) {
 	Point2 p0 = AdjustCoordinates(triangle.p0);
 	Point2 p1 = AdjustCoordinates(triangle.p1);
 	Point2 p2 = AdjustCoordinates(triangle.p2);
@@ -360,7 +360,7 @@ void OpenGLDrawTriangle(uint32 rgba, Triangle triangle) {
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawLine(uint32 rgba, float32 lineWidth, Line2 line) {
+void OpenGLDrawLine(Line2 line, float32 lineWidth, uint32 rgba) {
 	ArenaAlign(opengl.arena, 4);
 	float32* vertices = (float32*)ArenaAlloc(opengl.arena, 2*line.count*sizeof(float32));
 
@@ -394,7 +394,7 @@ void OpenGLDrawLine(uint32 rgba, float32 lineWidth, Line2 line) {
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawCircle(uint32 rgba, float32 lineWidth, Sphere2 circle, int32 startAngle, int32 endAngle) {
+void OpenGLDrawCircle(Sphere2 circle, float32 lineWidth, uint32 rgba, int32 startAngle, int32 endAngle) {
 	int32 count = (endAngle-startAngle+1);
 	float32 vertices[362*2];
 	for (int32 i=0; i<=count; i++) {
@@ -430,7 +430,7 @@ void OpenGLDrawCircle(uint32 rgba, float32 lineWidth, Sphere2 circle, int32 star
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawDisc(uint32 rgba, Sphere2 disc, int32 startAngle, int32 endAngle) {
+void OpenGLDrawDisc(Sphere2 disc, uint32 rgba, int32 startAngle, int32 endAngle) {
 	int32 count = (endAngle-startAngle+1);
 	float32 vertices[363*2];
 	Point2 center = AdjustCoordinates(disc.center);
@@ -468,7 +468,7 @@ void OpenGLDrawDisc(uint32 rgba, Sphere2 disc, int32 startAngle, int32 endAngle)
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawCurve3(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Point2 p2) {
+void OpenGLDrawCurve3(Point2 p0, Point2 p1, Point2 p2, float32 lineWidth, uint32 rgba) {
 	float32 vertices[257*2];
 
 	float32 fraction = LoadExp(-8);
@@ -503,7 +503,7 @@ void OpenGLDrawCurve3(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Poin
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawCurve4(uint32 rgba, float32 lineWidth, Point2 p0, Point2 p1, Point2 p2, Point2 p3) {
+void OpenGLDrawCurve4(Point2 p0, Point2 p1, Point2 p2, Point2 p3, uint32 rgba, float32 lineWidth) {
 	float32 vertices[257*2];
 
 	float32 fraction = LoadExp(-8);
