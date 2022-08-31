@@ -941,11 +941,11 @@ void __display_or_hide(UIElement* e) {
 	UIElement* element = e->next;
 	if (element->flags & UI_HIDDEN) {
 		element->flags &= ~UI_HIDDEN;
-		e->symbol.type = 3;
+		e->symbol.type = UI_UP_POINTING_TRIANGLE;
 	}
 	else {
 		element->flags |= UI_HIDDEN;
-		e->symbol.type = 4;
+		e->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 	}
 }
 
@@ -961,7 +961,7 @@ UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, UI
 	dropdown->onClick = __display_or_hide;
 	dropdown->background = RGBA_GREY;
 	dropdown->name = STR("dropdown");
-	dropdown->symbol.type = 4;
+	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 	dropdown->symbol.pos = {dim.width + 3, 15};
 	dropdown->symbol.color = RGBA_WHITE;
 
@@ -985,7 +985,7 @@ void __select(UIElement* e) {
 	visible->first->text.string = e->first->text.string;
 
 	listContainer->flags |= UI_HIDDEN;
-	visible->symbol.type = 4;
+	visible->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 }
 
 UIElement* UIAddDropdownItem(UIElement* dropdown, UIText text) {
@@ -1012,9 +1012,9 @@ void __expnad_or_collapse(UIElement* e) {
 	if (e->parent != ui.windowElement) {
 		LINKEDLIST_FOREACH(children, UIElement, child) height += child->height;
 	}
-	if (e->symbol.type == 2) {
+	if (e->symbol.type == UI_RIGHT_POINTING_TRIANGLE) {
 		e->first->flags &= ~UI_HIDDEN;
-		e->symbol.type = 4;
+		e->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 		if (e->parent != ui.windowElement) {
 			e = e->next;
 			while (e) {
@@ -1023,9 +1023,9 @@ void __expnad_or_collapse(UIElement* e) {
 			}
 		}
 	}
-	else if (e->symbol.type == 4) {
+	else if (e->symbol.type == UI_DOWN_POINTING_TRIANGLE) {
 		e->first->flags |= UI_HIDDEN;
-		e->symbol.type = 2;
+		e->symbol.type = UI_RIGHT_POINTING_TRIANGLE;
 		if (e->parent != ui.windowElement) {
 			e = e->next;
 			while (e) {
@@ -1048,7 +1048,7 @@ UIElement* UICreateTreeItem(UIElement* parent, Dimensions2i dim) {
 			e->y += dim.height;
 			e = e->next;
 		}
-		parent->symbol.type = 4;
+		parent->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 	}
 	else {
 		item = UICreateElement(NULL);
