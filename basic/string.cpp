@@ -130,14 +130,17 @@ int32 Float32ToDecimal(float32 number, int32 precision, byte* str) {
 	return count;
 }
 
-#define StringCopy(source, dest) (memcpy((dest), (source), (sizeof(source)-1)), (sizeof(source)-1))
+ssize StringCopy(char* source, byte* dest) {
+	memcpy(dest, source, sizeof(source)-1);
+	return sizeof(source)-1;
+}
 
-inline int32 BoolToAnsi(bool b, void* str){
+inline int32 BoolToAnsi(bool b, byte* str){
 	if (b){
-		return StringCopy("true", str);
+		return (memcpy(str, "true", 4), 4);
 	}
 	else {
-		return StringCopy("false", str);
+		return (memcpy(str, "false", 5), 5);
 	}
 }
 
@@ -151,7 +154,10 @@ struct String {
 
 #define STR(x) String{((byte*)x), (sizeof(x)-1)}
 
-#define StringCopy2(source, dest) (memcpy((dest), (source).data, (source).length), (source).length)
+ssize StringCopy(String source, byte* dest) {
+	memcpy(dest, source.data, source.length);
+	return source.length;
+}
 
 bool StringEquals(String str1, String str2) {
 	if (str1.length != str2.length) return false;
@@ -232,7 +238,7 @@ String GetString(StringBuilder* builder) {
 }
 
 void PushString(StringBuilder* builder, String str) {
-	builder->ptr += StringCopy2(str, builder->ptr);
+	builder->ptr += StringCopy(str, builder->ptr);
 }
 
 void PushNewLine(StringBuilder* builder) {
@@ -272,22 +278,28 @@ StringList CreateStringList(String string, StringNode* node) {
 	return {node, node, string.length};
 }
 
-/*void InsertString(StringList* list, StringNode* node, ssize i) {
-	ASSERT(i < list->totalLength);
-	ssize j = 0;
-	LINKEDLIST_FOREACH(list, StringNode, current) {
-		ssize length = current->string.length;
-		if (i == j + length) {
-			LINKEDLIST_ADD_AFTER(current, node);
-			break;
-		}
-		else if (i < j + length) {
-			ssize k = i-j;
+void StringListAppend(StringList* list, StringNode* node) {
+	if (node->string.length == 0) return;
+	LINKEDLIST_ADD(list, node);
+	list->totalLength += node->string.length;
+}
 
-			break;
-		}
-		else {
-			j += length;
-		}
+void StringListCopy(StringList list, byte* buffer) {
+	byte* ptr = buffer;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		ptr += StringCopy(string, ptr);
 	}
-}*/
+}
+
+byte GetChar(StringList list, ssize index) {
+	ssize i = 0;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		if (index < i + string.length) {
+			return string.data[index - i];
+		}
+		i += string.length;
+	}
+	return 0;
+}

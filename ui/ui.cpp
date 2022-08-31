@@ -34,6 +34,7 @@ struct UIText {
 	Font* font;
 	String string;
 	uint32 color;
+	StringList editable;
 };
 
 struct UIImage {
@@ -140,13 +141,20 @@ bool IsInBottomRight(Box2i box, Point2i pos) {
 	return box.x1-4 <= pos.x && box.y1-4 <= pos.y;
 }
 
-ssize IsInTextBound(UIElement* textElement, Box2i box, Point2i pos) {
+ssize GetTextIndex(UIElement* textElement, Point2i pos, Point2i cursorPos) {
 	UIText text = textElement->text;
-	if (!text.string.length) return -1;
-	float32 x_end = (float32)(pos.x - box.x0 + textElement->scrollPos.x);
-	float32 y_end = (float32)(pos.y - (box.y0 + text.font->height) + textElement->scrollPos.y);
+	StringList list;
 	StringNode node;
-	return GetCharIndex(text.font, CreateStringList(text.string, &node), x_end, y_end);
+	if (text.editable.totalLength) {
+		list = text.editable;
+	}
+	else if (text.string.length) {
+		list = CreateStringList(text.string, &node);
+	}
+	else return -1;
+	float32 x_end = (float32)(cursorPos.x - pos.x + textElement->scrollPos.x);
+	float32 y_end = (float32)(cursorPos.y - (pos.y + text.font->height) + textElement->scrollPos.y);
+	return GetCharIndex(text.font, list, x_end, y_end);
 }
 
 void SetPosition(UIElement* element, int32 x, int32 y) {
@@ -226,6 +234,11 @@ UIElement* GetScrollableAnscestor(UIElement* e) {
 Dimensions2i GetContentDim(UIElement* e) {
 	int32 width = 0;
 	int32 height = 0;
+	if (e->text.editable.totalLength) {
+		TextMetrics metrics = GetTextMetrics(e->text.font, e->text.editable);
+		width = (int32)(metrics.maxx + 0.5f);
+		height = (int32)(metrics.endy + 0.5f);
+	}
 	if (e->text.string.length) {
 		StringNode node = {e->text.string, NULL, NULL};
 		StringList list = {&node, &node, e->text.string.length};
@@ -242,57 +255,77 @@ Dimensions2i GetContentDim(UIElement* e) {
 
 void RenderText(UIElement* textElement, Point2i pos) {
 	UIText text = textElement->text;
-	if (!text.string.length) return;
-	String string = text.string;
+
+	StringNode node;
+	StringList list;
+	if (text.editable.totalLength) {
+		list = text.editable;
+	}
+	else if (text.string.length) {
+		list = CreateStringList(text.string, &node);
+	}
+	else return;
+
 	Font* font = text.font;
+	uint32 color = text.color;
 
 	float32 x = (float32)(pos.x - textElement->scrollPos.x);
 	float32 y = (float32)(UI_FLIPY(pos.y + font->height - textElement->scrollPos.y));
-	StringNode node = {string, NULL, NULL};
-	StringList list = {&node, &node, string.length};
-	RenderText(font, list, x, y, text.color);
+	RenderText(font, list, x, y, color);
 	
 	// Handle selected text
 	if (ui.selected && ui.selected == textElement) {
 		ssize start = MIN(ui.start, ui.end);
 		ssize end = MAX(ui.start, ui.end);
-		ASSERT(0 <= start && start <= end && end <= string.length);
-		ssize i = 0;
+		ASSERT(0 <= start && start <= end && end <= list.totalLength);
+
 		float32 x0 = x;
 		float32 y1 = y + font->height - 3;
+		float32 x1 = x;
+		ssize i = 0;
+		int32 phase = 0;
+		LINKEDLIST_FOREACH(&list, StringNode, current) {
+			String string = current->string;
+			for (ssize j = 0; j < string.length; j++) {
+				byte b = string.data[j];
 
-		while (true) {
-			if (i == start)
-				break;
-			byte b = string.data[i];
-			if (b == 10) {
-        		x0 = x;
-        		y1 -= font->height;
-      		}
-      		else if (32 <= b && b <= 127) {
-        		BakedChar* bakedchar = font->chardata + (b - 32);
-         		x0 += bakedchar->xadvance;
-         	}
-      		i++;
-		}
+				if (phase == 0) {
+					if (i == start) {
+						phase = 1;
+						x1 = x0;
+					}
+					else {
+						if (b == 10) {
+							x0 = x;
+							y1 -= font->height;
+						}
+						x0 += GetCharWidth(font, b);
+					}
+				}
 
-		float32 x1 = x0;
-		while(true) {
-			byte b = string.data[i];
-			if (b == 10 || i == end) {
-				if (start != end)
-					GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
-				if (i == end) 
-					break;
-				x0 = x;
-				x1 = x;
-				y1 -= font->height;
+				if (phase == 1) {
+					if (i == end) {
+						if (start != end)
+							GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
+						phase = 2;
+					}
+					else {
+						if (b == 10) {
+							if (start != end)
+								GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
+							x0 = x;
+							x1 = x;
+							y1 -= font->height;
+						}
+						x1 += GetCharWidth(font, b);
+					}
+				}
+
+				if (phase == 2) break;
+				i++;
 			}
-			else if (32 <= b && b <= 127) {
-        		BakedChar* bakedchar = font->chardata + (b - 32);
-         		x1 += bakedchar->xadvance;
-         	}
-      		i++;
+
+			if (phase == 2) break;
 		}
 		
 		
@@ -461,18 +494,23 @@ void UpdateTextScrollPos() {
 	int32 elementWidth = ui.selected->width;
 	int32 elementHeight = ui.selected->height;
 	Font* font = text.font;
-	String string = text.string;
-
-	String sub = {string.data, ui.end};
 	StringNode node;
-	StringList list = CreateStringList(sub, &node);
-	TextMetrics metrics = GetTextMetrics(font, list);
+	StringList list;
+
+	if (text.editable.totalLength) {
+		list = text.editable;
+	}
+	else {
+		list = CreateStringList(text.string, &node);
+	}
+
+	TextMetrics metrics = GetTextMetrics(font, list, ui.end);
 	float32 textLineWidth = metrics.endx;
 	float32 nextLetter = 0.0f;
-	if (ui.end < string.length) {
-		byte b = string.data[ui.end + 1];
+	if (ui.end < list.totalLength) {
+		byte b = GetChar(list, ui.end + 1);
 		if (b == 10) b = 32;
-		nextLetter = GetCharWidth(font, string.data[ui.end + 1]);
+		nextLetter = GetCharWidth(font, b);
 	}
 
 	int32 posRelativeToElement = (int32)(textLineWidth + nextLetter + 0.5f);
@@ -480,9 +518,7 @@ void UpdateTextScrollPos() {
 		ui.selected->scrollPos.x = posRelativeToElement - elementWidth; 
 	}
 
-	sub = {string.data, MAX(0, ui.end - 1)};
-	list = CreateStringList(sub, &node);
-	textLineWidth = GetTextMetrics(font, list).endx;
+	textLineWidth = GetTextMetrics(font, list, MAX(0, ui.end - 1)).endx;
 	posRelativeToElement = (int32)(textLineWidth + 0.5f);
 	if (posRelativeToElement < ui.selected->scrollPos.x) {
 		ui.selected->scrollPos.x = MAX(posRelativeToElement, 0);
@@ -516,7 +552,7 @@ UIElement* UIUpdateActiveElement() {
 	bool isInBottomRight = false;
 	ssize textIndex = -1;
 	if (element) {
-		textIndex = IsInTextBound(element, pos, cursorPos);
+		textIndex = GetTextIndex(element, pos.p0, cursorPos);
 		if(IsInBottomRight(pos, cursorPos) && (element->flags & UI_RESIZABLE)) {
 			OSSetCursorIcon(CUR_RESIZE);
 			isInBottomRight = true;
@@ -628,7 +664,7 @@ UIElement* UIUpdateActiveElement() {
 	// Handle text selection
 	if (ui.isSelecting) {
 		static int32 selectionCount = 0;
-		if (element && element->text.string.length) {
+		if (element && (element->text.string.length || element->text.editable.totalLength)) {
 			selectionCount = 0;
 			ASSERT(element == ui.selected && textIndex != -1);
 			ui.end = textIndex;
@@ -688,11 +724,12 @@ UIElement* UIUpdateActiveElement() {
 		if (OSIsKeyPressed(KEY_UP) || upKeyCount == 0) {
 			upKeyCount = 6;
 			if (ui.selected) {
-				String string = ui.selected->text.string;
-				Font* font = ui.selected->text.font;
+				UIText text = ui.selected->text;
+				String string = text.string;
+				Font* font = text.font;
 				StringNode node;
-				StringList list = CreateStringList({string.data, ui.end}, &node);
-				TextMetrics metrics = GetTextMetrics(font, list);
+				StringList list = text.editable.totalLength ? text.editable : CreateStringList(string, &node);
+				TextMetrics metrics = GetTextMetrics(font, list, ui.end);
 				ssize end = GetCharIndex(font, list, metrics.endx, metrics.endy - 2.5f*font->height);
 				if (end != -1) ui.end = end;
 
@@ -708,11 +745,12 @@ UIElement* UIUpdateActiveElement() {
 		if (OSIsKeyPressed(KEY_DOWN) || downKeyCount == 0) {
 			downKeyCount = 6;
 			if (ui.selected) {
-				String string = ui.selected->text.string;
-				Font* font = ui.selected->text.font;
+				UIText text = ui.selected->text;
+				String string = text.string;
+				Font* font = text.font;
 				StringNode node;
-				StringList list = CreateStringList({string.data, ui.end}, &node);
-				TextMetrics metrics = GetTextMetrics(font, list);
+				StringList list = text.editable.totalLength ? text.editable : CreateStringList(string, &node);
+				TextMetrics metrics = GetTextMetrics(font, list, ui.end);
 				ssize end = GetCharIndex(font, list, metrics.endx, metrics.endy - 0.5f*font->height);
 				if (end != -1) ui.end = end;
 
@@ -726,24 +764,26 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle copy
 	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C) && ui.selected) {
-		String string = ui.selected->text.string;
+		String string;
 		ssize start = MIN(ui.start, ui.end);
 		ssize end = MAX(ui.start, ui.end);
+
+		if (ui.selected->text.editable.totalLength) {
+			StringList list = ui.selected->text.editable;
+			byte* buffer = (byte*)ArenaAlloc(ui.scratch, list.totalLength);
+			StringListCopy(list, buffer);
+			string = {buffer, list.totalLength};
+			// TODO: don't copy the entire text
+		}
+		else {
+			string = ui.selected->text.string;
+		}
+		
 		String sub = {string.data + start, end - start};
 		OSCopyToClipboard(sub);
 	}
 
 	return element;
-}
-
-void UIDrawLine(Point2i p0, Point2i p1, uint32 rgba, float32 lineWidth) {
-	Point2 points[2] = {{(float32)p0.x, (float32)UI_FLIPY(p0.y)}, {(float32)p1.x, (float32)UI_FLIPY(p1.y)}};
-	Line2 line = {points, 2};
-	GfxDrawLine(line, lineWidth, rgba);
-}
-
-Box2i UIGetAbsolutePosition(UIElement* element) {
-	return GetAbsolutePosition(element);
 }
 
 // specific elements

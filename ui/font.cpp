@@ -82,16 +82,18 @@ ssize GetCharIndex(Font* font, StringList list, float32 x_end, float32 y_end) {
 	float32 x = 0;
 	float32 y = 0;
 
+	ssize i = 0;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
-		for (ssize i = 0; i < string.length; i++) {
-			byte b = string.data[i];
+		for (ssize j = 0; j < string.length; j++) {
+			byte b = string.data[j];
 			if (b == 10) {
 				y += font->height;
 				x = 0;
 			}
 			x += GetCharWidth(font, b);
 			if (x_end <= x - 2 && y_end <= y) return i;
+			i++;
 		}
 	}
 
@@ -121,6 +123,33 @@ TextMetrics GetTextMetrics(Font* font, StringList list) {
 			}
 			x += GetCharWidth(font, b);
 		}
+	}
+
+	maxx = MAX(x, maxx);
+	return {maxx, x, y};
+}
+
+TextMetrics GetTextMetrics(Font* font, StringList list, ssize stop) {
+	if (list.totalLength == 0) return {};
+	
+	float32 maxx = 0;
+	float32 x = 0;
+	float32 y = font->height * 1.5f;
+	ssize i = 0;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		for (ssize j = 0; j < string.length; j++) {
+			if (i == stop) break;
+			byte b = string.data[j];
+			if (b == 10) {
+				maxx = MAX(maxx, x);
+				x = 0;
+				y += font->height;
+			}
+			x += GetCharWidth(font, b);
+			i++;
+		}
+		if (i == stop) break;
 	}
 
 	maxx = MAX(x, maxx);

@@ -15,24 +15,31 @@ int main() {
 	Font* smallf = (Font*)ArenaAlloc(&persist, sizeof(Font));
 	*smallf = LoadFont(&scratch, "..\\consola.ttf", 18);
 
-	UIElement* e1 = UICreateScrollingPane(NULL, {200, 200}, {12, 12});
-	e1->borderWidth = 1;
-	e1->borderColor = RGBA_WHITE;
-	e1->text.font = font;
-	e1->text.color = RGBA_WHITE;
-	e1->text.string = STR(R"STRING(Lorem ipsum dolor sit amet, 
+	String str1 = STR(R"STRING(Lorem ipsum dolor sit amet, 
 consectetur adipiscing elit, 
 sed do eiusmod tempor incididunt 
 ut labore et dolore magna aliqua. 
 Ut enim ad minim veniam, quis nostrud 
 exercitation ullamco laboris nisi ut 
 aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit
+Duis)STRING");
+	StringNode node1 = {str1, NULL, NULL};
+
+	String str2 = STR(R"STRING( aute irure dolor in reprehenderit
 in voluptate velit esse cillum dolore
 eu fugiat nulla pariatur. Excepteur
 sint occaecat cupidatat non proident, 
 sunt in culpa qui officia deserunt
 mollit anim id est laborum.)STRING");
+	StringNode node2 = {str2, &node1, NULL};
+	node1.next = &node2;
+
+	UIElement* e1 = UICreateScrollingPane(NULL, {200, 200}, {12, 12});
+	e1->borderWidth = 1;
+	e1->borderColor = RGBA_WHITE;
+	e1->text.font = font;
+	e1->text.color = RGBA_WHITE;
+	e1->text.editable = {&node1, &node2, str1.length + str2.length};
 
 	UIElement* dropdown = UICreateDropdown(NULL, {98, 36}, {12, 224}, {font, STR("Select"), RGBA_WHITE});
 	byte itemsbuf[] = "item 1item 2item 3item 4item 5item 6item 7";
