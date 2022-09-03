@@ -8,6 +8,8 @@ struct {
 	BYTE mouse_prev[3];
 	DWORD mouseWheelDelta;
 	DWORD mouseHWheelDelta;
+	CHAR typed[4];
+	int32 strlength;
 	HCURSOR cursors[7];
 } window;
 
@@ -45,6 +47,10 @@ DWORD Win32GetMouseWheelDelta() {
 
 DWORD Win32GetMouseHWheelDelta() {
 	return window.mouseHWheelDelta;
+}
+
+String Win32GetTypedText() {
+	return {(byte*)window.typed, (ssize)window.strlength};
 }
 
 void Win32ExitFullScreen() {
@@ -135,6 +141,13 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		case WM_LBUTTONDBLCLK: {
 			window.mouse[3] = 1;
 		} break;
+		case WM_CHAR: {
+			if (wParam == 13) wParam = 10;
+			if (32 <= wParam && wParam <= 127 || 9 <= wParam && wParam <= 10) {
+				window.typed[window.strlength] = (CHAR)wParam;
+				window.strlength++;
+			}
+		}
 	}
 
 	return DefWindowProc(handle, message, wParam, lParam);
@@ -224,7 +237,8 @@ void Win32ProcessWindowEvents() {
 	window.mouse_prev[0] = window.mouse[0];
 	window.mouse_prev[1] = window.mouse[1];
 	window.mouse_prev[2] = window.mouse[2];
-	window.mouse[3] = 0;;
+	window.mouse[3] = 0;
+	window.strlength = 0;
 	window.mouseWheelDelta = 0;
 	window.mouseHWheelDelta = 0;
 	MSG message;

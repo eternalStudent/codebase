@@ -12,7 +12,9 @@
 
 #if defined(_WIN32)
 #  include "win32window.cpp"
-#  define KEY_SHIFT					VK_SHIFT		// 0x10
+#  define KEY_BACKSPACE 			VK_BACK			// 0x08
+#  define KEY_TAB					VK_TAB			// 0x09
+#  define KEY_SHIFT 				VK_SHIFT		// 0x10
 #  define KEY_CTRL					VK_CONTROL		// 0x11
 #  define KEY_ESC 					VK_ESCAPE		// 0x1B
 #  define KEY_SPACE 				VK_SPACE		// 0x20
@@ -31,6 +33,7 @@
 #  define OSCreateWindow			Win32CreateWindow
 #  define OSCreateWindowFullScreen	Win32CreateWindowFullScreen
 #  define OSProcessWindowEvents 	Win32ProcessWindowEvents
+#  define OSWindowDestroyed 		Win32WindowDestroyed
 #  define OSSetCursorIcon			Win32SetCursorIcon
 #  define OSExitFullScreen			Win32ExitFullScreen
 #  define OSEnterFullScreen 		Win32EnterFullScreen
@@ -44,8 +47,7 @@
 #  define OSIsMouseDoubleClicked	Win32IsMouseDoubleClicked
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OSGetMouseHWheelDelta 	Win32GetMouseHWheelDelta
-#  define OSWindowDestroyed 		Win32WindowDestroyed
-
+#  define OSGetTypedText			Win32GetTypedText
 #  define OSCopyToClipboard 		Win32CopyToClipboard
 #endif
 

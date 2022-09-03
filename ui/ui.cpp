@@ -6,15 +6,16 @@
 #define UI_CLICKABLE		(1 << 3)
 #define UI_HIDE_OVERFLOW 	(1 << 4)
 #define UI_SCROLLABLE		((1 << 5) + UI_HIDE_OVERFLOW)
+#define UI_EDITABLE 		(1 << 6)
 
-#define UI_HIDDEN			(1 << 6)
-#define UI_CENTER			(1 << 7)
-#define UI_RIGHT			(1 << 8)
+#define UI_HIDDEN			(1 << 7)
+#define UI_CENTER			(1 << 8)
+#define UI_RIGHT			(1 << 9)
 
-#define UI_FIT_CONTENT		(1 << 9)
+#define UI_FIT_CONTENT		(1 << 10)
 
-#define UI_ELEVATOR 		(1 << 10)
-#define UI_BRING_PARENT_TO_FRONT	(1 << 11)
+#define UI_ELEVATOR 		(1 << 11)
+#define UI_BRING_PARENT_TO_FRONT	(1 << 12)
 
 #include "font.cpp"
 
@@ -101,6 +102,8 @@ struct UIElement {
 
 struct {
 	FixedSize allocator;
+	FixedSize stringNodeAllocator;
+	struct {byte* start;byte* current;} buffer; 
 	Arena* scratch;
 
 	UIStyle originalStyle;
@@ -286,7 +289,7 @@ void RenderText(UIElement* textElement, Point2i pos) {
 		int32 phase = 0;
 		LINKEDLIST_FOREACH(&list, StringNode, current) {
 			String string = current->string;
-			for (ssize j = 0; j < string.length; j++) {
+			for (ssize j = 0; j < string.length; j++, i++) {
 				byte b = string.data[j];
 
 				if (phase == 0) {
@@ -322,10 +325,12 @@ void RenderText(UIElement* textElement, Point2i pos) {
 				}
 
 				if (phase == 2) break;
-				i++;
 			}
 
 			if (phase == 2) break;
+		}
+		if (end == list.totalLength && start != end) {
+			GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
 		}
 		
 		
@@ -441,8 +446,10 @@ void RenderElement(UIElement* element) {
 //-----------
 
 void UIInit(Arena* persist, Arena* scratch) {
-	int32 capacity = 200;
-	ui.allocator = CreateFixedSize(persist, capacity, sizeof(UIElement));
+	ui.allocator = CreateFixedSize(persist, 200, sizeof(UIElement));
+	ui.stringNodeAllocator = CreateFixedSize(persist, 100, sizeof(StringNode));
+	byte* buffer = (byte*)ArenaAlloc(persist, 512);
+	ui.buffer = {buffer, buffer};
 	ui.scratch = scratch;
 }
 
@@ -482,6 +489,14 @@ UIElement* UICreateElement(UIElement* parent) {
 	return element;
 }
 
+StringList UICreateEditableText(String string) {
+	StringNode* node = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+	StringCopy(string, ui.buffer.current);
+	*node = {{ui.buffer.current, string.length}, NULL, NULL};
+	ui.buffer.current += string.length;
+	return {node, node, string.length};
+}
+
 void UIDestroyElement(UIElement* element) {
 	LINKEDLIST_REMOVE(element->parent, element);
 	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
@@ -513,21 +528,27 @@ void UpdateTextScrollPos() {
 		nextLetter = GetCharWidth(font, b);
 	}
 
+	// right
 	int32 posRelativeToElement = (int32)(textLineWidth + nextLetter + 0.5f);
 	if (elementWidth < posRelativeToElement - ui.selected->scrollPos.x) {
 		ui.selected->scrollPos.x = posRelativeToElement - elementWidth; 
 	}
 
-	textLineWidth = GetTextMetrics(font, list, MAX(0, ui.end - 1)).endx;
-	posRelativeToElement = (int32)(textLineWidth + 0.5f);
+	// left
+	if (GetChar(list, ui.end - 1) != 10) {
+		textLineWidth = GetTextMetrics(font, list, MAX(0, ui.end - 1)).endx;
+		posRelativeToElement = (int32)(textLineWidth + 0.5f);
+	}
 	if (posRelativeToElement < ui.selected->scrollPos.x) {
 		ui.selected->scrollPos.x = MAX(posRelativeToElement, 0);
 	}
 
+	// down
 	if (elementHeight < metrics.endy - ui.selected->scrollPos.y) {
 		ui.selected->scrollPos.y = (int32)(metrics.endy + 0.5f) - elementHeight;
 	}
 
+	// up
 	if (metrics.endy - font->height < ui.selected->scrollPos.y) {
 		ui.selected->scrollPos.y = MAX((int32)(metrics.endy - 1.5f*font->height + 0.5f), 0);
 	}
@@ -709,8 +730,7 @@ UIElement* UIUpdateActiveElement() {
 		if (OSIsKeyPressed(KEY_RIGHT) || rightKeyCount == 0) {
 			rightKeyCount = 6;
 			if (ui.selected) {
-				String string = ui.selected->text.string;
-				ui.end = MIN(ui.end + 1, string.length);
+				ui.end = MIN(ui.end + 1, ui.selected->text.editable.totalLength);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
@@ -761,6 +781,33 @@ UIElement* UIUpdateActiveElement() {
 		}
 		else downKeyCount--;
 	}
+	static int32 backspaceKeyCount = 0;
+	if (OSIsKeyDown(KEY_BACKSPACE)) {
+		if (OSIsKeyPressed(KEY_BACKSPACE) || backspaceKeyCount == 0) {
+			backspaceKeyCount = 6;
+			if (ui.selected && ui.selected->flags & UI_EDITABLE) {
+				StringList* list = &ui.selected->text.editable;
+				ssize start = MIN(ui.start, ui.end);
+				ssize end = MAX(ui.start, ui.end);
+				if (end == list->totalLength) {
+					ssize length = start == end ? 1 : end - start;
+					if (list->last->string.data + list->last->string.length == ui.buffer.current) ui.buffer.current -= length;
+					list->last->string.length -= length;
+					list->totalLength -= length;
+					if (start != end) {
+						ui.end = start;
+						ui.start = start;
+					}
+					else {
+						ui.end--;
+						ui.start--;
+					}
+					UpdateTextScrollPos();
+				}
+			}
+		}
+		else backspaceKeyCount--;
+	}
 
 	// Handle copy
 	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C) && ui.selected) {
@@ -781,6 +828,37 @@ UIElement* UIUpdateActiveElement() {
 		
 		String sub = {string.data + start, end - start};
 		OSCopyToClipboard(sub);
+	}
+
+	// Handle typing
+	if (ui.selected && ui.selected->flags & UI_EDITABLE) {
+		String typed = OSGetTypedText();
+		if (typed.length) {
+			StringList* list = &ui.selected->text.editable;
+			ssize start = MIN(ui.start, ui.end);
+			ssize end = MAX(ui.start, ui.end);
+			if (end == list->totalLength) {
+				if (start != end) {
+					ssize length = end - start;
+					if (list->last->string.data + list->last->string.length == ui.buffer.current) ui.buffer.current -= length;
+					list->last->string.length -= length;
+					list->totalLength -= length;
+					ui.end = start;
+					ui.start = start;
+				}
+			 	if (list->last->string.data + list->last->string.length != ui.buffer.current) {
+			 		StringNode* node = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+			 		LINKEDLIST_ADD(list, node);
+			 	}
+				StringCopy(typed, ui.buffer.current);
+				ui.buffer.current += typed.length;
+				list->last->string.length += typed.length;
+				list->totalLength += typed.length;
+				ui.end += typed.length;
+				ui.start += typed.length;
+				UpdateTextScrollPos();
+			}
+		}
 	}
 
 	return element;
