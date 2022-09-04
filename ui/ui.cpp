@@ -421,7 +421,7 @@ void RenderElement(UIElement* element) {
 
 		element->height = (int32)length;
 
-		if (pos + element->height > scrollBar->height) element->y = scrollBar->height - element->height;
+		if (pos + length > scrollBar->height) element->y = scrollBar->height - element->height;
 		else element->y = (int32)pos;
 	}
 	Box2i box = GetAbsolutePosition(element);
@@ -449,6 +449,12 @@ void RenderElement(UIElement* element) {
 
 // Text
 //-----------
+
+StringNode* CreateStringNode() {
+	StringNode* result = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+	ASSERT(result);
+	return result;
+}
 
 void UpdateTextScrollPos() {
 	UIText text = ui.selected->text;
@@ -540,16 +546,17 @@ void DeleteSelectedText() {
 					}
 					break;
 				}
-				else if (end < i + node->string.length) {
+				else if (end - i < node->string.length) {
 					ssize length1 = end - i - 1;
 					ssize length2 = node->string.length - length1 - 1;
 
 					if (length1 == 0) {
 						node->string.data++;
+						node->string.length--;
 					}
 					else {
 						node->string.length = length1;
-						StringNode* node2 = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+						StringNode* node2 = CreateStringNode();
 						LINKEDLIST_ADD_AFTER(list, node, node2);
 						node2->string.data = node->string.data + end - i;
 						node2->string.length = length2;
@@ -570,23 +577,74 @@ void DeleteSelectedText() {
 			StringNode* node = list->last;
 			if (node->string.data + node->string.length == ui.buffer.current) 
 				ui.buffer.current -= MIN(node->string.length, length);
-			if (length < node->string.length) {				
-				node->string.length -= length;
-			}
-			else if (node->string.length == length) {
+			while (length) {
+				if (length < node->string.length) {				
+					node->string.length -= length;
+					break;
+				}
+				length -= node->string.length;
 				LINKEDLIST_REMOVE(list, node);
 				FixedSizeFree(&ui.stringNodeAllocator, node);
+				node = list->last;
 			}
-			else {
-				// TODO
-			}
-			list->totalLength -= length;
-			ui.end = start;
-			ui.start = start;
 		}
 		else {
-			// TODO
+			ssize i = 0;
+			StringNode* node = NULL;
+			for (node = list->first; node != NULL; node = node->next) {
+				if (start - i < node->string.length) {
+					if (end - i < node->string.length) {
+						if (start == i) {
+							node->string.data += length;
+							node->string.length -= length;
+						}
+						else {
+							ssize length1 = start - i;
+							ssize length2 = node->string.length - length1 - length;
+							ASSERT(length2 > 0);
+
+							node->string.length = length1;
+							StringNode* node1 = CreateStringNode();
+							node1->string.data = node->string.data + node->string.length + length;
+							node1->string.length = length2;
+							LINKEDLIST_ADD_AFTER(list, node, node1);
+						}
+						length = 0;
+					}
+					else {
+						length -= node->string.length - (start - i);
+						if (start == i) {
+							LINKEDLIST_REMOVE(list, node);
+							FixedSizeFree(&ui.stringNodeAllocator, node);
+						}
+						else {
+							node->string.length = start - i;
+						}
+					}
+					break;
+				}
+				i += node->string.length;
+			}
+
+			node = node->next;
+			while (length) {
+				if (length < node->string.length) {
+					node->string.data += length;
+					node->string.length -= length;
+					break;
+				}
+				else {
+					StringNode* next = node->next;
+					length -= node->string.length;
+					LINKEDLIST_REMOVE(list, node);
+					FixedSizeFree(&ui.stringNodeAllocator, node);
+					node = next;
+				}
+			}
 		}
+		list->totalLength -= length;
+		ui.end = start;
+		ui.start = start;
 	}
 }
 
@@ -638,7 +696,7 @@ UIElement* UICreateElement(UIElement* parent) {
 }
 
 StringList UICreateEditableText(String string) {
-	StringNode* node = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+	StringNode* node = CreateStringNode();
 	StringCopy(string, ui.buffer.current);
 	*node = {{ui.buffer.current, string.length}, NULL, NULL};
 	ui.buffer.current += string.length;
@@ -924,14 +982,14 @@ UIElement* UIUpdateActiveElement() {
 			}
 			if (ui.end == list->totalLength) {
 			 	if (list->last->string.data + list->last->string.length != ui.buffer.current) {
-			 		StringNode* node = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+			 		StringNode* node = CreateStringNode();
 			 		LINKEDLIST_ADD(list, node);
 			 		node->string.data = ui.buffer.current;
 			 	}
 			 	list->last->string.length += typed.length;
 			}
 			else if (ui.end == 0) {
-				StringNode* node = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+				StringNode* node = CreateStringNode();
 			 	LINKEDLIST_ADD_TO_START(list, node);
 				node->string.data = ui.buffer.current;
 				node->string.length = typed.length;
@@ -945,7 +1003,7 @@ UIElement* UIUpdateActiveElement() {
 							current->string.length += typed.length;
 						}
 						else {
-							StringNode* node = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+							StringNode* node = CreateStringNode();
 							LINKEDLIST_ADD_AFTER(list, current, node);
 							node->string.data = ui.buffer.current;
 							node->string.length = typed.length;
@@ -956,11 +1014,11 @@ UIElement* UIUpdateActiveElement() {
 						ssize length1 = ui.end - i;
 						ssize length2 = string.length - length1;
 						current->string.length = length1;
-						StringNode* node1 = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+						StringNode* node1 = CreateStringNode();
 						LINKEDLIST_ADD_AFTER(list, current, node1);
 						node1->string.data = current->string.data + current->string.length;
 						node1->string.length = length2;
-						StringNode* node2 = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+						StringNode* node2 = CreateStringNode();
 						LINKEDLIST_ADD_AFTER(list, current, node2);
 						node2->string.data = ui.buffer.current;
 						node2->string.length = typed.length;
