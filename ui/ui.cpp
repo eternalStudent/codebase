@@ -1132,9 +1132,7 @@ UIElement* UIUpdateActiveElement() {
 	// Handle select all
 	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_A) && ui.selected) {
 		UIText text = ui.selected->text;
-		if ((text.editable.totalLength && ui.end == text.editable.totalLength) || (text.string.length && ui.end == text.string.length));
-		else
-			ui.end = text.string.length;
+		ui.end = GetTextLength();
 		ui.start = 0;
 	}
 
