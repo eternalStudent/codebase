@@ -867,11 +867,14 @@ UIElement* UIUpdateActiveElement() {
 	if (element && OSIsMouseDoubleClicked() && textIndex != -1) {
 		ui.selected = element;
 		UIText text = ui.selected->text;
-		if (text.editable.totalLength)
-			ui.end = text.editable.totalLength;
-		else
-			ui.end = text.string.length;
-		ui.start = 0;
+		if (text.editable.totalLength) {
+			StringListFindWord(text.editable, textIndex, &ui.start, &ui.end);
+		}
+		else {
+			StringNode node;
+			StringList list = CreateStringList(text.string, &node);
+			StringListFindWord(list, textIndex, &ui.start, &ui.end);
+		}
 	}
 	
 	// Handle mouse released

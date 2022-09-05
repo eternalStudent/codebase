@@ -338,3 +338,28 @@ ssize StringListGetLastIndexOf(StringList list, ssize start, ssize end, byte b) 
 	}
 	return result;
 }
+
+void StringListFindWord(StringList list, ssize index, ssize* start, ssize* end) {
+	ssize i = 0;
+	*start = 0;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		for (ssize j = 0; j < string.length; j++, i++) {
+			byte b = string.data[j];
+			bool alphaNumeric = 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || b == '_';
+			if (i == index && !alphaNumeric) {
+				*start = i;
+				*end = i + 1;
+				return;
+			}
+			if (i < index && !alphaNumeric) {
+				*start = i + 1;
+			}
+			if (index < i && !alphaNumeric) {
+				*end = i;
+				return;
+			}
+		}
+	}
+	*end = list.totalLength;
+}
