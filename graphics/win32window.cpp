@@ -329,3 +329,27 @@ BOOL Win32CopyToClipboard(String str) {
 	CloseClipboard();
 	return TRUE;
 }
+
+String Win32PasteFromClipboard() {
+	if (!OpenClipboard(window.handle)) {
+		LOG("failed to open clipboard");
+		return {};
+	}
+
+	HANDLE hMem = GetClipboardData(CF_TEXT);
+	if (!hMem) {
+		LOG("failed to get clipboard data");
+		return {};
+	}
+
+	byte* data = (byte*)GlobalLock(hMem);
+	ssize length = 0;
+	while (data[length]) length++;
+
+	if (!GlobalUnlock(hMem)) {
+		LOG("failed to unlock memory");
+	}
+
+	CloseClipboard();
+	return {data, length};
+}

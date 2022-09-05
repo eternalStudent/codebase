@@ -26,20 +26,27 @@
 #  define KEY_UP					VK_UP			// 0x26
 #  define KEY_RIGHT 				VK_RIGHT		// 0x27
 #  define KEY_DOWN					VK_DOWN			// 0x28
+#  define KEY_DELETE				VK_DELETE		// 0x2E
+#  define KEY_A 					0x41
 #  define KEY_C 					0x43
+#  define KEY_V 					0x56
+#  define KEY_X 					0x58
 
-#  define OSGetWindowDimensions 	Win32GetWindowDimensions
-#  define OSGetWindowHandle 		Win32GetWindowHandle
 #  define OSCreateWindow			Win32CreateWindow
-#  define OSCreateWindowFullScreen	Win32CreateWindowFullScreen
 #  define OSProcessWindowEvents 	Win32ProcessWindowEvents
-#  define OSWindowDestroyed 		Win32WindowDestroyed
-#  define OSSetCursorIcon			Win32SetCursorIcon
+
+#  define OSCreateWindowFullScreen	Win32CreateWindowFullScreen
 #  define OSExitFullScreen			Win32ExitFullScreen
 #  define OSEnterFullScreen 		Win32EnterFullScreen
+
+#  define OSGetWindowDimensions 	Win32GetWindowDimensions
+#  define OSWindowDestroyed 		Win32WindowDestroyed
+#  define OSSetCursorIcon			Win32SetCursorIcon
+#  define OSGetCursorPosition 		Win32GetCursorPosition
+
 #  define OSOpenFileDialog			Win32OpenFileDialog
 #  define OSSaveFileDialog			Win32SaveFileDialog
-#  define OSGetCursorPosition 		Win32GetCursorPosition
+
 #  define OSIsKeyDown 				Win32IsKeyDown
 #  define OSIsKeyPressed			Win32IsKeyPressed
 #  define OSIsMouseDown 			Win32IsMouseDown
@@ -48,7 +55,9 @@
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OSGetMouseHWheelDelta 	Win32GetMouseHWheelDelta
 #  define OSGetTypedText			Win32GetTypedText
+
 #  define OSCopyToClipboard 		Win32CopyToClipboard
+#  define OSPasteFromClipboard		Win32PasteFromClipboard
 #endif
 
 #if defined(__gnu_linux__)
@@ -59,22 +68,6 @@
 #  include <X11/cursorfont.h>
 #  undef Font
 #  include "linuxwindow.cpp"
-#  define OSGetWindowDimensions		LinuxGetWindowDimensions
-#  define OSCreateWindow			LinuxCreateWindow
-#  define OSCreateWindowFullScreen	LinuxCreateWindowFullScreen
-#  define OSProcessWindowEvents		LinuxProcessWindowEvents
-#  define OSWindowDestroyed			LinuxWindowDestroyed
-#  define OSGetWindowHandle			LinuxGetWindowHandle
-#  define OSSetCursorIcon			LinuxSetCursorIcon
-#  define OSGetCursorPosition 		LinuxGetCursorPosition
-#  define OSIsMouseDown 			LinuxIsMouseDown
-#  define OSIsKeyDown				LinuxIsKeyDown
-#  define OSIsKeyPressed			LinuxIsKeyPressed
-#  define OSOpenFileDialog			LinuxOpenFileDialog
-#  define OSSaveFileDialog			LinuxSaveFileDialog
-
-#  define OSCopyToClipboard 		LinuxCopyToClipboard
-
 #  define KEY_ESC 					(XK_Escape       && 0xff)
 #  define KEY_SPACE					(XK_KP_Space     && 0xff)
 #  define KEY_PGUP					(XK_KP_Page_Up   && 0xff)
@@ -85,4 +78,31 @@
 #  define KEY_UP					(XK_KP_Up	     && 0xff)
 #  define KEY_RIGHT					(XK_KP_Right     && 0xff)
 #  define KEY_DOWN					(XK_KP_Down      && 0xff)
+
+#  define OSCreateWindow			LinuxCreateWindow
+#  define OSProcessWindowEvents 	LinuxProcessWindowEvents
+
+#  define OSCreateWindowFullScreen	LinuxCreateWindowFullScreen
+#  define OSExitFullScreen			LinuxExitFullScreen
+#  define OSEnterFullScreen 		LinuxEnterFullScreen
+
+#  define OSGetWindowDimensions 	LinuxGetWindowDimensions
+#  define OSWindowDestroyed 		LinuxWindowDestroyed
+#  define OSSetCursorIcon			LinuxSetCursorIcon
+#  define OSGetCursorPosition 		LinuxGetCursorPosition
+
+#  define OSOpenFileDialog			LinuxOpenFileDialog
+#  define OSSaveFileDialog			LinuxSaveFileDialog
+
+#  define OSIsKeyDown 				LinuxIsKeyDown
+#  define OSIsKeyPressed			LinuxIsKeyPressed
+#  define OSIsMouseDown 			LinuxIsMouseDown
+#  define OSIsMousePressed			LinuxIsMousePressed
+#  define OSIsMouseDoubleClicked	LinuxIsMouseDoubleClicked
+#  define OSGetMouseWheelDelta		LinuxGetMouseWheelDelta
+#  define OSGetMouseHWheelDelta 	LinuxGetMouseHWheelDelta
+#  define OSGetTypedText			LinuxGetTypedText
+
+#  define OSCopyToClipboard 		LinuxCopyToClipboard
+#  define OSPasteFromClipboard		LinuxPasteFromClipboard
 #endif

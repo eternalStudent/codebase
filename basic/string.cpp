@@ -303,3 +303,38 @@ byte GetChar(StringList list, ssize index) {
 	}
 	return 0;
 }
+
+ssize StringListGetIndexOf(StringList list, ssize start, ssize end, byte b) {
+	ssize i = 0;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		if (string.length <= start - i) {
+			i += string.length;
+			continue;
+		}
+		for (ssize j = 0; j < string.length; j++, i++) {
+			if (i == end) return -1;
+			if (start <= i && string.data[j] == b)
+				return i;
+		}
+	}
+	return -1;
+}
+
+ssize StringListGetLastIndexOf(StringList list, ssize start, ssize end, byte b) {
+	ssize i = 0;
+	ssize result = -1;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		if (string.length <= start - i) {
+			i += string.length;
+			continue;
+		}
+		for (ssize j = 0; j < string.length; j++, i++) {
+			if (i == end) return result;
+			if (start <= i && string.data[j] == b)
+				result = i;
+		}
+	}
+	return result;
+}
