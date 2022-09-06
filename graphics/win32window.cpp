@@ -1,15 +1,25 @@
 struct {
 	HWND handle;
+
 	Dimensions2i dim;
 	BOOL destroyed;
-	BYTE keys[256];
-	BYTE mouse[4];
-	BYTE keys_prev[256];
-	BYTE mouse_prev[3];
-	DWORD mouseWheelDelta;
-	DWORD mouseHWheelDelta;
+
+	BYTE keyIsDown[256];
+	BYTE keyWasDown[256];
 	CHAR typed[4];
 	int32 strlength;
+
+	BYTE mouseLeftButtonIsDown;
+	BYTE mouseRightButtonIsDown;
+	BYTE mouseLeftButtonWasDown;
+	BYTE mouseRightButtonWasDown;
+	int32 clickCount;
+	int32 prevClickCount;
+	RECT clickRect;
+	DWORD timeLastClicked;
+	DWORD mouseWheelDelta;
+	DWORD mouseHWheelDelta;
+
 	HCURSOR cursors[7];
 } window;
 
@@ -22,23 +32,31 @@ Dimensions2i Win32GetWindowDimensions() {
 }
 
 BOOL Win32IsKeyDown(DWORD key) {
-	return window.keys[key] == 1;
+	return window.keyIsDown[key] == 1;
 }
 
 BOOL Win32IsKeyPressed(DWORD key) {
-	return window.keys[key] == 1 && window.keys_prev[key] == 0;
+	return window.keyIsDown[key] == 1 && window.keyWasDown[key] == 0;
 }
 
-BOOL Win32IsMouseDown(DWORD mouse) {
-	return window.mouse[mouse] == 1;
+BOOL Win32IsMouseLeftButtonDown() {
+	return window.mouseLeftButtonIsDown == 1 && window.clickCount == 1;
 }
 
-BOOL Win32IsMousePressed(DWORD mouse) {
-	return window.mouse[mouse] == 1 && window.mouse_prev[mouse] == 0;
+BOOL Win32IsMouseLeftClicked() {
+	return window.clickCount == 1 && window.mouseLeftButtonIsDown == 1 && window.mouseLeftButtonWasDown == 0;
+}
+
+BOOL Win32IsMouseRightClicked() {
+	return window.mouseRightButtonIsDown == 1 && window.mouseRightButtonWasDown == 0;
 }
 
 BOOL Win32IsMouseDoubleClicked() {
-	return window.mouse[3] == 1;
+	return window.clickCount == 2 && window.prevClickCount == 1;
+}
+
+BOOL Win32IsMouseTripleClicked() {
+	return window.clickCount == 3 && window.prevClickCount == 2;
 }
 
 DWORD Win32GetMouseWheelDelta() {
@@ -57,8 +75,7 @@ void Win32ExitFullScreen() {
 	DWORD dwStyle = GetWindowLong(window.handle, GWL_STYLE);
 	SetWindowLong(window.handle, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
 	SetWindowPos(window.handle, NULL, 0, 0, 920, 540, SWP_FRAMECHANGED);
-	memset(window.keys, 0, 256);
-	memset(window.mouse, 0, 3);
+	memset(window.keyIsDown, 0, 256);
 }
 
 BOOL GetPrimaryMonitorRect(RECT* monitorRect){
@@ -108,29 +125,37 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		} break;
 		case WM_KEYDOWN: {
 			UINT vkcode = (UINT)wParam;
-			window.keys[vkcode] = 1;
+			window.keyIsDown[vkcode] = 1;
 		} break;
 		case WM_KEYUP: {
 			UINT vkcode = (UINT)wParam;
-			window.keys[vkcode] = 0;
+			window.keyIsDown[vkcode] = 0;
 		} break;
 		case WM_LBUTTONDOWN : {
-			window.mouse[0] = 1;
+			window.mouseLeftButtonIsDown = 1;
+
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+  			DWORD time = GetMessageTime();
+
+  			if (!PtInRect(&window.clickRect, {x, y}) || time - window.timeLastClicked > GetDoubleClickTime()) {
+  				window.clickCount = 0;
+  			}
+  			window.clickCount++;
+
+  			window.timeLastClicked = time;
+  			SetRect(&window.clickRect, x, y, x, y);
+  			InflateRect(&window.clickRect, GetSystemMetrics(SM_CXDOUBLECLK) / 2, GetSystemMetrics(SM_CYDOUBLECLK) / 2);
 		} break;
 		case WM_LBUTTONUP : {
-			window.mouse[0] = 0;
-		} break;
-		case WM_MBUTTONDOWN : {
-			window.mouse[1] = 1;
-		} break;
-		case WM_MBUTTONUP : {
-			window.mouse[1] = 0;
+			window.mouseLeftButtonIsDown = 0;
 		} break;
 		case WM_RBUTTONDOWN : {
-			window.mouse[2] = 1;
+			window.mouseRightButtonIsDown = 1;
+			window.clickCount = 0;
 		} break;
 		case WM_RBUTTONUP : {
-			window.mouse[2] = 0;
+			window.mouseRightButtonIsDown = 0;
 		} break;
 		case WM_MOUSEWHEEL: {
 			window.mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
@@ -138,9 +163,10 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		case WM_MOUSEHWHEEL: {
 			window.mouseHWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 		} break;
-		case WM_LBUTTONDBLCLK: {
-			window.mouse[3] = 1;
-		} break;
+		case WM_ACTIVATE: {
+			window.clickCount = 0;
+			// TODO: probably more stuff should be reset here
+		}
 		case WM_CHAR: {
 			if (wParam == 13) wParam = 10;
 			if (32 <= wParam && wParam <= 127 || 9 <= wParam && wParam <= 10) {
@@ -155,7 +181,7 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 
 WNDCLASSA CreateWindowClass() {
 	WNDCLASSA windowClass = {};
-	windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW | CS_DBLCLKS;
+	windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 	windowClass.lpfnWndProc = MainWindowCallback;
 	windowClass.hInstance = GetModuleHandle(NULL);
 	windowClass.lpszClassName = "WindowClass";
@@ -233,11 +259,10 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 }
 
 void Win32ProcessWindowEvents() {
-	for (int32 i = 0; i < 256; i++) window.keys_prev[i] = window.keys[i];
-	window.mouse_prev[0] = window.mouse[0];
-	window.mouse_prev[1] = window.mouse[1];
-	window.mouse_prev[2] = window.mouse[2];
-	window.mouse[3] = 0;
+	for (int32 i = 0; i < 256; i++) window.keyWasDown[i] = window.keyIsDown[i];
+	window.mouseLeftButtonWasDown = window.mouseLeftButtonIsDown;
+	window.mouseRightButtonWasDown = window.mouseRightButtonIsDown;
+	window.prevClickCount = window.clickCount;
 	window.strlength = 0;
 	window.mouseWheelDelta = 0;
 	window.mouseHWheelDelta = 0;

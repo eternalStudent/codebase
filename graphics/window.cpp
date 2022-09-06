@@ -1,7 +1,3 @@
-#define MOUSE_L 					0
-#define MOUSE_M 					1
-#define MOUSE_R 					2
-
 #define CUR_ARROW 					0
 #define CUR_MOVE					1	 					
 #define CUR_RESIZE					2
@@ -11,6 +7,7 @@
 #define CUR_TEXT					6
 
 #if defined(_WIN32)
+#  include <Windowsx.h>
 #  include "win32window.cpp"
 #  define KEY_BACKSPACE 			VK_BACK			// 0x08
 #  define KEY_TAB					VK_TAB			// 0x09
@@ -49,9 +46,11 @@
 
 #  define OSIsKeyDown 				Win32IsKeyDown
 #  define OSIsKeyPressed			Win32IsKeyPressed
-#  define OSIsMouseDown 			Win32IsMouseDown
-#  define OSIsMousePressed			Win32IsMousePressed
+#  define OSIsMouseLeftButtonDown 	Win32IsMouseLeftButtonDown
+#  define OSIsMouseLeftClicked		Win32IsMouseLeftClicked
+#  define OSIsMouseRightClicked		Win32IsMouseRightClicked
 #  define OSIsMouseDoubleClicked	Win32IsMouseDoubleClicked
+#  define OSIsMouseTripleClicked	Win32IsMouseTripleClicked
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OSGetMouseHWheelDelta 	Win32GetMouseHWheelDelta
 #  define OSGetTypedText			Win32GetTypedText
@@ -96,9 +95,11 @@
 
 #  define OSIsKeyDown 				LinuxIsKeyDown
 #  define OSIsKeyPressed			LinuxIsKeyPressed
-#  define OSIsMouseDown 			LinuxIsMouseDown
-#  define OSIsMousePressed			LinuxIsMousePressed
+#  define OSIsMouseLeftButtonDown 	LinuxIsMouseLeftButtonDown
+#  define OSIsMouseLeftClicked		LinuxIsMouseLeftClicked
+#  define OSIsMouseRightClicked		LinuxIsMouseRightClicked
 #  define OSIsMouseDoubleClicked	LinuxIsMouseDoubleClicked
+#  define OSIsMouseTripleClicked	LinuxIsMouseTripleClicked
 #  define OSGetMouseWheelDelta		LinuxGetMouseWheelDelta
 #  define OSGetMouseHWheelDelta 	LinuxGetMouseHWheelDelta
 #  define OSGetTypedText			LinuxGetTypedText

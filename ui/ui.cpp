@@ -836,7 +836,7 @@ UIElement* UIUpdateActiveElement() {
 		OSSetCursorIcon(CUR_ARROW);
 
 	// Handle mouse pressed
-	if (OSIsMousePressed(MOUSE_L)) {
+	if (OSIsMouseLeftClicked()) {
 		ui.selected = NULL;
 		if (element) {
 			if (element->flags & UI_SHUFFLEABLE) BringToFront(element);
@@ -876,9 +876,33 @@ UIElement* UIUpdateActiveElement() {
 			StringListFindWord(list, textIndex, &ui.start, &ui.end);
 		}
 	}
+
+	// Handle triple click
+	if (element && OSIsMouseTripleClicked() && textIndex != -1) {
+		ui.selected = element;
+		UIText text = ui.selected->text;
+		if (text.editable.totalLength) {
+			StringList list = text.editable;
+			if (ui.start != 0) {
+				ssize index = StringListGetLastIndexOf(list, 0, ui.end, 10);
+				ui.start = index != -1 ? index + 1 : 0;
+			}
+			if (ui.end != list.totalLength) {
+				ssize index = StringListGetIndexOf(list, ui.end, list.totalLength, 10);
+				ui.end = index != -1 ? index : list.totalLength;
+			}
+		}
+		else {
+			String string = text.string;
+			while (0 < ui.start && string.data[ui.start - 1] != 10)
+				ui.start--;
+			while (ui.end < string.length && string.data[ui.end] != 10)
+				ui.end++;
+		}
+	}
 	
 	// Handle mouse released
-	if (!OSIsMouseDown(MOUSE_L)) {
+	if (!OSIsMouseLeftButtonDown()) {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
 		ui.isSelecting = false;
@@ -1092,7 +1116,7 @@ UIElement* UIUpdateActiveElement() {
 		else {
 			if (ui.selected->text.editable.totalLength) {
 				StringList list = ui.selected->text.editable;
-				if (ui.end != list.totalLength) {
+				if (ui.end != 0) {
 					ssize index = StringListGetLastIndexOf(list, 0, ui.end, 10);
 					ui.end = index != -1 ? index + 1 : 0;
 				}
