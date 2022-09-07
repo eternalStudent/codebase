@@ -159,7 +159,7 @@ EGLBoolean LinuxOpenGLInit() {
 #undef X
 
 	// use 0 to disable vsync
-	int vsync = 1;
+	int vsync = 0;
 	ok = eglSwapInterval(display, vsync);
 	if (!ok)
 		LOG("Failed to set swap interval");
@@ -168,7 +168,7 @@ EGLBoolean LinuxOpenGLInit() {
 }
 
 EGLBoolean LinuxOpenGLSwapBuffers() {
-	WindowHandle handle = OsGetWindowHandle();
+	WindowHandle handle = LinuxGetWindowHandle();
 	EGLDisplay display = eglGetDisplay((EGLNativeDisplayType)handle.display);
 	if (display == EGL_NO_DISPLAY)
 		return FAIL("Failed to get EGL display");

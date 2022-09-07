@@ -20,11 +20,11 @@ inline Point2 Cerp2(float32 t, Point2 p0, Point2 p1, Point2 p2, Point2 p3) {
 }
 
 void PushPoint2(StringBuilder* builder, Point2 p, int32 precision) {
-    builder->ptr += StringCopy("(", builder->ptr);
+    builder->ptr += COPY("(", builder->ptr);
     builder->ptr += Float32ToDecimal(p.x, precision, builder->ptr);
-    builder->ptr += StringCopy(", ", builder->ptr);
+    builder->ptr += COPY(", ", builder->ptr);
     builder->ptr += Float32ToDecimal(p.y, precision, builder->ptr);
-    builder->ptr += StringCopy(")", builder->ptr);
+    builder->ptr += COPY(")", builder->ptr);
 }
 
 union Point2i {
@@ -35,11 +35,11 @@ union Point2i {
 typedef Point2i Dimensions2i;
 
 void PushPoint2i(StringBuilder* builder, Point2i p) {
-    builder->ptr += StringCopy("(", builder->ptr);
+    builder->ptr += COPY("(", builder->ptr);
     builder->ptr += Int32ToDecimal(p.x, builder->ptr);
-    builder->ptr += StringCopy(", ", builder->ptr);
+    builder->ptr += COPY(", ", builder->ptr);
     builder->ptr += Int32ToDecimal(p.y, builder->ptr);
-    builder->ptr += StringCopy(")", builder->ptr);
+    builder->ptr += COPY(")", builder->ptr);
 }
 
 #define MOVE2(p0, p1)           {(p0).x+(p1).x, (p0).y+(p1).y}

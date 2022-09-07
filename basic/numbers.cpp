@@ -1,6 +1,7 @@
 typedef unsigned char byte;
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef int16_t int16;
 typedef int32_t int32;
