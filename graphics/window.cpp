@@ -7,7 +7,8 @@
 #define CUR_TEXT				6
 
 #define KEY_BACKSPACE 			0x08
-#define KEY_TAB					0x09
+#define KEY_TAB 				0x09
+#define KEY_ENTER				0x0D
 #define KEY_SHIFT 				0x10
 #define KEY_CTRL				0x11
 #define KEY_ESC 				0x1B
@@ -37,6 +38,7 @@
 #  define OSCreateWindowFullScreen	Win32CreateWindowFullScreen
 #  define OSExitFullScreen			Win32ExitFullScreen
 #  define OSEnterFullScreen 		Win32EnterFullScreen
+#  define OSSetWindowIcon			Win32SetWindowIcon
 
 #  define OSGetWindowDimensions 	Win32GetWindowDimensions
 #  define OSWindowDestroyed 		Win32WindowDestroyed

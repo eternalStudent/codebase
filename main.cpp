@@ -10,10 +10,10 @@ int main() {
 	UICreateWindow("OpenGL Window", {512, 768}, RGBA_DARKGREY);
 
 	Font* font = (Font*)ArenaAlloc(&persist, sizeof(Font));
-	*font = LoadFont(&scratch, "..\\consola.ttf", 24);
+	*font = LoadDefaultFont(&scratch, 24);
 
 	Font* smallf = (Font*)ArenaAlloc(&persist, sizeof(Font));
-	*smallf = LoadFont(&scratch, "..\\consola.ttf", 18);
+	*smallf = LoadDefaultFont(&scratch, 18);
 
 	UIElement* e1 = UICreateScrollingPane(NULL, {200, 200}, {12, 12});
 	e1->flags |= UI_EDITABLE;

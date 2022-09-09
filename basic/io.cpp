@@ -2,15 +2,14 @@
 #  include "win32io.cpp"
 #  define File          		HANDLE
 #  define FILE_ERROR 			INVALID_HANDLE_VALUE 
-#  define OsOpenFile    		Win32OpenFile
-#  define OsCreateFile 			Win32CreateFile
-#  define OsReadFile    		Win32ReadFile
-#  define OsWriteFile			Win32WriteFile
-#  define OsGetFileSize 		Win32GetFileSize
-#  define OsCloseFile   		CloseHandle
+#  define OSOpenFile    		Win32OpenFile
+#  define OSCreateFile			Win32CreateFile
+#  define OSReadFile    		Win32ReadFile
+#  define OSWriteFile			Win32WriteFile
+#  define OSGetFileSize 		Win32GetFileSize
+#  define OSCloseFile   		CloseHandle
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)
 #  define STDOUT 				GetStdHandle(STD_OUTPUT_HANDLE)
-
 #endif
 
 #if defined(__gnu_linux__)
@@ -19,21 +18,21 @@
 #  include "linuxio.cpp"
 #  define File          		int
 #  define FILE_ERROR 			-1
-#  define OsOpenFile    		LinuxOpenFile
-#  define OsCreateFile 			LinuxCreateFile
-#  define OsReadFile    		LinuxReadFile
-#  define OsWriteFile			LinuxWriteFile
-#  define OsGetFileSize 		LinuxGetFileSize
-#  define OsCloseFile   		close
+#  define OSOpenFile    		LinuxOpenFile
+#  define OSCreateFile			LinuxCreateFile
+#  define OSReadFile    		LinuxReadFile
+#  define OSWriteFile			LinuxWriteFile
+#  define OSGetFileSize 		LinuxGetFileSize
+#  define OSCloseFile   		close
 #  define STDIN 				0
 #  define STDOUT 				1
 #endif
 
-bool OsReadAll(File file, byte* buffer, int64 length) {
+bool OSReadAll(File file, byte* buffer, int64 length) {
 	if (file == FILE_ERROR)
 		return false;
 
-	int64 size = OsGetFileSize(file);
+	int64 size = OSGetFileSize(file);
 	if (!size) 
 		return false;
 
@@ -42,18 +41,18 @@ bool OsReadAll(File file, byte* buffer, int64 length) {
 	byte* pos = buffer;
 	int64 read;
 	do {
-		read = OsReadFile(file, pos, (int32)(left & MAX_INT32));
+		read = OSReadFile(file, pos, (int32)(left & MAX_INT32));
 		pos  += read;
 		left -= read;
 	} while ((0 < left) && (0 < read));
 	return true;
 }
 
-String OsReadAll(File file, Arena* arena) {
+String OSReadAll(File file, Arena* arena) {
 	if (file == FILE_ERROR)
 		return {};
 
-	int64 size = OsGetFileSize(file);
+	int64 size = OSGetFileSize(file);
 	if (!size) 
 		return {};
 
@@ -66,21 +65,21 @@ String OsReadAll(File file, Arena* arena) {
 	byte* pos = buffer;
 	int64 read;
 	do {
-		read = OsReadFile(file, pos, (int32)(left & MAX_INT32));
+		read = OSReadFile(file, pos, (int32)(left & MAX_INT32));
 		pos  += read;
 		left -= read;
 	} while ((0 < left) && (0 < read));
 	return {buffer, size};
 }
 
-String OsReadAll(const char* path, Arena* arena) {
-	File file = OsOpenFile(path);
-	String all = OsReadAll(file, arena);
-	OsCloseFile(file);
+String OSReadAll(const char* path, Arena* arena) {
+	File file = OSOpenFile(path);
+	String all = OSReadAll(file, arena);
+	OSCloseFile(file);
 	return all;
 }
 
-bool OsWriteAll(File file, byte* buffer, int64 length) {
+bool OSWriteAll(File file, byte* buffer, int64 length) {
 	if (file == FILE_ERROR)
 		return false;
 
@@ -89,7 +88,7 @@ bool OsWriteAll(File file, byte* buffer, int64 length) {
 	byte* pos = buffer;
 	int64 written;
 	do {
-		written = OsWriteFile(file, pos, (int32)(left & MAX_INT32));
+		written = OSWriteFile(file, pos, (int32)(left & MAX_INT32));
 		pos  += written;
 		left -= written;
 	} while ((0 < left) && (0 < written));

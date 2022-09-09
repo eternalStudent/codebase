@@ -503,7 +503,7 @@ void OpenGLDrawCurve3(Point2 p0, Point2 p1, Point2 p2, float32 lineWidth, uint32
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawCurve4(Point2 p0, Point2 p1, Point2 p2, Point2 p3, uint32 rgba, float32 lineWidth) {
+void OpenGLDrawCurve4(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 lineWidth, uint32 rgba) {
 	float32 vertices[257*2];
 
 	float32 fraction = LoadExp(-8);

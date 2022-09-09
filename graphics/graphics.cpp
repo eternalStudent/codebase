@@ -31,6 +31,11 @@ TextureId GfxLoadTexture(Arena* arena, const char* filePath, Filter filter) {
 	return GfxGenerateTexture(image, filter);
 }
 
+TextureId GfxLoadTexture(Arena* arena, byte* data, Filter filter) {
+	Image image = BMPLoadImage(arena, data);
+	return GfxGenerateTexture(image, filter);
+}
+
 void GfxDrawBox2RoundedLines(Box2 box, float32 r, float32 lineWidth, uint32 rgba) {
 	GfxDrawCircle({{box.x1-r, box.y1-r}, r}, lineWidth, rgba,   0,  90);
 	GfxDrawCircle({{box.x0+r, box.y1-r}, r}, lineWidth, rgba,  90, 180);

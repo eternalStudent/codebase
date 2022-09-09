@@ -103,15 +103,6 @@ BOOL Win32EnterFullScreen() {
 	return TRUE;
 }
 
-/*
-Dimensions2i Win32GetWindowDimensions(HWND window) {
-	RECT clientRect;
-	GetClientRect(window, &clientRect);
-	LONG width = clientRect.right;
-	LONG height = clientRect.bottom;
-	return Dimensions2i{width, height};
-}*/
-
 LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch (message) {
 		case WM_DESTROY: {
@@ -179,13 +170,95 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 	return DefWindowProc(handle, message, wParam, lParam);
 }
 
+// TODO: figure out a cross-platform abstraction over resources/assets
+String LoadAsset(int i) {
+    HRSRC res = FindResource(GetModuleHandle(0), MAKEINTRESOURCE(i), RT_RCDATA);
+    HGLOBAL handle = LoadResource(0, res);
+    LPVOID data = LockResource(handle);
+    DWORD size = SizeofResource(0, res);
+    return {(byte*)data, (ssize)size};
+}
+
+// TODO: use the other one
+void Win32SetWindowIcon(int i) {
+	HRSRC res = FindResource(GetModuleHandle(0), MAKEINTRESOURCE(i), RT_ICON);
+    HGLOBAL handle = LoadResource(0, res);
+    LPVOID data = LockResource(handle);
+    DWORD size = SizeofResource(0, res);
+	HICON icon = CreateIconFromResource((PBYTE)data, size, TRUE, 0x00030000);
+	SendMessage(window.handle, WM_SETICON, ICON_BIG, (LPARAM)icon);
+	SendMessage(window.handle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+}
+
+void Win32SetWindowIcon(Image image) {
+    HDC dc = GetDC(NULL);
+    BITMAPV5HEADER bi = {};
+    bi.bV5Size        = sizeof(bi);
+    bi.bV5Width       = image.width;
+    bi.bV5Height      = image.height;
+    bi.bV5Planes      = 1;
+    bi.bV5BitCount    = 32;
+    bi.bV5Compression = BI_BITFIELDS;
+    bi.bV5RedMask     = 0x000000ff;
+    bi.bV5GreenMask   = 0x0000ff00;
+    bi.bV5BlueMask    = 0x00ff0000;
+    bi.bV5AlphaMask   = 0xff000000;
+    byte* target = NULL;
+    HBITMAP color = CreateDIBSection(dc, 
+    	(BITMAPINFO*)&bi, 
+    	DIB_RGB_COLORS, 
+    	(VOID**)&target, 
+    	NULL, 0);
+    ReleaseDC(NULL, dc);
+    if (!color) {
+        LOG("Failed to create bitmap");
+        return;
+    }
+
+    HBITMAP mask = CreateBitmap(image.width, image.height, 1, 1, NULL);
+    if (!mask) {
+        LOG("Failed to create mask bitmap");
+        DeleteObject(color);
+        return;
+    }
+
+    byte* source = image.data;
+    for (int32 i = 0;  i < image.width*image.height; i++) {
+        target[0] = source[2];
+        target[1] = source[1];
+        target[2] = source[0];
+        target[3] = source[3];
+        target += 4;
+        source += 4;
+    }
+
+    ICONINFO ii = {};
+    ii.fIcon    = TRUE;
+    ii.xHotspot = 0;
+    ii.yHotspot = 0;
+    ii.hbmMask  = mask;
+    ii.hbmColor = color;
+    HICON icon = CreateIconIndirect(&ii);
+
+    DeleteObject(color);
+    DeleteObject(mask);
+
+    if (!icon) {
+        if (icon) LOG("Failed to create icon");
+        else LOG("Failed to create cursor");
+        return;
+    }
+
+    SendMessage(window.handle, WM_SETICON, ICON_BIG, (LPARAM)icon);
+    SendMessage(window.handle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+}
+
 WNDCLASSA CreateWindowClass() {
 	WNDCLASSA windowClass = {};
 	windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 	windowClass.lpfnWndProc = MainWindowCallback;
 	windowClass.hInstance = GetModuleHandle(NULL);
 	windowClass.lpszClassName = "WindowClass";
-
 	RegisterClassA(&windowClass);
 
 	return windowClass;

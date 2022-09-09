@@ -5,17 +5,23 @@
 #define UI_SHUFFLEABLE		(1 << 2)
 #define UI_CLICKABLE		(1 << 3)
 #define UI_HIDE_OVERFLOW 	(1 << 4)
-#define UI_SCROLLABLE		((1 << 5) + UI_HIDE_OVERFLOW)
+#define UI_SCROLLABLE		((1 << 5) | UI_HIDE_OVERFLOW)
 #define UI_EDITABLE 		(1 << 6)
+#define UI_BRING_PARENT_TO_FRONT	(1 << 7)
 
-#define UI_HIDDEN			(1 << 7)
-#define UI_CENTER			(1 << 8)
-#define UI_RIGHT			(1 << 9)
+#define UI_HIDDEN			(1 << 8)
 
-#define UI_FIT_CONTENT		(1 << 10)
+// layout flags, should probably be replaced by a layout system
+#define UI_CENTER			(1 << 9)
+#define UI_MIDDLE			(1 << 10)
+#define UI_RIGHT			(1 << 11)
+#define UI_BOTTOM			(1 << 12)
+#define UI_FIT_CONTENT		(1 << 13)
+#define UI_MIN_CONTENT		(1 << 14)
 
-#define UI_ELEVATOR 		(1 << 11)
-#define UI_BRING_PARENT_TO_FRONT	(1 << 12)
+#define UI_ELEVATOR 		(1 << 15)
+#define UI_ADDENDUM			(1 << 16)
+
 
 #include "font.cpp"
 
@@ -64,6 +70,11 @@ struct UIElement {
 		struct {int32 x, y, width, height;};
 		struct {Point2i pos; Dimensions2i dim;};
 		UIBox box;
+	};
+
+	union {
+		struct{ int32 minWidth, minHeight;};
+		Dimensions2i minDim;
 	};
 
 	union {
@@ -130,15 +141,20 @@ Box2i GetAbsolutePosition(UIElement* element) {
 	Box2i parentPos = GetAbsolutePosition(parent);
 	if (parent == NULL) parent = ui.windowElement;
 
-	return (element->flags & UI_RIGHT)
-		? Box2i{parentPos.x1 - element->x - parent->scrollPos.x - element->width, 
-				parentPos.y0 + element->y - parent->scrollPos.y, 
-				parentPos.x1 - element->x - parent->scrollPos.x,
-				parentPos.y0 + element->y - parent->scrollPos.y + element->height}
-		: Box2i{parentPos.x0 + element->x - parent->scrollPos.x,
-				parentPos.y0 + element->y - parent->scrollPos.y,
-				parentPos.x0 + element->x - parent->scrollPos.x + element->width,
-				parentPos.y0 + element->y - parent->scrollPos.y + element->height};
+	int32 x0 = (element->flags & UI_RIGHT) 
+		? parentPos.x1 - element->x - parent->scrollPos.x - element->width
+		: parentPos.x0 + element->x - parent->scrollPos.x;
+	int32 y0 = (element->flags & UI_BOTTOM) 
+		? parentPos.y1 - element->y - parent->scrollPos.y - element->height
+		: parentPos.y0 + element->y - parent->scrollPos.y;
+	int32 x1 = (element->flags & UI_RIGHT)
+		? parentPos.x1 - element->x - parent->scrollPos.x
+		: parentPos.x0 + element->x - parent->scrollPos.x + element->width;
+	int32 y1 = (element->flags & UI_BOTTOM) 
+		? parentPos.y1 - element->y - parent->scrollPos.y
+		: parentPos.y0 + element->y - parent->scrollPos.y + element->height;
+
+	return {x0, y0, x1, y1};
 }
 
 bool IsInBottomRight(Box2i box, Point2i pos) {
@@ -152,7 +168,7 @@ ssize GetTextIndex(UIElement* textElement, Point2i pos, Point2i cursorPos) {
 	if (text.editable.totalLength) {
 		list = text.editable;
 	}
-	else if (text.string.length) {
+	else if (text.string.length || textElement->flags & UI_EDITABLE) {
 		list = CreateStringList(text.string, &node);
 	}
 	else return -1;
@@ -251,6 +267,7 @@ Dimensions2i GetContentDim(UIElement* e) {
 		height = (int32)(metrics.endy + 0.5f);
 	}
 	LINKEDLIST_FOREACH(e, UIElement, child) {
+		if (child->flags & UI_ADDENDUM) continue;
 		width  = MAX(child->x + child->width, width);
 		height = MAX(child->y + child->height, height);
 	}
@@ -408,17 +425,40 @@ int32 __center(UIElement* element) {
 	return (element->parent->width - element->width)/2;
 }
 
+int32 __middle(UIElement* element) {
+	return (element->parent->height - element->height)/2;
+}
+
 void RenderElement(UIElement* element) {
 	if (element->flags & UI_HIDDEN) return;
 	if (element->flags & UI_CENTER) element->x = __center(element);
-	if (element->flags & UI_FIT_CONTENT) element->dim = GetContentDim(element);
+	if (element->flags & UI_MIDDLE) element->y = __middle(element);
+	Dimensions2i contentDim = GetContentDim(element);
+	if (element->flags & UI_FIT_CONTENT) {
+		int32 newWidth = MAX(element->minWidth, contentDim.width);
+		int32 newHeight = MAX(element->minHeight, contentDim.height);
+		if (newWidth != element->width || newHeight != element->height) {
+			element->dim = {newWidth, newHeight};
+			if (element->onResize) element->onResize(element);
+		}
+	}
+	if (element->flags & UI_MIN_CONTENT) {
+		if (!element->width) element->width = element->minWidth;
+		if (!element->height) element->height = element->minHeight;
+		int32 newWidth = MAX(element->width, contentDim.width);
+		int32 newHeight = MAX(element->height, contentDim.height);
+		if (newWidth != element->width || newHeight != element->height) {
+			element->dim = {newWidth, newHeight};
+			if (element->onResize) element->onResize(element);
+		}
+	}
 	if (element->flags & UI_ELEVATOR) {
 		UIElement* scrollBar = element->parent;
 		UIElement* pane = scrollBar->prev;
-		Dimensions2i contentDim = GetContentDim(pane);
+		Dimensions2i paneDim = GetContentDim(pane);
 
-		float32 length = (float32)(pane->height*scrollBar->height)/(float32)contentDim.height;
-		float32 pos = (float32)((scrollBar->height - length)*pane->scrollPos.y)/(float32)(contentDim.height - pane->height); 
+		float32 length = (float32)(pane->height*scrollBar->height)/(float32)paneDim.height;
+		float32 pos = (float32)((scrollBar->height - length)*pane->scrollPos.y)/(float32)(paneDim.height - pane->height); 
 
 		element->height = (int32)length;
 
@@ -464,6 +504,7 @@ StringNode* CreateStringNode() {
 }
 
 void UpdateTextScrollPos() {
+	if (!(ui.selected->flags & UI_SCROLLABLE)) return;
 	UIText text = ui.selected->text;
 	int32 elementWidth = ui.selected->width;
 	int32 elementHeight = ui.selected->height;
@@ -666,7 +707,7 @@ void InsertText(String newString) {
 		ASSERT(ui.start == ui.end);
 	}
 	if (ui.end == list->totalLength) {
-	 	if (list->last->string.data + list->last->string.length != ui.buffer.current) {
+	 	if (list->last == NULL || list->last->string.data + list->last->string.length != ui.buffer.current) {
 	 		StringNode* node = CreateStringNode();
 	 		LINKEDLIST_ADD(list, node);
 	 		node->string.data = ui.buffer.current;
@@ -1168,6 +1209,17 @@ UIElement* UIUpdateActiveElement() {
 
 	return element;
 }
+
+void UIDrawLine(Point2i p0, Point2i p1, uint32 rgba, float32 lineWidth) {
+	Point2 points[2] = {{(float32)p0.x, (float32)UI_FLIPY(p0.y)}, {(float32)p1.x, (float32)UI_FLIPY(p1.y)}};
+	Line2 line = {points, 2};
+	GfxDrawLine(line, lineWidth, rgba);
+}
+
+Box2i UIGetAbsolutePosition(UIElement* element) {
+	return GetAbsolutePosition(element);
+}
+
 
 // specific elements
 //-------------------

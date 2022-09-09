@@ -16,9 +16,20 @@ struct Font {
 #include "truetype.cpp"
 
 Font LoadFont(Arena* arena, const char* filePath, float32 height){
-	byte* data = OsReadAll(filePath, arena).data;
+	byte* data = OSReadAll(filePath, arena).data;
 	return TTLoadFont(arena, data, height);
 }
+
+#if defined(_WIN32)
+Font LoadDefaultFont(Arena* arena, float32 height) {
+	// NOTE: martins says that if the code uses GetEnvironmentVariableA then any 
+	// unicode string in env variables will most likely break the program
+	byte buffer[MAX_PATH] = {};
+	byte* ptr = buffer + GetEnvironmentVariable("windir", (LPTSTR)buffer, MAX_PATH);
+	COPY("\\Fonts\\consola.ttf", ptr);
+	return LoadFont(arena, (const char*)buffer, height);
+}
+#endif
 
 // NOTE: adopted from stbtt_GetBakedQuad
 void RenderText(Font* font, StringList list, float32 x, float32 y, uint32 color){
