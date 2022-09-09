@@ -69,7 +69,7 @@ String OSReadAll(File file, Arena* arena) {
 		pos  += read;
 		left -= read;
 	} while ((0 < left) && (0 < read));
-	return {buffer, size};
+	return {buffer, (ssize)size};
 }
 
 String OSReadAll(const char* path, Arena* arena) {

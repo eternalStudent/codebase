@@ -1,3 +1,7 @@
+#if (!defined(WM_MOUSEHWHEEL))
+#define WM_MOUSEHWHEEL 0x020e
+#endif
+
 struct {
 	HWND handle;
 
