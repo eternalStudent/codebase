@@ -8,10 +8,16 @@ struct Image {
 };
 
 #include "bitmap.cpp"
+#include "png.cpp"
 
 Image LoadImage(Arena* arena, const char* filepath) {
     byte* data = OSReadAll(filepath, arena).data;
     return BMPLoadImage(arena, data);
+}
+
+Image LoadStbImage(Arena* arena, const char* filePath) {
+    String all = OSReadAll(filePath, arena);
+    return PNGLoadImage(arena, all.data);
 }
 
 typedef Point4 Color;

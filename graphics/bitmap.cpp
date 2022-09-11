@@ -129,6 +129,8 @@ int32 ParseBMPHeader(byte** data, BMPHeader* info, Image* image) {
 
 #define MAX_DIMENSIONS (1 << 24)
 
+// BUG: image.channels is set to the number of channels in the file
+// and not the number of channels in the result, which is always 4
 Image BMPLoadImage(Arena* arena, byte* data) {
     byte pal[256][4];
     int32 psize = 0, i, j, width;

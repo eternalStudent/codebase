@@ -31,6 +31,7 @@
 
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
 extern "C" int _fltused = 0;
+extern "C" int _tls_index = 0;
 #endif
 
 union opaque64 {

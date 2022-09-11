@@ -183,7 +183,7 @@ String LoadAsset(int i) {
     return {(byte*)data, (ssize)size};
 }
 
-// TODO: use the other one
+// NOTE: use the other one for cross-platfromness
 void Win32SetWindowIcon(int i) {
 	HRSRC res = FindResource(GetModuleHandle(0), MAKEINTRESOURCE(i), RT_ICON);
     HGLOBAL handle = LoadResource(0, res);
@@ -203,9 +203,9 @@ void Win32SetWindowIcon(Image image) {
     bi.bV5Planes      = 1;
     bi.bV5BitCount    = 32;
     bi.bV5Compression = BI_BITFIELDS;
-    bi.bV5RedMask     = 0x000000ff;
+    bi.bV5RedMask     = 0x00ff0000;
     bi.bV5GreenMask   = 0x0000ff00;
-    bi.bV5BlueMask    = 0x00ff0000;
+    bi.bV5BlueMask    = 0x000000ff;
     bi.bV5AlphaMask   = 0xff000000;
     byte* target = NULL;
     HBITMAP color = CreateDIBSection(dc, 

@@ -6,7 +6,7 @@ inline byte PeekByte(byte** data) {
 	return **data;
 }
 
-inline void Skip(byte** data, int64 distance) {
+inline void Skip(byte** data, ssize distance) {
 	*data+=distance;
 }
 
