@@ -1017,7 +1017,15 @@ UIElement* UIUpdateActiveElement() {
 					UpdateTextScrollPos();
 				}
 				if (selectedPos.x1 < cursorPos.x) {
-					if (ui.end < ui.selected->text.string.length && ui.selected->text.string.data[ui.end + 1] != 10) {
+					ssize length = GetTextLength();
+					byte nextChar;
+					if (ui.selected->text.editable.totalLength) {
+						nextChar = GetChar(ui.selected->text.editable, ui.end+1);
+					}
+					else {
+						nextChar = ui.selected->text.string.data[ui.end + 1];
+					}
+					if (ui.end < length && nextChar != 10) {
 						ui.end++;
 						UpdateTextScrollPos();
 					}
