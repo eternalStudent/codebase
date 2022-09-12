@@ -1210,10 +1210,14 @@ UIElement* UIUpdateActiveElement() {
 	return element;
 }
 
-void UIDrawLine(Point2i p0, Point2i p1, uint32 rgba, float32 lineWidth) {
+void UIDrawLine(Point2i p0, Point2i p1, float32 lineWidth, uint32 rgba) {
 	Point2 points[2] = {{(float32)p0.x, (float32)UI_FLIPY(p0.y)}, {(float32)p1.x, (float32)UI_FLIPY(p1.y)}};
 	Line2 line = {points, 2};
 	GfxDrawLine(line, lineWidth, rgba);
+}
+
+void UIDrawRect(Point2i p0, Point2i p1, float32 lineWidth, uint32 rgba) {
+	GfxDrawBox2Lines({(float32)p0.x, (float32)UI_FLIPY(p1.y), (float32)p1.x, (float32)UI_FLIPY(p0.y)}, lineWidth, rgba);
 }
 
 Box2i UIGetAbsolutePosition(UIElement* element) {

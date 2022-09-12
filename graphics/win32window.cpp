@@ -47,6 +47,14 @@ BOOL Win32IsMouseLeftButtonDown() {
 	return window.mouseLeftButtonIsDown == 1 && window.clickCount == 1;
 }
 
+BOOL Win32IsMouseLeftButtonUp() {
+	return window.mouseLeftButtonIsDown == 0;
+}
+
+BOOL Win32IsMouseLeftReleased() {
+	return window.mouseLeftButtonIsDown == 0 && window.mouseLeftButtonWasDown == 1;
+}
+
 BOOL Win32IsMouseLeftClicked() {
 	return window.clickCount == 1 && window.mouseLeftButtonIsDown == 1 && window.mouseLeftButtonWasDown == 0;
 }
