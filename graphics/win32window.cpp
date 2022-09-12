@@ -248,8 +248,7 @@ void Win32SetWindowIcon(Image image) {
     DeleteObject(mask);
 
     if (!icon) {
-        if (icon) LOG("Failed to create icon");
-        else LOG("Failed to create cursor");
+        LOG("Failed to create icon");
         return;
     }
 
