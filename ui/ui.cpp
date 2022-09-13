@@ -6,21 +6,22 @@
 #define UI_CLICKABLE		(1 << 3)
 #define UI_HIDE_OVERFLOW 	(1 << 4)
 #define UI_SCROLLABLE		((1 << 5) | UI_HIDE_OVERFLOW)
-#define UI_EDITABLE 		(1 << 6)
-#define UI_BRING_PARENT_TO_FRONT	(1 << 7)
+#define UI_INFINITESCROLL	((1 << 6) | UI_SCROLLABLE)
+#define UI_EDITABLE 		(1 << 7)
+#define UI_BRING_PARENT_TO_FRONT	(1 << 8)
 
-#define UI_HIDDEN			(1 << 8)
+#define UI_HIDDEN			(1 << 9)
 
 // layout flags, should probably be replaced by a layout system
-#define UI_CENTER			(1 << 9)
-#define UI_MIDDLE			(1 << 10)
-#define UI_RIGHT			(1 << 11)
-#define UI_BOTTOM			(1 << 12)
-#define UI_FIT_CONTENT		(1 << 13)
-#define UI_MIN_CONTENT		(1 << 14)
+#define UI_CENTER			(1 << 10)
+#define UI_MIDDLE			(1 << 11)
+#define UI_RIGHT			(1 << 12)
+#define UI_BOTTOM			(1 << 13)
+#define UI_FIT_CONTENT		(1 << 14)
+#define UI_MIN_CONTENT		(1 << 15)
 
-#define UI_ELEVATOR 		(1 << 15)
-#define UI_ADDENDUM			(1 << 16)
+#define UI_ELEVATOR 		(1 << 16)
+#define UI_ADDENDUM			(1 << 17)
 
 
 #include "font.cpp"
@@ -183,6 +184,10 @@ void SetPosition(UIElement* element, int32 x, int32 y) {
 	}
 	else {
 		UIElement* parent = element->parent;
+		if (parent->flags & UI_INFINITESCROLL) {
+			element->pos = {x, y};
+			return;
+		}
 
 		if (x < 0) element->x = 0;
 		else if (x+element->width > parent->width) element->x = parent->width-element->width;
@@ -959,16 +964,20 @@ UIElement* UIUpdateActiveElement() {
 
 			if (mouseWheelDelta) {
 				scrollable->scrollPos.y -= mouseWheelDelta;
-				if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
-				if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
-					scrollable->scrollPos.y = contentDim.height - scrollable->height;
+				if (!(scrollable->flags & UI_INFINITESCROLL)) {
+					if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
+					if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
+						scrollable->scrollPos.y = MAX(contentDim.height - scrollable->height, 0);
+				}
 			}
 
 			if (mouseHWheelDelta) {
 				scrollable->scrollPos.x += mouseHWheelDelta;
-				if (scrollable->scrollPos.x < 0) scrollable->scrollPos.x = 0;
-				if (scrollable->scrollPos.x > contentDim.width - scrollable->width)
-					scrollable->scrollPos.x = contentDim.width - scrollable->width;
+				if (!(scrollable->flags & UI_INFINITESCROLL)) {
+					if (scrollable->scrollPos.x < 0) scrollable->scrollPos.x = 0;
+					if (scrollable->scrollPos.x > contentDim.width - scrollable->width)
+						scrollable->scrollPos.x = MAX(contentDim.width - scrollable->width, 0);
+				}
 			}
 		}
 	}
