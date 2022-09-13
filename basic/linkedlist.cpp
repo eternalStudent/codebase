@@ -18,4 +18,10 @@
 											if ((n)->next) (n)->next->prev = (n)->prev;\
 											else (list)->last = (n)->prev;}while(0)
 
+#define LINKEDLIST_CONCAT(list1, list2) 	do{if((list2)->first){\
+											if ((list1)->last) (list1)->last->next=(list2)->first;\
+											else (list1)->first=(list2)->first;\
+											(list2)->first->prev=(list1)->last;\
+											(list1)->last=(list2)->last;}}while(0)
+
 #define LINKEDLIST_FOREACH(list, t, n)		for(t* n = (list)->first; n != NULL; n = n->next)

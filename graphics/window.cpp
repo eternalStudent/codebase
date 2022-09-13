@@ -60,6 +60,7 @@
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OSGetMouseHWheelDelta 	Win32GetMouseHWheelDelta
 #  define OSGetTypedText			Win32GetTypedText
+#  define OSResetMouse				Win32ResetMouse
 
 #  define OSCopyToClipboard 		Win32CopyToClipboard
 #  define OSPasteFromClipboard		Win32PasteFromClipboard

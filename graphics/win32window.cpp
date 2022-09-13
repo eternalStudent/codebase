@@ -79,6 +79,10 @@ DWORD Win32GetMouseHWheelDelta() {
 	return window.mouseHWheelDelta;
 }
 
+void Win32ResetMouse() {
+	window.mouseLeftButtonIsDown = 0;
+}
+
 String Win32GetTypedText() {
 	return {(byte*)window.typed, (ssize)window.strlength};
 }

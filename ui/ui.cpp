@@ -964,7 +964,7 @@ UIElement* UIUpdateActiveElement() {
 
 			if (mouseWheelDelta) {
 				scrollable->scrollPos.y -= mouseWheelDelta;
-				if (!(scrollable->flags & UI_INFINITESCROLL)) {
+				if ((scrollable->flags & UI_INFINITESCROLL) != UI_INFINITESCROLL) {
 					if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
 					if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
 						scrollable->scrollPos.y = MAX(contentDim.height - scrollable->height, 0);
@@ -973,7 +973,7 @@ UIElement* UIUpdateActiveElement() {
 
 			if (mouseHWheelDelta) {
 				scrollable->scrollPos.x += mouseHWheelDelta;
-				if (!(scrollable->flags & UI_INFINITESCROLL)) {
+				if ((scrollable->flags & UI_INFINITESCROLL) != UI_INFINITESCROLL) {
 					if (scrollable->scrollPos.x < 0) scrollable->scrollPos.x = 0;
 					if (scrollable->scrollPos.x > contentDim.width - scrollable->width)
 						scrollable->scrollPos.x = MAX(contentDim.width - scrollable->width, 0);
@@ -1498,6 +1498,64 @@ UIElement* UIAddDropdownItem(UIElement* dropdown, UIText text) {
 	UIElement* textElement = UICreateElement(item);
 	textElement->x = 5;
 	textElement->text = text;
+
+	return item;
+}
+
+UIElement* UICreateColorDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, uint32 color, uint32 border) {
+	UIElement* container = UICreateElement(parent);
+	container->dim = dim;
+	container->pos = pos;
+	container->name = STR("dropdown container");
+
+	UIElement* dropdown = UICreateElement(container);
+	dropdown->dim = dim;
+	dropdown->flags = UI_CLICKABLE | UI_BRING_PARENT_TO_FRONT;
+	dropdown->onClick = __display_or_hide;
+	dropdown->background = color;
+	dropdown->name = STR("dropdown");
+	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
+	dropdown->symbol.pos = {dim.width + 3, dim.height/2 - 3};
+	dropdown->symbol.color = RGBA_WHITE;
+	dropdown->borderColor = border;
+	dropdown->borderWidth = 1;
+
+	UIElement* hidden = UICreateScrollingPane(container, {dim.width, 100}, {0, dim.height});
+	hidden->parent->flags |= UI_HIDDEN;
+	hidden->background = RGBA_GREY;
+
+	return dropdown;
+}
+
+void __select_color(UIElement* e) {
+	UIElement* list = e->parent;
+	UIElement* listContainer = list->parent;
+	UIElement* dropdown = listContainer->parent;
+	UIElement* visible = dropdown->first;
+
+	visible->background = e->background;
+
+	listContainer->flags |= UI_HIDDEN;
+	visible->symbol.type = UI_DOWN_POINTING_TRIANGLE;
+	OSResetMouse();
+}
+
+void __hover3(UIElement* e) {
+	e->borderColor = e->parent->parent->prev->borderColor;
+	e->borderWidth = 1;
+}
+
+UIElement* UIAddColorDropdownItem(UIElement* dropdown, uint32 color) {
+	UIElement* list = dropdown->next->first;
+	UIElement* last = list->last;
+
+	UIElement* item = UICreateElement(list);
+	item->dim = dropdown->dim;
+	if (last) item->y = last->y + last->height;
+	item->flags = UI_CLICKABLE;
+	item->onClick = __select_color;
+	item->onHover = __hover3;
+	item->background = color;
 
 	return item;
 }
