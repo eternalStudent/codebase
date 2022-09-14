@@ -4,12 +4,12 @@ struct FixedSize {
 	ssize size;
 };
 
-void FixedSizeInit(FixedSize* allocator, byte* buffer, ssize cap, ssize size) {
+void FixedSizeInit(FixedSize* allocator, byte* buffer, int32 cap, ssize size) {
 	allocator->buffer = buffer;
 	allocator->next = buffer;
 	allocator->size = size;
 
-	for (ssize i = 0; i < cap-2; i++) {
+	for (int32 i = 0; i < cap-2; i++) {
 		*(void**)buffer = (void*)(buffer + size);
 		buffer = *(byte**)buffer;
 	}
@@ -28,4 +28,8 @@ void FixedSizeFree(FixedSize* allocator, void* data) {
 	if (data == NULL) return;
 	*(void**)data = allocator->next;
 	allocator->next = data;
+}
+
+int32 FixedSizeGetIndex(FixedSize* allocator, void* data) {
+	return (int32)(((byte*)data - (byte*)allocator->buffer)/allocator->size);
 }
