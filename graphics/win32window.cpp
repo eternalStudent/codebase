@@ -87,6 +87,10 @@ String Win32GetTypedText() {
 	return {(byte*)window.typed, (ssize)window.strlength};
 }
 
+void Win32ResetTypedText() {
+	window.strlength = 0;
+}
+
 void Win32ExitFullScreen() {
 	DWORD dwStyle = GetWindowLong(window.handle, GWL_STYLE);
 	SetWindowLong(window.handle, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);

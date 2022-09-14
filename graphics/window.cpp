@@ -50,6 +50,8 @@
 
 #  define OSIsKeyDown 				Win32IsKeyDown
 #  define OSIsKeyPressed			Win32IsKeyPressed
+#  define OSGetTypedText			Win32GetTypedText
+#  define OSResetTypedText			Win32ResetTypedText
 #  define OSIsMouseLeftButtonDown 	Win32IsMouseLeftButtonDown
 #  define OSIsMouseLeftButtonUp 	Win32IsMouseLeftButtonUp
 #  define OSIsMouseLeftClicked		Win32IsMouseLeftClicked
@@ -59,7 +61,6 @@
 #  define OSIsMouseTripleClicked	Win32IsMouseTripleClicked
 #  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
 #  define OSGetMouseHWheelDelta 	Win32GetMouseHWheelDelta
-#  define OSGetTypedText			Win32GetTypedText
 #  define OSResetMouse				Win32ResetMouse
 
 #  define OSCopyToClipboard 		Win32CopyToClipboard

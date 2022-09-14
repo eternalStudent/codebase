@@ -840,6 +840,9 @@ StringList UICreateEditableText(String string) {
 }
 
 void UIDestroyElement(UIElement* element) {
+	if (ui.active == element) ui.active = NULL;
+	if (ui.selected == element) ui.selected = NULL;
+
 	LINKEDLIST_REMOVE(element->parent, element);
 	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
 
@@ -1241,6 +1244,15 @@ Box2i UIGetAbsolutePosition(UIElement* element) {
 	return GetAbsolutePosition(element);
 }
 
+void UISelectTextElement(UIElement* element) {
+	ui.selected = element;
+	ui.end = GetTextLength();
+	ui.start = ui.end;
+}
+
+UIElement* GetSelectedTextElement() {
+	return ui.selected;
+}
 
 // specific elements
 //-------------------
