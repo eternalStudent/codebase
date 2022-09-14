@@ -1,23 +1,9 @@
 #include <emmintrin.h>
+#include <memory.h>
 
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
 #  include <intrin.h>
-extern "C" void* memset(void* dst, int src, size_t size);
-extern "C" void* memcpy(void* dst, const void* src, size_t size);
-
-#pragma function(memset)
-extern "C" void* memset(void* dst, int src, size_t size) {
-    __stosb((unsigned char*)dst, (unsigned char)src, size);
-    return dst;
-}
-
-#pragma function(memcpy)
-extern "C" void* memcpy(void* dst, const void* src, size_t size) {
-    __movsb((unsigned char*)dst, (unsigned char*)src, size);
-    return dst;
-}
 #else
-#  include <memory.h>
 #  include <smmintrin.h>
 #endif
 

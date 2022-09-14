@@ -75,7 +75,6 @@ mollit anim id est laborum.)STRING"));
 	textElement->x = 18;
 	textElement->text = {smallf, STR("xyz"), RGBA_WHITE};
 
-
 	while(!OSWindowDestroyed() && !OSIsKeyDown(KEY_ESC)) {
 		ArenaFreeAll(&scratch);
 		OSProcessWindowEvents();
@@ -90,7 +89,7 @@ mollit anim id est laborum.)STRING"));
 }
 
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
-void __stdcall WinMainCRTStartup() {
+extern "C" void WinMainCRTStartup() {
     ExitProcess(main());
 }
 #endif
