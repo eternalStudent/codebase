@@ -1250,7 +1250,7 @@ void UISelectTextElement(UIElement* element) {
 	ui.start = ui.end;
 }
 
-UIElement* GetSelectedTextElement() {
+UIElement* UIGetSelectedTextElement() {
 	return ui.selected;
 }
 
