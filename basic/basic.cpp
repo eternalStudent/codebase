@@ -11,7 +11,12 @@
 #  include <unistd.h>
 #endif
 
-#define ASSERT(Expression) 		do{if(!(Expression)) {*(volatile int *)0 = 0;}}while(0)
+#if defined(DEBUG)
+#  define ASSERT(expression) 	do{if(!(expression)) {*(volatile int *)0 = 0;}}while(0)
+#else
+#  define ASSERT(expression)
+#endif
+
 #ifndef LOG
 #  define LOG(text) 			do{}while(0)
 #  define FAIL(text)			0
@@ -23,7 +28,6 @@
 #include "io.cpp"
 #include "time.cpp"
 #include "binary_reader.cpp"
-#include "array.cpp"
 
 #if defined(__clang__) || defined(__GNUC__)
 #  define alignof	__alignof__
