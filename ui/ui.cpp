@@ -56,6 +56,7 @@ struct UIImage {
 #define UI_DOWN_POINTING_TRIANGLE 		4
 #define UI_SQUARE 						5
 #define UI_BULLET 						6
+#define UI_DIAGONAL 					7
 
 struct UISymbol {
 	union {
@@ -422,6 +423,11 @@ void RenderSymbol(UISymbol symbol, Point2i pos) {
 		} break;
 		case UI_BULLET: {
 			GfxDrawDisc({{x0, UI_FLIPY(y0 + 5.0f)}, 5.0f}, symbol.color, 0, 360);
+		} break;
+		case UI_DIAGONAL: {
+			Point2 points[2] = {{(float32)pos.x, (float32)UI_FLIPY(pos.y)}, {(float32)x0, (float32)UI_FLIPY(y0)}};
+			Line2 line = {points, 2};
+			GfxDrawLine(line, 1, symbol.color);
 		} break;
 	}
 }
@@ -1449,11 +1455,11 @@ void __display_or_hide(UIElement* e) {
 	UIElement* element = e->next;
 	if (element->flags & UI_HIDDEN) {
 		element->flags &= ~UI_HIDDEN;
-		e->symbol.type = UI_UP_POINTING_TRIANGLE;
+		e->parent->symbol.type = UI_UP_POINTING_TRIANGLE;
 	}
 	else {
 		element->flags |= UI_HIDDEN;
-		e->symbol.type = UI_DOWN_POINTING_TRIANGLE;
+		e->parent->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 	}
 }
 
@@ -1462,6 +1468,9 @@ UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, UI
 	container->dim = dim;
 	container->pos = pos;
 	container->name = STR("dropdown container");
+	container->symbol.type = UI_DOWN_POINTING_TRIANGLE;
+	container->symbol.pos = {dim.width + 3, 15};
+	container->symbol.color = RGBA_WHITE;
 
 	UIElement* dropdown = UICreateElement(container);
 	dropdown->dim = dim;
@@ -1469,10 +1478,7 @@ UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, UI
 	dropdown->onClick = __display_or_hide;
 	dropdown->background = RGBA_GREY;
 	dropdown->name = STR("dropdown");
-	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-	dropdown->symbol.pos = {dim.width + 3, 15};
-	dropdown->symbol.color = RGBA_WHITE;
-
+	
 	UIElement* textElement = UICreateElement(dropdown);
 	textElement->x = 5;
 	textElement->text = text;
@@ -1493,7 +1499,7 @@ void __select(UIElement* e) {
 	visible->first->text.string = e->first->text.string;
 
 	listContainer->flags |= UI_HIDDEN;
-	visible->symbol.type = UI_DOWN_POINTING_TRIANGLE;
+	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 }
 
 UIElement* UIAddDropdownItem(UIElement* dropdown, UIText text) {
@@ -1519,6 +1525,9 @@ UIElement* UICreateColorDropdown(UIElement* parent, Dimensions2i dim, Point2i po
 	container->dim = dim;
 	container->pos = pos;
 	container->name = STR("dropdown container");
+	container->symbol.type = UI_DOWN_POINTING_TRIANGLE;
+	container->symbol.pos = {dim.width + 3, dim.height/2 - 3};
+	container->symbol.color = RGBA_WHITE;
 
 	UIElement* dropdown = UICreateElement(container);
 	dropdown->dim = dim;
@@ -1526,15 +1535,12 @@ UIElement* UICreateColorDropdown(UIElement* parent, Dimensions2i dim, Point2i po
 	dropdown->onClick = __display_or_hide;
 	dropdown->background = color;
 	dropdown->name = STR("dropdown");
-	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-	dropdown->symbol.pos = {dim.width + 3, dim.height/2 - 3};
-	dropdown->symbol.color = RGBA_WHITE;
+	
 	dropdown->borderColor = border;
 	dropdown->borderWidth = 1;
 
 	UIElement* hidden = UICreateScrollingPane(container, {dim.width, 100}, {0, dim.height});
 	hidden->parent->flags |= UI_HIDDEN;
-	hidden->background = RGBA_GREY;
 
 	return dropdown;
 }
@@ -1546,9 +1552,10 @@ void __select_color(UIElement* e) {
 	UIElement* visible = dropdown->first;
 
 	visible->background = e->background;
+	visible->symbol = e->symbol;
 
 	listContainer->flags |= UI_HIDDEN;
-	visible->symbol.type = UI_DOWN_POINTING_TRIANGLE;
+	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
 	OSResetMouse();
 }
 
