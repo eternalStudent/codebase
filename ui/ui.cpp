@@ -1260,6 +1260,28 @@ UIElement* UIGetSelectedTextElement() {
 	return ui.selected;
 }
 
+UIElement* UICloneElement(UIElement* element, UIElement* parent) {
+	UIElement* cloned = UICreateElement(parent);
+	UIElement* prev = cloned->prev;
+	memcpy(cloned, element, sizeof(UIElement));
+	cloned->prev = prev;
+	cloned->parent = parent == NULL ? ui.windowElement : parent;
+	cloned->next = NULL;
+	cloned->first = NULL;
+	cloned->last = NULL;
+
+	if (element->text.editable.totalLength) {
+		StringListCopy(element->text.editable, ui.buffer.current);
+		cloned->text.editable = UICreateEditableText({ui.buffer.current, element->text.editable.totalLength});
+		ui.buffer.current += element->text.editable.totalLength;
+	}
+
+	LINKEDLIST_FOREACH(element, UIElement, child) 
+		UICloneElement(child, cloned);
+
+	return cloned;
+}
+
 // specific elements
 //-------------------
 
