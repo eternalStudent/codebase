@@ -1256,10 +1256,6 @@ void UISelectTextElement(UIElement* element) {
 	ui.start = ui.end;
 }
 
-UIElement* UIGetSelectedTextElement() {
-	return ui.selected;
-}
-
 UIElement* UICloneElement(UIElement* element, UIElement* parent) {
 	UIElement* cloned = UICreateElement(parent);
 	UIElement* prev = cloned->prev;
