@@ -1,4 +1,4 @@
-HANDLE Win32OpenFile(LPTSTR filePath) {
+HANDLE Win32OpenFile(LPCTSTR filePath) {
 	HANDLE hFile = CreateFile(
 		filePath, 
 		GENERIC_READ, 
@@ -14,7 +14,7 @@ HANDLE Win32OpenFile(LPTSTR filePath) {
 	return hFile;
 }
 
-HANDLE Win32CreateFile(LPTSTR filePath) {
+HANDLE Win32CreateFile(LPCTSTR filePath) {
 	HANDLE hFile = CreateFile(
 		filePath, 
 		GENERIC_WRITE, 

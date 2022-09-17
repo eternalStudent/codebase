@@ -10,10 +10,12 @@ struct Image {
 #include "bitmap.cpp"
 #include "png.cpp"
 
-#define IMAGE_BITMAP 	1
-#define IMAGE_PNG		2
+#if !defined(IMAGE_BITMAP)
+#  define IMAGE_BITMAP 	0
+#endif
+#define IMAGE_PNG		3
 
-Image LoadImage(Arena* arena, const char* filepath, int32 format) {
+Image LoadImage(Arena* arena, const char* filepath, uint32 format) {
 	byte* data = OSReadAll(filepath, arena).data;
 	if (format == IMAGE_BITMAP)
 		return BMPLoadImage(arena, data);
