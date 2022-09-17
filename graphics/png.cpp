@@ -639,7 +639,8 @@ byte* convert_format(Arena* arena, byte* data, int32 img_n, uint32 x, uint32 y) 
 
    byte* good = (byte*)ArenaAlloc(arena, 4*x*y);
    if (good == NULL) {
-      return FAIL("Out of memory");
+      LOG("Out of memory");
+      return NULL;
    }
 
    for (int32 j = 0; j < (int32)y; ++j) {
@@ -663,7 +664,7 @@ byte* convert_format(Arena* arena, byte* data, int32 img_n, uint32 x, uint32 y) 
          CASE(4,1) {dest[0] = compute_y(src[0],src[1],src[2]);                   } break;
          CASE(4,2) {dest[0] = compute_y(src[0],src[1],src[2]); dest[1] = src[3]; } break;
          CASE(4,3) {dest[0] = src[0];dest[1]=src[1];dest[2]=src[2];              } break;
-         default: ASSERT(0); return FAIL("Unsupported format conversion");
+         default: ASSERT(0); LOG("Unsupported format conversion"); return NULL;
       }
       #undef CASE
    }
@@ -680,7 +681,8 @@ uint16* convert_format16(Arena* arena, uint16 *data, int32 img_n, uint32 x, uint
 
    uint16* good = (uint16*)ArenaAlloc(arena, 4*x*y*2);
    if (good == NULL) {
-      return (uint16*)FAIL("Out of memory");
+      LOG("Out of memory");
+      return NULL;
    }
 
    for (int32 j = 0; j < (int32)y; ++j) {
@@ -704,7 +706,7 @@ uint16* convert_format16(Arena* arena, uint16 *data, int32 img_n, uint32 x, uint
          CASE(4,1) { dest[0]=compute_y_16(src[0],src[1],src[2]);                   } break;
          CASE(4,2) { dest[0]=compute_y_16(src[0],src[1],src[2]); dest[1] = src[3]; } break;
          CASE(4,3) { dest[0]=src[0];dest[1]=src[1];dest[2]=src[2];                 } break;
-         default: ASSERT(0); return (uint16*)FAIL("Unsupported format conversion");
+         default: ASSERT(0); LOG("Unsupported format conversion"); return NULL;
       }
       #undef CASE
    }

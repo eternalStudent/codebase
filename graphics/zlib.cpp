@@ -159,9 +159,9 @@ int32 zexpand(Arena* arena, ZBuf* z, byte* zout, int32 n) { // need to make room
    if (!z->z_expandable) return FAIL("output buffer limit");
    cur   = (uint32) (z->zout - z->zout_start);
    limit = old_limit = (uint32)(z->zout_end - z->zout_start);
-   if (UINT_MAX - cur < (uint32)n) return FAIL("Out of memory");
+   if (0xffffffff - cur < (uint32)n) return FAIL("Out of memory");
    while (cur + n > limit) {
-      if(limit > UINT_MAX / 2) return FAIL("Out of memory");
+      if(limit > 0xffffffff / 2) return FAIL("Out of memory");
       limit *= 2;
    }
    q = (byte* )ArenaReAlloc(arena, z->zout_start, old_limit, limit);

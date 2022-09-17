@@ -85,6 +85,7 @@
 #  define OSCreateWindowFullScreen	LinuxCreateWindowFullScreen
 #  define OSExitFullScreen			LinuxExitFullScreen
 #  define OSEnterFullScreen 		LinuxEnterFullScreen
+#  define OSSetWindowIcon			LinuxSetWindowIcon
 
 #  define OSGetWindowDimensions 	LinuxGetWindowDimensions
 #  define OSWindowDestroyed 		LinuxWindowDestroyed
@@ -96,14 +97,18 @@
 
 #  define OSIsKeyDown 				LinuxIsKeyDown
 #  define OSIsKeyPressed			LinuxIsKeyPressed
+#  define OSGetTypedText			LinuxGetTypedText
+#  define OSResetTypedText			LinuxResetTypedText
 #  define OSIsMouseLeftButtonDown 	LinuxIsMouseLeftButtonDown
+#  define OSIsMouseLeftButtonUp 	LinuxIsMouseLeftButtonUp
 #  define OSIsMouseLeftClicked		LinuxIsMouseLeftClicked
-#  define OSIsMouseRightClicked		LinuxIsMouseRightClicked
+#  define OSIsMouseLeftReleased 	LinuxIsMouseLeftReleased
+#  define OSIsMouseRightClicked 	LinuxIsMouseRightClicked
 #  define OSIsMouseDoubleClicked	LinuxIsMouseDoubleClicked
 #  define OSIsMouseTripleClicked	LinuxIsMouseTripleClicked
 #  define OSGetMouseWheelDelta		LinuxGetMouseWheelDelta
 #  define OSGetMouseHWheelDelta 	LinuxGetMouseHWheelDelta
-#  define OSGetTypedText			LinuxGetTypedText
+#  define OSResetMouse				LinuxResetMouse
 
 #  define OSCopyToClipboard 		LinuxCopyToClipboard
 #  define OSPasteFromClipboard		LinuxPasteFromClipboard
