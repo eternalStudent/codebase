@@ -1,23 +1,25 @@
 struct Image {
-    union {
-        Dimensions2i dimensions;
-        struct { int32 width, height;};
-    };
-    int32 channels;
-    byte* data;
+	union {
+		Dimensions2i dimensions;
+		struct { int32 width, height;};
+	};
+	int32 channels;
+	byte* data;
 };
 
 #include "bitmap.cpp"
 #include "png.cpp"
 
-Image LoadImage(Arena* arena, const char* filepath) {
-    byte* data = OSReadAll(filepath, arena).data;
-    return BMPLoadImage(arena, data);
-}
+#define IMAGE_BITMAP 	1
+#define IMAGE_PNG		2
 
-Image LoadStbImage(Arena* arena, const char* filePath) {
-    String all = OSReadAll(filePath, arena);
-    return PNGLoadImage(arena, all.data);
+Image LoadImage(Arena* arena, const char* filepath, int32 format) {
+	byte* data = OSReadAll(filepath, arena).data;
+	if (format == IMAGE_BITMAP)
+		return BMPLoadImage(arena, data);
+	if (format == IMAGE_PNG)
+		return PNGLoadImage(arena, data);
+	return {};
 }
 
 typedef Point4 Color;
@@ -35,13 +37,13 @@ typedef Point4 Color;
 #define RGBA_TURQUOISE      0xffefd867
 
 inline Color RgbaToColor(uint32 rgba) {
-    union {
-        uint32 rgba;
-        struct {byte r, g, b, a;};
-    } color;
-    color.rgba = rgba;
-    return {color.r/255.0f,
-            color.g/255.0f,
-            color.b/255.0f,
-            color.a/255.0f};
+	union {
+		uint32 rgba;
+		struct {byte r, g, b, a;};
+	} color;
+	color.rgba = rgba;
+	return {color.r/255.0f,
+			color.g/255.0f,
+			color.b/255.0f,
+			color.a/255.0f};
 }

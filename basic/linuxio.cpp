@@ -44,3 +44,28 @@ off_t LinuxGetFileSize(int fd) {
     fstat(fd, &st);
     return st.st_size;
 }
+
+char* LinuxGetDefaultFontPath() {
+    FcPattern* pattern = FcNameParse((const FcChar8*)"monospace");
+    FcBool success = FcConfigSubstitute(0,pattern,FcMatchPattern);
+    if (!success) {
+        LOG("failed to find font");
+        return {};
+    }
+    
+    FcDefaultSubstitute(pattern);
+    FcResult result;
+    FcPattern* fontMatch = FcFontMatch(NULL, pattern, &result);
+    if (!fontMatch) {
+        LOG("failed to match font");
+        return {};
+    }
+
+    FcChar8 *filename;
+    if (!FcPatternGetString (fontMatch, FC_FILE, 0, &filename) == FcResultMatch) {
+        LOG("failed to get font file name");
+        return {};
+    }
+
+    return (char*)filename;
+}

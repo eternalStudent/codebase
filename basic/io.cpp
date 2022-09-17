@@ -8,6 +8,7 @@
 #  define OSWriteFile			Win32WriteFile
 #  define OSGetFileSize 		Win32GetFileSize
 #  define OSCloseFile   		CloseHandle
+#  define OSGetDefaultFontPath	Win32GetDefaultFontPath
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)
 #  define STDOUT 				GetStdHandle(STD_OUTPUT_HANDLE)
 #endif
@@ -17,6 +18,7 @@
 #  include <sys/stat.h>
 #  include <errno.h>
 #  include <limits.h>
+#  include <fontconfig/fontconfig.h>
 #  include "linuxio.cpp"
 #  define File          		int
 #  define FILE_ERROR 			-1
@@ -25,6 +27,7 @@
 #  define OSReadFile    		LinuxReadFile
 #  define OSWriteFile			LinuxWriteFile
 #  define OSGetFileSize 		LinuxGetFileSize
+#  define OSGetDefaultFontPath	LinuxGetDefaultFontPath
 #  define OSCloseFile   		close
 #  define STDIN 				0
 #  define STDOUT 				1

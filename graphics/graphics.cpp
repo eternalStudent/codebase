@@ -26,8 +26,8 @@
 #define GfxSwapBuffers				OSOpenGLSwapBuffers
 
 
-TextureId GfxLoadTexture(Arena* arena, const char* filePath, Filter filter) {
-	Image image = LoadImage(arena, filePath);
+TextureId GfxLoadTexture(Arena* arena, const char* filePath, int32 format, Filter filter) {
+	Image image = LoadImage(arena, filePath, format);
 	return GfxGenerateTexture(image, filter);
 }
 
