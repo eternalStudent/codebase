@@ -3,8 +3,11 @@ int LinuxOpenFile(const char* filePath) {
         filePath, 
         O_RDWR
     ); 
-    if (fd == -1) {
-        LOG("failed to open file");
+    if (fd == -1 && errno == EACCES) {
+        fd = open(filePath, O_RDONLY); 
+        if (fd == -1) {
+            LOG("failed to open file");
+        }
     }
     return fd;
 }

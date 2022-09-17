@@ -15,6 +15,8 @@
 #if defined(__gnu_linux__)
 #  include <fcntl.h>
 #  include <sys/stat.h>
+#  include <errno.h>
+#  include <limits.h>
 #  include "linuxio.cpp"
 #  define File          		int
 #  define FILE_ERROR 			-1

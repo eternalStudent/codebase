@@ -12,6 +12,7 @@ struct {
 	Atom WM_DELETE_WINDOW;
 	Atom CLIPBOARD;
 	Atom TARGETS;
+	Atom NET_WM_ICON;
 
 	Window root;
 	Cursor cursors[7];
@@ -64,6 +65,7 @@ void _internalCreateWindow(Window root, const char* title, int width, int height
 	window.WM_DELETE_WINDOW = XInternAtom(window.display , "WM_DELETE_WINDOW", False);
 	window.CLIPBOARD = XInternAtom(window.display , "CLIPBOARD", False);
 	window.TARGETS = XInternAtom(window.display , "TARGETS", False);
+	window.NET_WM_ICON = XInternAtom(window.display, "_NET_WM_ICON", False);
 	XSetWMProtocols(window.display, window.window, &window.WM_DELETE_WINDOW, 1);
 
 	// show the window
@@ -307,6 +309,30 @@ void LinuxProcessWindowEvents() {
 	}
 }
 
+
+void LinuxSetWindowIcon(Image image) {
+	int longCount = 2 + image.width * image.height;
+	byte* icon = (byte*)LinuxHeapAllocate(longCount * sizeof(unsigned long));
+	unsigned long* target = (unsigned long*)icon;
+	*target++ = image.width;
+	*target++ = image.height;
+	for (int x = image.width;  x >= 0;  x--) for (int y = 0;  y < image.height;  y++) {
+		*target++ = (((unsigned long) image.data[(x*image.height + y) * 4 + 0]) << 16) |
+		(((unsigned long) image.data[(x*image.height + y) * 4 + 1]) <<  8) |
+		(((unsigned long) image.data[(x*image.height + y) * 4 + 2]) <<  0) |
+		(((unsigned long) image.data[(x*image.height + y) * 4 + 3]) << 24);
+	}
+
+	XChangeProperty(window.display, window.window,
+					window.NET_WM_ICON,
+					XA_CARDINAL, 32,
+					PropModeReplace,
+					(byte*) icon,
+					longCount);
+
+    XFlush(window.display);
+}
+
 Bool LinuxIsKeyDown(int key) {
 	if (key == 0x10) return window.shiftIsDown == 1;
 	if (key == 0x11) return window.ctrlIsDown == 1;
@@ -337,6 +363,10 @@ Bool LinuxIsMouseDoubleClicked() {
 
 Bool LinuxIsMouseTripleClicked() {
 	return window.clickCount == 3 && window.prevClickCount == 2;
+}
+
+void LinuxResetMouse(){
+	window.mouseLeftButtonIsDown = 0;
 }
 
 int32 LinuxGetMouseWheelDelta() {
@@ -385,7 +415,11 @@ int OpenPipe(const char* cmd) {
     int read_end = pipefd[0];
 	int pid = fork();
 	if (pid = -1) {
-		LOG("failed to create new process");
+		LOG("failed to create new process ");
+		byte buffer[10] = {};
+		int32 length = Uint32ToDecimal(errno, buffer);
+		buffer[length] = 10;
+		write(1, buffer, length + 1);
 		close(write_end);
 		return -1;
 	}
@@ -421,3 +455,7 @@ String LinuxPasteFromClipboard() {
 	// TODO: Call XConvertSelection
 	return {};
 }
+
+char** LinuxGetFontsPath(int* n) {
+	return XGetFontPath(window.display, n);
+} 
