@@ -64,7 +64,7 @@
 #  define OSResetMouse				Win32ResetMouse
 
 #  define OSCopyToClipboard 		Win32CopyToClipboard
-#  define OSPasteFromClipboard		Win32PasteFromClipboard
+#  define OSRequestClipboardData	Win32RequestClipboardData
 #endif
 
 #if defined(__gnu_linux__)
@@ -111,5 +111,5 @@
 #  define OSResetMouse				LinuxResetMouse
 
 #  define OSCopyToClipboard 		LinuxCopyToClipboard
-#  define OSPasteFromClipboard		LinuxPasteFromClipboard
+#  define OSRequestClipboardData	LinuxRequestClipboardData
 #endif

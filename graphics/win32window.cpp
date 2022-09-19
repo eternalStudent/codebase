@@ -447,16 +447,16 @@ BOOL Win32CopyToClipboard(String str) {
 	return TRUE;
 }
 
-String Win32PasteFromClipboard() {
+BOOL Win32RequestClipboardData(void (*callback)(String)) {
 	if (!OpenClipboard(window.handle)) {
 		LOG("failed to open clipboard");
-		return {};
+		return FALSE;
 	}
 
 	HANDLE hMem = GetClipboardData(CF_TEXT);
 	if (!hMem) {
 		LOG("failed to get clipboard data");
-		return {};
+		return FALSE;
 	}
 
 	byte* data = (byte*)GlobalLock(hMem);
@@ -468,5 +468,6 @@ String Win32PasteFromClipboard() {
 	}
 
 	CloseClipboard();
-	return {data, length};
+	callback({data, length});
+	return TRUE;
 }

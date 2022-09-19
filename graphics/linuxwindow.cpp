@@ -8,16 +8,14 @@ struct {
 		WindowHandle handle;
 		struct {Window window; Display* display;};
 	};
+
 	Atom WM_PROTOCOLS;
 	Atom WM_DELETE_WINDOW;
-	Atom CLIPBOARD;
-	Atom TARGETS;
-	Atom NET_WM_ICON;
+	Atom _NET_WM_ICON;
 
 	Window root;
 	Cursor cursors[7];
 	XIC xic;
-	Bool destroyed;
 
 	char keyPressed[256];
 	char shiftIsDown;
@@ -40,8 +38,15 @@ struct {
 
 	Point2i cursorPos;
 	Dimensions2i dim;
+	Bool destroyed;
 
+	// clipboard
+	Atom CLIPBOARD;
+	Atom TARGETS;
+	Atom UTF8_STRING;
 	String selection;
+	Atom target;
+	void (*pasteCallback)(String);
 	
 } window;
 
@@ -60,12 +65,14 @@ void _internalCreateWindow(Window root, const char* title, int width, int height
 	XSelectInput(window.display, window.window, StructureNotifyMask | ExposureMask | PointerMotionMask 
 		| ButtonPressMask | ButtonReleaseMask | KeyPressMask | KeyReleaseMask);
 
-	// subscribe to window close notification
 	window.WM_PROTOCOLS = XInternAtom(window.display, "WM_PROTOCOLS", False);
 	window.WM_DELETE_WINDOW = XInternAtom(window.display , "WM_DELETE_WINDOW", False);
 	window.CLIPBOARD = XInternAtom(window.display , "CLIPBOARD", False);
 	window.TARGETS = XInternAtom(window.display , "TARGETS", False);
-	window.NET_WM_ICON = XInternAtom(window.display, "_NET_WM_ICON", False);
+	window.UTF8_STRING = XInternAtom(window.display, "UTF8_STRING", False);
+
+	window._NET_WM_ICON = XInternAtom(window.display, "_NET_WM_ICON", False);
+
 	XSetWMProtocols(window.display, window.window, &window.WM_DELETE_WINDOW, 1);
 
 	// show the window
@@ -105,15 +112,15 @@ void LinuxEnterFullScreen() {
 	Atom wm_fullscreen = XInternAtom(window.display, "_NET_WM_STATE_FULLSCREEN", True);
 
 	XEvent event = {};
-    event.type = ClientMessage;
-    event.xclient.window = window.window;
-    event.xclient.message_type = wm_state;
-    //event.xclient.send_event = True; ???
-    event.xclient.format = 32;
-    event.xclient.data.l[0] = 1;
-    event.xclient.data.l[1] = wm_fullscreen;
-    event.xclient.data.l[2] = 0;
-    XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
+	event.type = ClientMessage;
+	event.xclient.window = window.window;
+	event.xclient.message_type = wm_state;
+	//event.xclient.send_event = True; ???
+	event.xclient.format = 32;
+	event.xclient.data.l[0] = 1;
+	event.xclient.data.l[1] = wm_fullscreen;
+	event.xclient.data.l[2] = 0;
+	XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
 }
 
 void LinuxExitFullScreen() {
@@ -121,15 +128,15 @@ void LinuxExitFullScreen() {
 	Atom wm_fullscreen = XInternAtom(window.display, "_NET_WM_STATE_FULLSCREEN", True);
 
 	XEvent event = {};
-    event.type = ClientMessage;
-    event.xclient.window = window.window;
-    event.xclient.message_type = wm_state;
-    //event.xclient.send_event = True; ???
-    event.xclient.format = 32;
-    event.xclient.data.l[0] = 0;
-    event.xclient.data.l[1] = wm_fullscreen;
-    event.xclient.data.l[2] = 0;
-    XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
+	event.type = ClientMessage;
+	event.xclient.window = window.window;
+	event.xclient.message_type = wm_state;
+	//event.xclient.send_event = True; ???
+	event.xclient.format = 32;
+	event.xclient.data.l[0] = 0;
+	event.xclient.data.l[1] = wm_fullscreen;
+	event.xclient.data.l[2] = 0;
+	XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
 }
 
 void LinuxCreateWindowFullScreen(const char* title) {
@@ -165,75 +172,75 @@ void LinuxProcessWindowEvents() {
 		XNextEvent(window.display, &event);
 		switch (event.type) {
 			case ClientMessage: {
-				if (event.xclient.message_type == window.WM_PROTOCOLS) {
-					Atom protocol = event.xclient.data.l[0];
+				XClientMessageEvent client = event.xclient;
+				if (client.message_type == window.WM_PROTOCOLS) {
+					Atom protocol = client.data.l[0];
 					if (protocol == window.WM_DELETE_WINDOW) {
 						window.destroyed = True;
 					}
-			 	}
+				}
 			} break;
 			case DestroyNotify: {
-                if ((window.display == event.xdestroywindow.display) &&
-                    (window.window == event.xdestroywindow.window)) {
-                    window.destroyed = True;
-                }
-            } break;
-            case ButtonPress: {
-            	window.cursorPos = {event.xbutton.x, event.xbutton.y};
-            	if (event.xbutton.button == Button1) {
-            		window.mouseLeftButtonIsDown = 1;
+				XDestroyWindowEvent destroywindow = event.xdestroywindow;
+				if ((window.display == destroywindow.display) && (window.window == destroywindow.window)) {
+					window.destroyed = True;
+				}
+			} break;
+			case ButtonPress: {
+				XButtonEvent button = event.xbutton;
+				window.cursorPos = {button.x, button.y};
+				if (button.button == Button1) {
+					window.mouseLeftButtonIsDown = 1;
 
-  					Time time = event.xbutton.time;
+					Time time = button.time;
 
-  					int32 dx = ABS(window.cursorPos.x - window.lastClickPoint.x);
-  					int32 dy = ABS(window.cursorPos.y - window.lastClickPoint.y);
-  					if (dx > 4 || dy > 4 || time - window.timeLastClicked > 500) {
-  						window.clickCount = 0;
-  					}
-  					window.clickCount++;
+					int32 dx = ABS(window.cursorPos.x - window.lastClickPoint.x);
+					int32 dy = ABS(window.cursorPos.y - window.lastClickPoint.y);
+					if (dx > 4 || dy > 4 || time - window.timeLastClicked > 500) {
+						window.clickCount = 0;
+					}
+					window.clickCount++;
 
-  					window.timeLastClicked = time;
-  					window.lastClickPoint = window.cursorPos;
-            	}
-            	//else if (event.xbutton.button == Button2) {
-            	//	window.mouse[1] = 1;
-            	//}
-            	else if (event.xbutton.button == Button3) {
-            		window.mouseRightButtonIsDown = 1;
-            		window.clickCount = 0;
-            	}
-            	else if (event.xbutton.button == Button4) {
-            		window.mouseWheelDelta = 72;
-            	}
-            	else if (event.xbutton.button == Button5) {
-            		window.mouseWheelDelta = -72;
-            	}
-            	else if (event.xbutton.button == Button6) {
-            		window.mouseHWheelDelta = -72;
-            	}
-            	else if (event.xbutton.button == Button7) {
-            		window.mouseHWheelDelta = 72;
-            	}
-            } break;
-            case ButtonRelease: {
-            	window.cursorPos = {event.xbutton.x, event.xbutton.y};
-            	if (event.xbutton.button == Button1) {
-            		window.mouseLeftButtonIsDown = 0;
-            	}
-            	//else if (event.xbutton.button == Button2) {
-            	//	window.mouse[1] = 0;
-            	//}
-            	else if (event.xbutton.button == Button3) {
-            		window.mouseRightButtonIsDown = 0;
-            	} 
-            } break;
-            case MotionNotify: {
-            	window.cursorPos = {event.xmotion.x, event.xmotion.y};
-            } break;
-            case ConfigureNotify: {
-            	window.dim = {event.xconfigure.width, event.xconfigure.height};
-            } break;
-            case KeyPress: {
+					window.timeLastClicked = time;
+					window.lastClickPoint = window.cursorPos;
+				}
+				//else if (button.button == Button2) {
+				//	window.mouse[1] = 1;
+				//}
+				else if (event.xbutton.button == Button3) {
+					window.mouseRightButtonIsDown = 1;
+					window.clickCount = 0;
+				}
+				else if (event.xbutton.button == Button4) {
+					window.mouseWheelDelta = 72;
+				}
+				else if (event.xbutton.button == Button5) {
+					window.mouseWheelDelta = -72;
+				}
+				else if (event.xbutton.button == Button6) {
+					window.mouseHWheelDelta = -72;
+				}
+				else if (event.xbutton.button == Button7) {
+					window.mouseHWheelDelta = 72;
+				}
+			} break;
+			case ButtonRelease: {
+				XButtonEvent button = event.xbutton;
+				window.cursorPos = {button.x, button.y};
+				if (button.button == Button1) {
+					window.mouseLeftButtonIsDown = 0;
+				}
+				else if (button.button == Button3) {
+					window.mouseRightButtonIsDown = 0;
+				} 
+			} break;
+			case MotionNotify: {
+				window.cursorPos = {event.xmotion.x, event.xmotion.y};
+			} break;
+			case ConfigureNotify: {
+				window.dim = {event.xconfigure.width, event.xconfigure.height};
+			} break;
+			case KeyPress: {
 				KeySym symbol = NoSymbol;
 				Status status;
 				char typed[4];
@@ -264,30 +271,61 @@ void LinuxProcessWindowEvents() {
 				else if (symbol == XK_V || symbol == XK_v) {window.keyPressed[KEY_V]= 1;}
 				else if (symbol == XK_X || symbol == XK_X) {window.keyPressed[KEY_X]= 1;}
 				else window.keyPressed[symbol & 0xff] = 1;
-            } break;
-            case KeyRelease: {
-            	KeySym symbol = XkbKeycodeToKeysym(window.display, event.xkey.keycode, 0, 0);
+			} break;
+			case KeyRelease: {
+				KeySym symbol = XkbKeycodeToKeysym(window.display, event.xkey.keycode, 0, 0);
 				if (symbol == XK_Control_L || symbol == XK_Control_R) {
 					window.ctrlIsDown = 0;
 				} 
 				else if (symbol == XK_Shift_L || symbol == XK_Shift_R) {
 					window.shiftIsDown = 0;
 				}
-            } break;
-            case SelectionNotify: {
-				// TODO: this is the paste code. Call XGetWindowProperty.
-            } break;
-            case SelectionRequest: {
-            	if ((XGetSelectionOwner(window.display, window.CLIPBOARD) == window.window) && event.xselectionrequest.selection == window.CLIPBOARD) {
-					XSelectionRequestEvent requestEvent = event.xselectionrequest;
-					Atom UTF8_STRING = XInternAtom(window.display, "UTF8_STRING", 1);
-					if (UTF8_STRING == None) UTF8_STRING = XA_STRING;
+			} break;
+			case SelectionNotify: {
+				XSelectionEvent selection = event.xselection;
+				if (selection.property != None) {
+					Atom actualType;
+					int actualFormat;
+					unsigned long bytesAfter;
+					unsigned char* data;
+					unsigned long count;
+					XGetWindowProperty(window.display, window.window, window.CLIPBOARD, 0, LONG_MAX, False, AnyPropertyType,
+						&actualType, &actualFormat, &count, &bytesAfter, &data);
+					
+					if (selection.target == window.TARGETS) {
+						Atom* list = (Atom*)data;
+						window.target = None;
+						for (unsigned long i = 0; i < count; i++) {
+							if (list[i] == XA_STRING) {
+								window.target = XA_STRING;
+							}
+							else if (list[i] == window.UTF8_STRING) {
+								window.target = window.UTF8_STRING;
+								break;
+							}
+						}
+						if (window.target != None)
+							XConvertSelection(window.display, window.CLIPBOARD, window.target, window.CLIPBOARD, window.window, CurrentTime);
+					}
 
-					if (requestEvent.target == window.TARGETS) {
+					if (selection.target == window.target) {
+						String pasted = {data, (ssize)count};
+						window.pasteCallback(pasted);
+					}
+
+					if (data) XFree(data);
+				}
+			} break;
+			case SelectionRequest: {
+				if ((XGetSelectionOwner(window.display, window.CLIPBOARD) == window.window) && event.xselectionrequest.selection == window.CLIPBOARD) {
+					XSelectionRequestEvent requestEvent = event.xselectionrequest;
+					if (requestEvent.target == window.TARGETS && requestEvent.property != None) {
+						// We are asked for a targets list and we reply with a list of length 1, only UTF8_STRING.
 						XChangeProperty(requestEvent.display, requestEvent.requestor, requestEvent.property, 
-						XA_ATOM, 32, PropModeReplace, (unsigned char*)&UTF8_STRING, 1);
+						XA_ATOM, 32, PropModeReplace, (unsigned char*)&window.UTF8_STRING, 1);
 					}
 					else {
+						// The target was chosen, and now we deliver the selection
 						XChangeProperty(requestEvent.display, requestEvent.requestor, requestEvent.property, 
 							requestEvent.target, 8, PropModeReplace, window.selection.data, window.selection.length);
 					}
@@ -324,13 +362,13 @@ void LinuxSetWindowIcon(Image image) {
 	}
 
 	XChangeProperty(window.display, window.window,
-					window.NET_WM_ICON,
+					window._NET_WM_ICON,
 					XA_CARDINAL, 32,
 					PropModeReplace,
 					(byte*) icon,
 					longCount);
 
-    XFlush(window.display);
+	XFlush(window.display);
 }
 
 Bool LinuxIsKeyDown(int key) {
@@ -412,23 +450,19 @@ int OpenPipe(const char* cmd) {
 	int pipefd[2];
 	pipe(pipefd);
 	int write_end = pipefd[1];
-    int read_end = pipefd[0];
+	int read_end = pipefd[0];
 	int pid = fork();
 	if (pid = -1) {
-		LOG("failed to create new process ");
-		byte buffer[10] = {};
-		int32 length = Uint32ToDecimal(errno, buffer);
-		buffer[length] = 10;
-		write(1, buffer, length + 1);
+		LOG("failed to create new process");
 		close(write_end);
 		return -1;
 	}
 	else if (pid == 0) {
 		close(read_end);
 		dup2(write_end, 1);
-        close(write_end);
-        execl("/bin/sh", "sh", "-c", cmd, NULL);
-        exit(127);
+		close(write_end);
+		execl("/bin/sh", "sh", "-c", cmd, NULL);
+		exit(127);
 	}
 
 	close(write_end);
@@ -451,9 +485,9 @@ void LinuxCopyToClipboard(String str) {
 	XSetSelectionOwner(window.display, window.CLIPBOARD, window.window, CurrentTime);
 }
 
-String LinuxPasteFromClipboard() {
-	// TODO: Call XConvertSelection
-	return {};
+void LinuxRequestClipboardData(void (*callback)(String)) {
+	window.pasteCallback = callback;
+	XConvertSelection(window.display, window.CLIPBOARD, window.TARGETS, window.CLIPBOARD, window.window, CurrentTime);
 }
 
 char** LinuxGetFontsPath(int* n) {

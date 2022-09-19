@@ -1209,8 +1209,7 @@ UIElement* UIUpdateActiveElement() {
 
 	// Handle paste
 	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_V) && ui.selected) {
-		String pasted = OSPasteFromClipboard();
-		InsertText(pasted);
+		OSRequestClipboardData(InsertText);
 	}
 
 	// Handle cut
