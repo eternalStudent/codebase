@@ -45,7 +45,7 @@ off_t LinuxGetFileSize(int fd) {
     return st.st_size;
 }
 
-char* LinuxGetDefaultFontPath() {
+char* LinuxGetDefaultFontPath(void* unused) {
     FcPattern* pattern = FcNameParse((const FcChar8*)"monospace");
     FcBool success = FcConfigSubstitute(0,pattern,FcMatchPattern);
     if (!success) {

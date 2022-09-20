@@ -21,7 +21,8 @@ Font LoadFont(Arena* arena, const char* filePath, float32 height){
 }
 
 Font LoadDefaultFont(Arena* arena, float32 height) {
-	return LoadFont(arena, OSGetDefaultFontPath(), height);
+	char buffer[260] = {}; 
+	return LoadFont(arena, OSGetDefaultFontPath(buffer), height);
 }
 
 // NOTE: adopted from stbtt_GetBakedQuad
