@@ -388,6 +388,14 @@ Bool LinuxIsMouseLeftButtonDown() {
 	return window.mouseLeftButtonIsDown == 1 && window.clickCount == 1;
 }
 
+Bool LinuxIsMouseLeftButtonUp() {
+	return window.mouseLeftButtonIsDown == 0;
+}
+
+Bool LinuxIsMouseLeftReleased() {
+	return window.mouseLeftButtonIsDown == 0 && window.mouseLeftButtonWasDown == 1;
+}
+
 Bool LinuxIsMouseLeftClicked() {
 	return window.clickCount == 1 && window.mouseLeftButtonIsDown == 1 && window.mouseLeftButtonWasDown == 0;
 }
@@ -418,6 +426,10 @@ int32 LinuxGetMouseHWheelDelta() {
 
 String LinuxGetTypedText() {
 	return {(byte*)window.typed, (ssize)window.strlength};
+}
+
+void LinuxResetTypedText() {
+	window.strlength = 0;
 }
 
 Bool LinuxWindowDestroyed() {
