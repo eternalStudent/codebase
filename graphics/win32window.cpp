@@ -371,8 +371,8 @@ void Win32SetCursorIcon(int32 icon) {
 }
 
 HANDLE Win32OpenFileDialog() {
-	CHAR path[MAX_PATH];
-	OPENFILENAME dialog = {};
+	WCHAR path[MAX_PATH];
+	OPENFILENAMEW dialog = {};
 	dialog.lStructSize = sizeof(OPENFILENAME);
 	path[0] = 0;
 	dialog.lpstrFile = path;
@@ -380,7 +380,7 @@ HANDLE Win32OpenFileDialog() {
 	dialog.hwndOwner = window.handle;
 	dialog.Flags = OFN_FILEMUSTEXIST;
 	dialog.Flags |= OFN_NOCHANGEDIR;
-	BOOL success = GetOpenFileName(&dialog);
+	BOOL success = GetOpenFileNameW(&dialog);
 	if (!success) {
 		LOG("failed to get save file name");
 		return INVALID_HANDLE_VALUE ;
@@ -389,8 +389,8 @@ HANDLE Win32OpenFileDialog() {
 }
 
 HANDLE Win32SaveFileDialog() {
-	CHAR path[MAX_PATH];
-	OPENFILENAME dialog = {};
+	WCHAR path[MAX_PATH];
+	OPENFILENAMEW dialog = {};
 	dialog.lStructSize = sizeof(OPENFILENAME);
 	path[0] = 0;
 	dialog.lpstrFile = path;
@@ -398,7 +398,7 @@ HANDLE Win32SaveFileDialog() {
 	dialog.hwndOwner = window.handle;
 	dialog.Flags = OFN_OVERWRITEPROMPT;
 	dialog.Flags |= OFN_NOCHANGEDIR;
-	BOOL success = GetSaveFileName(&dialog);
+	BOOL success = GetSaveFileNameW(&dialog);
 	if (!success) {
 		LOG("failed to get save file name");
 		return INVALID_HANDLE_VALUE ;

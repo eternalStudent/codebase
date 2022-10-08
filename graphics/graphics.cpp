@@ -25,14 +25,8 @@
 #define GfxSetColor 				OpenGLSetColor
 #define GfxSwapBuffers				OSOpenGLSwapBuffers
 
-
-TextureId GfxLoadTexture(Arena* arena, const char* filePath, int32 format, Filter filter) {
-	Image image = LoadImage(arena, filePath, format);
-	return GfxGenerateTexture(image, filter);
-}
-
-TextureId GfxLoadTexture(Arena* arena, byte* data, Filter filter) {
-	Image image = BMPLoadImage(arena, data);
+TextureId GfxLoadTexture(Arena* arena, byte* data, int32 format, Filter filter) {
+	Image image = LoadImage(arena, data, format);
 	return GfxGenerateTexture(image, filter);
 }
 

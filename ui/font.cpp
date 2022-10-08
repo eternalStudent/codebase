@@ -15,8 +15,7 @@ struct Font {
 
 #include "truetype.cpp"
 
-Font LoadFont(Arena* arena, const char* filePath, float32 height){
-	byte* data = OSReadAll(filePath, arena).data;
+Font LoadFont(Arena* arena, byte* data, float32 height){
 	return TTLoadFont(arena, data, height);
 }
 

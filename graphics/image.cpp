@@ -15,8 +15,7 @@ struct Image {
 #endif
 #define IMAGE_PNG		3
 
-Image LoadImage(Arena* arena, const char* filepath, uint32 format) {
-	byte* data = OSReadAll(filepath, arena).data;
+Image LoadImage(Arena* arena, byte* data, uint32 format) {
 	if (format == IMAGE_BITMAP)
 		return BMPLoadImage(arena, data);
 	if (format == IMAGE_PNG)

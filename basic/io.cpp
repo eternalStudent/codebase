@@ -77,13 +77,6 @@ String OSReadAll(File file, Arena* arena) {
 	return {buffer, (ssize)size};
 }
 
-String OSReadAll(const char* path, Arena* arena) {
-	File file = OSOpenFile(path);
-	String all = OSReadAll(file, arena);
-	OSCloseFile(file);
-	return all;
-}
-
 bool OSWriteAll(File file, byte* buffer, int64 length) {
 	if (file == FILE_ERROR)
 		return false;

@@ -1,5 +1,5 @@
-HANDLE Win32OpenFile(LPCTSTR filePath) {
-	HANDLE hFile = CreateFile(
+HANDLE Win32OpenFile(LPCWSTR filePath) {
+	HANDLE hFile = CreateFileW(
 		filePath, 
 		GENERIC_READ, 
 		FILE_SHARE_READ,
@@ -14,8 +14,8 @@ HANDLE Win32OpenFile(LPCTSTR filePath) {
 	return hFile;
 }
 
-HANDLE Win32CreateFile(LPCTSTR filePath) {
-	HANDLE hFile = CreateFile(
+HANDLE Win32CreateFile(LPCWSTR filePath) {
+	HANDLE hFile = CreateFileW(
 		filePath, 
 		GENERIC_WRITE, 
 		0,    // sharing mode
@@ -53,8 +53,8 @@ LONGLONG Win32GetFileSize(HANDLE hFile) {
 }
 
 HANDLE Win32GetDefaultFontFile() {
-	TCHAR filePath[MAX_PATH];
-	LPTSTR ptr = filePath + GetEnvironmentVariable("windir", (LPTSTR)filePath, MAX_PATH);
-	COPY("\\Fonts\\consola.ttf", ptr);
+	WCHAR filePath[MAX_PATH];
+	LPWSTR ptr = filePath + GetEnvironmentVariableW(L"windir", (LPWSTR)filePath, MAX_PATH);
+	COPY(L"\\Fonts\\consola.ttf", ptr);
 	return Win32OpenFile(filePath);
 }
