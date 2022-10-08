@@ -167,7 +167,7 @@ void LinuxProcessWindowEvents() {
 	window.mouseHWheelDelta = 0;
 	window.strlength = 0;
 
-	if (XPending(window.display)) {
+	while (XPending(window.display)) {
 		XEvent event;
 		XNextEvent(window.display, &event);
 		switch (event.type) {
@@ -255,6 +255,7 @@ void LinuxProcessWindowEvents() {
 				else if (symbol == XK_Shift_L || symbol == XK_Shift_R) {window.shiftIsDown = 1;}
 				else if (symbol == XK_BackSpace ) {window.keyPressed[KEY_BACKSPACE] = 1;}
 				else if (symbol == XK_Tab       ) {window.keyPressed[KEY_TAB]       = 1;}
+				else if (symbol == XK_Return    ) {window.keyPressed[KEY_ENTER]     = 1;}
 				else if (symbol == XK_Escape    ) {window.keyPressed[KEY_ESC]       = 1;}
 				else if (symbol == XK_space     ) {window.keyPressed[KEY_SPACE]     = 1;}
 				else if (symbol == XK_Page_Up   ) {window.keyPressed[KEY_PGUP]      = 1;}
@@ -308,7 +309,7 @@ void LinuxProcessWindowEvents() {
 							XConvertSelection(window.display, window.CLIPBOARD, window.target, window.CLIPBOARD, window.window, CurrentTime);
 					}
 
-					if (selection.target == window.target) {
+					else if (selection.target == window.target) {
 						String pasted = {data, (ssize)count};
 						window.pasteCallback(pasted);
 					}
@@ -318,29 +319,29 @@ void LinuxProcessWindowEvents() {
 			} break;
 			case SelectionRequest: {
 				if ((XGetSelectionOwner(window.display, window.CLIPBOARD) == window.window) && event.xselectionrequest.selection == window.CLIPBOARD) {
-					XSelectionRequestEvent requestEvent = event.xselectionrequest;
-					if (requestEvent.target == window.TARGETS && requestEvent.property != None) {
+					XSelectionRequestEvent request = event.xselectionrequest;
+					if (request.target == window.TARGETS && request.property != None) {
 						// We are asked for a targets list and we reply with a list of length 1, only UTF8_STRING.
-						XChangeProperty(requestEvent.display, requestEvent.requestor, requestEvent.property, 
+						XChangeProperty(request.display, request.requestor, request.property, 
 						XA_ATOM, 32, PropModeReplace, (unsigned char*)&window.UTF8_STRING, 1);
 					}
-					else {
+					else if (request.target == window.UTF8_STRING && request.property != None) {
 						// The target was chosen, and now we deliver the selection
-						XChangeProperty(requestEvent.display, requestEvent.requestor, requestEvent.property, 
-							requestEvent.target, 8, PropModeReplace, window.selection.data, window.selection.length);
+						XChangeProperty(request.display, request.requestor, request.property, 
+							request.target, 8, PropModeReplace, window.selection.data, window.selection.length);
 					}
 
 					XSelectionEvent sendEvent;
 					sendEvent.type = SelectionNotify;
-					sendEvent.serial = requestEvent.serial;
-					sendEvent.send_event = requestEvent.send_event;
-					sendEvent.display = requestEvent.display;
-					sendEvent.requestor = requestEvent.requestor;
-					sendEvent.selection = requestEvent.selection;
-					sendEvent.target = requestEvent.target;
-					sendEvent.property = requestEvent.property;
-					sendEvent.time = requestEvent.time;
-					XSendEvent(window.display, requestEvent.requestor, 0, 0, (XEvent *) &sendEvent);
+					sendEvent.serial = request.serial;
+					sendEvent.send_event = request.send_event;
+					sendEvent.display = request.display;
+					sendEvent.requestor = request.requestor;
+					sendEvent.selection = request.selection;
+					sendEvent.target = request.target;
+					sendEvent.property = request.property;
+					sendEvent.time = request.time;
+					XSendEvent(window.display, request.requestor, 0, 0, (XEvent*)&sendEvent);
 				}
 			} break;
 		}
