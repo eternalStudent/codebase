@@ -8,7 +8,7 @@
 #  define OSWriteFile			Win32WriteFile
 #  define OSGetFileSize 		Win32GetFileSize
 #  define OSCloseFile   		CloseHandle
-#  define OSGetDefaultFontPath	Win32GetDefaultFontPath
+#  define OSGetDefaultFontFile	Win32GetDefaultFontFile
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)
 #  define STDOUT 				GetStdHandle(STD_OUTPUT_HANDLE)
 #endif
@@ -27,7 +27,7 @@
 #  define OSReadFile    		LinuxReadFile
 #  define OSWriteFile			LinuxWriteFile
 #  define OSGetFileSize 		LinuxGetFileSize
-#  define OSGetDefaultFontPath	LinuxGetDefaultFontPath
+#  define OSGetDefaultFontFile	LinuxGetDefaultFontFile
 #  define OSCloseFile   		close
 #  define STDIN 				0
 #  define STDOUT 				1
