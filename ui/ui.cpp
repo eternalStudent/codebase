@@ -514,6 +514,10 @@ StringNode* CreateStringNode() {
 	return result;
 }
 
+void DestroyStringNode(StringNode* node) {
+	FixedSizeFree(&ui.stringNodeAllocator, node);
+}
+
 void UpdateTextScrollPos() {
 	if (!(ui.selected->flags & UI_SCROLLABLE)) return;
 	UIText text = ui.selected->text;
@@ -837,6 +841,14 @@ UIElement* UICreateElement(UIElement* parent) {
 	return element;
 }
 
+void UIAddLocalElement(UIElement* element, UIElement* parent) {
+	ASSERT(element != NULL);
+
+	if (parent == NULL) parent = ui.windowElement;
+	LINKEDLIST_ADD(parent, element);
+	element->parent = parent;
+}
+
 StringList UICreateEditableText(String string) {
 	StringNode* node = CreateStringNode();
 	StringCopy(string, ui.buffer.current);
@@ -845,14 +857,27 @@ StringList UICreateEditableText(String string) {
 	return {node, node, string.length};
 }
 
+void UIDestroyEditableText(StringList list) {
+	LINKEDLIST_FOREACH(&list, StringNode, child) DestroyStringNode(child);
+}
+
 void UIDestroyElement(UIElement* element) {
 	if (ui.active == element) ui.active = NULL;
 	if (ui.selected == element) ui.selected = NULL;
 
+	UIDestroyEditableText(element->text.editable);
 	LINKEDLIST_REMOVE(element->parent, element);
 	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
 
 	FixedSizeFree(&ui.allocator, element);
+}
+
+void UIRemoveLocalElement(UIElement* element) {
+	if (ui.active == element) ui.active = NULL;
+	if (ui.selected == element) ui.selected = NULL;
+
+	LINKEDLIST_REMOVE(element->parent, element);
+	LINKEDLIST_FOREACH(element, UIElement, child) UIRemoveLocalElement(child);
 }
 
 UIElement* UIUpdateActiveElement() {
