@@ -53,7 +53,7 @@ LONGLONG Win32GetFileSize(HANDLE hFile) {
 }
 
 HANDLE Win32GetDefaultFontFile() {
-	WCHAR filePath[MAX_PATH];
+	WCHAR filePath[MAX_PATH] = {};
 	LPWSTR ptr = filePath + GetEnvironmentVariableW(L"windir", (LPWSTR)filePath, MAX_PATH);
 	COPY(L"\\Fonts\\consola.ttf", ptr);
 	return Win32OpenFile(filePath);
