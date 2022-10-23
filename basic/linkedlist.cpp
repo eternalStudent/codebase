@@ -25,3 +25,12 @@
 											(list1)->last=(list2)->last;}}while(0)
 
 #define LINKEDLIST_FOREACH(list, t, n)		for(t* n = (list)->first; n != NULL; n = n->next)
+
+#define LINKEDLIST_MOVETOLAST(list, n)		do{if ((n)->next){\
+											if ((n)->prev) (n)->prev->next = (n)->next;\
+											else (list)->first = (n)->next;\
+											(n)->next->prev = (n)->prev;\
+											(list)->last->next = (n);\
+											(n)->prev = (list)->last;\
+											(n)->next = NULL;\
+											(list)->last = (n);}}while(0)

@@ -24,6 +24,9 @@
 #define KEY_DELETE				0x2E
 #define KEY_A 					0x41
 #define KEY_C 					0x43
+#define KEY_N 					0x4E
+#define KEY_O 					0x4F
+#define KEY_S 					0x53
 #define KEY_V 					0x56
 #define KEY_X 					0x58
 
