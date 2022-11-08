@@ -21,8 +21,8 @@ struct MessageQueue {
 struct {
 	IAudioClient3* audioClient;
 	MessageQueue queue;
-	struct {BYTE* data; UINT32 length;} music;
-	struct {uint16* data; UINT32 length;} sound;
+	struct {int16* data; UINT32 length;} music;
+	struct {int16* data; UINT32 length;} sound;
 } audio;
 
 void AudioEnqueueMessage(AudioMessage message) {
@@ -43,7 +43,7 @@ void Win32AudioPlayMusic(PCM* pcm) {
 	AudioMessage message;
 	message.type = 1;
 	message.ptr = &pcm->samples;
-	message.num = pcm->size;
+	message.num = pcm->size / 2;
 	AudioEnqueueMessage(message);
 }
 
@@ -51,7 +51,7 @@ void Win32AudioPlaySound(PCM* pcm) {
 	AudioMessage message;
 	message.type = 2;
 	message.ptr = &pcm->samples;
-	message.num = pcm->size;
+	message.num = pcm->size / 2;
 	AudioEnqueueMessage(message);
 }
 
@@ -79,12 +79,12 @@ DWORD AudioThread(LPVOID arg) {
 		AudioMessage message;
 		while (AudioDequeueMessage(&message)) {
 			if (message.type == 1) {
-				audio.music.data = (BYTE*)message.ptr;
+				audio.music.data = (int16*)message.ptr;
 				audio.music.length = message.num;
 			}
 			if (message.type == 2) {
-				audio.sound.data = (uint16*)message.ptr;
-				audio.sound.length = message.num / 2;
+				audio.sound.data = (int16*)message.ptr;
+				audio.sound.length = message.num;
 			}
 		}
 
@@ -92,31 +92,22 @@ DWORD AudioThread(LPVOID arg) {
 		audio.audioClient->GetCurrentPadding(&bufferPadding);
 
 		UINT32 frameCount = numBufferFrames - bufferPadding;
-		BYTE* writeBuffer;
-		hr = audioRenderClient->GetBuffer(frameCount, &writeBuffer);
+		int16* writeBuffer;
+		hr = audioRenderClient->GetBuffer(frameCount, (BYTE**)&writeBuffer);
 		ASSERT(SUCCEEDED(hr));
-		DWORD numOfSamples = frameCount * 2;
-		DWORD bufferSize = numOfSamples * sizeof(uint16);
-		{
-			DWORD bytesToRead = MIN(audio.music.length, bufferSize);
-			if (bytesToRead) {
-				memcpy(writeBuffer, audio.music.data, bytesToRead);
-			}
-			if (bytesToRead < bufferSize) {
-				memset(writeBuffer + bytesToRead, 0, bufferSize - bytesToRead);
-			}
-			audio.music.data += bytesToRead;
-			audio.music.length -= bytesToRead;
+
+		for (UINT32 i = 0; i < frameCount*2; i++) {
+			int16 music = i < audio.music.length ? audio.music.data[i] : 0; 
+			int16 sound = i < audio.sound.length ? audio.sound.data[i] : 0; 
+			writeBuffer[i] = music + sound;
 		}
-		if (audio.sound.length) {
-			DWORD samplesToRead = MIN(audio.sound.length, numOfSamples);
-			uint16* samples = (uint16*)writeBuffer;
-			for (uint32 i = 0; i < samplesToRead; i++) {
-				samples[i] += audio.sound.data[i];
-			}
-			audio.sound.data += samplesToRead;
-			audio.sound.length -= samplesToRead;
-		}
+		uint32 musicLength = MIN(frameCount*2, audio.music.length);
+		audio.music.data += musicLength;
+		audio.music.length -= musicLength;
+
+		uint32 soundLength = MIN(frameCount*2, audio.sound.length);
+		audio.sound.data += soundLength;
+		audio.sound.length -= soundLength;
 
 		audioRenderClient->ReleaseBuffer(frameCount, 0); // releases the previous buffer space
 	}
