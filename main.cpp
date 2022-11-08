@@ -1,81 +1,64 @@
+#define LOG(text)	WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), text, sizeof(text)-1, NULL, NULL)
+
 #include "basic/basic.cpp"
 #include "graphics/graphics.cpp"
 #include "ui/ui.cpp"
+#include "audio/audio.cpp"
+
+void Play(UIElement* e) {
+	Win32AudioPlaySound((PCM*)e->context.p);
+}
 
 int main() {
 	Arena scratch = CreateArena(1024*1024*1024);
-	Arena persist = CreateArena(1024*1024);
+	Arena persist = CreateArena(1024*1024*1024);
 
 	UIInit(&persist, &scratch);
-	UICreateWindow("OpenGL Window", {512, 768}, RGBA_DARKGREY);
+	UICreateWindow("blah blah blah", {512, 768}, RGBA_DARKGREY);
+	Win32AudioInit();
 
-	Font* font = (Font*)ArenaAlloc(&persist, sizeof(Font));
-	*font = LoadDefaultFont(&scratch, 24);
+	File file1 = Win32OpenFile(L"..\\wasapi\\data\\Nitemare.wav");
+	byte* data1 = OSReadAll(file1, &scratch).data;
+	ASSERT(data1);
+	PCM* wav1 = WAVLoadAudio(&persist, data1);
 
-	Font* smallf = (Font*)ArenaAlloc(&persist, sizeof(Font));
-	*smallf = LoadDefaultFont(&scratch, 18);
+	UIElement* button1 = UICreateElement(NULL);
+	button1->dim = {120, 60};
+	button1->pos = {30, 30};
+	button1->onClick = Play;
+	button1->flags = UI_CLICKABLE;
+	button1->background = RGBA_ORANGE;
+	button1->context.p = wav1;
 
-	UIElement* e1 = UICreateScrollingPane(NULL, {200, 200}, {12, 12});
-	e1->flags |= UI_EDITABLE;
-	e1->borderWidth = 1;
-	e1->borderColor = RGBA_WHITE;
-	e1->text.font = font;
-	e1->text.color = RGBA_WHITE;
-	e1->text.editable = UICreateEditableText(STR(R"STRING(Lorem ipsum dolor sit amet, 
-consectetur adipiscing elit, 
-sed do eiusmod tempor incididunt 
-ut labore et dolore magna aliqua. 
-Ut enim ad minim veniam, quis nostrud 
-exercitation ullamco laboris nisi ut 
-aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit
-in voluptate velit esse cillum dolore
-eu fugiat nulla pariatur. Excepteur
-sint occaecat cupidatat non proident, 
-sunt in culpa qui officia deserunt
-mollit anim id est laborum.)STRING"));
+	File file2 = Win32OpenFile(L"..\\wasapi\\data\\blink.wav");
+	byte* data2 = OSReadAll(file2, &scratch).data;
+	ASSERT(data2);
+	PCM* wav2 = WAVLoadAudio(&persist, data2);
 
-	UIElement* dropdown = UICreateDropdown(NULL, {98, 36}, {12, 224}, {font, STR("Select"), RGBA_WHITE});
-	byte itemsbuf[] = "item 1item 2item 3item 4item 5item 6item 7";
-	for (int32 i = 0; i < 7; i++) UIAddDropdownItem(dropdown, {font, {itemsbuf+ 6*i, 6}, RGBA_WHITE});
+	UIElement* button2 = UICreateElement(NULL);
+	button2->dim = { 120, 60 };
+	button2->pos = { 180, 30 };
+	button2->onClick = Play;
+	button2->flags = UI_CLICKABLE;
+	button2->background = RGBA_ORANGE;
+	button2->context.p = wav2;
 
-	UIElement* root = UICreateTreeItem(NULL, {48, 24});
-	root->pos = {12, 300};
-	UIElement* textElement = UICreateElement(root);
-	textElement->x = 18;
-	textElement->text = {smallf, STR("root"), RGBA_WHITE};
 
-	UIElement* item1 = UICreateTreeItem(root, {48, 24});
-	textElement = UICreateElement(item1);
-	textElement->x = 18;
-	textElement->text = {smallf, STR("item 1"), RGBA_WHITE};
+	File file3 = Win32OpenFile(L"..\\wasapi\\data\\main theme1.wav");
+	byte* data3 = OSReadAll(file3, &scratch).data;
+	ASSERT(data3);
+	PCM* theme = WAVLoadAudio(&persist, data3);
+	Win32AudioPlayMusic(theme);
 
-	UIElement* item2 = UICreateTreeItem(root, {48, 24});
-	textElement = UICreateElement(item2);
-	textElement->x = 18;
-	textElement->text = {smallf, STR("item 2"), RGBA_WHITE};
+	UIElement* bloop = UICreateElement(NULL);
+	bloop->dim = { 60, 60 };
+	bloop->pos = { 120, 120 };
+	bloop->flags = UI_MOVABLE;
+	bloop->background = RGBA_BLUE;
+	
+	while(!OSWindowDestroyed()) {
+		if (OSIsKeyPressed(KEY_ESC)) break;
 
-	UIElement* apple = UICreateTreeItem(item1, {48, 24});
-	textElement = UICreateElement(apple);
-	textElement->x = 18;
-	textElement->text = {smallf, STR("apple"), RGBA_WHITE};
-
-	UIElement* orange = UICreateTreeItem(item1, {48, 24});
-	textElement = UICreateElement(orange);
-	textElement->x = 18;
-	textElement->text = {smallf, STR("orange"), RGBA_WHITE};
-
-	UIElement* abc = UICreateTreeItem(item2, {48, 24});
-	textElement = UICreateElement(abc);
-	textElement->x = 18;
-	textElement->text = {smallf, STR("abc"), RGBA_WHITE};
-
-	UIElement* xyz = UICreateTreeItem(item2, {48, 24});
-	textElement = UICreateElement(xyz);
-	textElement->x = 18;
-	textElement->text = {smallf, STR("xyz"), RGBA_WHITE};
-
-	while(!OSWindowDestroyed() && !OSIsKeyDown(KEY_ESC)) {
 		ArenaFreeAll(&scratch);
 		OSProcessWindowEvents();
 
