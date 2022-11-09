@@ -5,8 +5,11 @@
 
 struct AudioMessage {
 	UINT32 type;
-	UINT32 num;
-	LPVOID ptr;
+	union {
+		UINT32 i;
+		FLOAT f;
+	};
+	LPVOID p;
 };
 
 #define MESSAGE_QUEUE_CAP		4
@@ -21,8 +24,8 @@ struct MessageQueue {
 struct {
 	IAudioClient3* audioClient;
 	MessageQueue queue;
-	struct {int16* data; UINT32 length;} music;
-	struct {int16* data; UINT32 length;} sound;
+	struct {int16* data; UINT32 length; float32 volume; UINT32 mute;} music;
+	struct {int16* data; UINT32 length; float32 volume; UINT32 mute;} sound;
 } audio;
 
 void AudioEnqueueMessage(AudioMessage message) {
@@ -42,16 +45,46 @@ BOOL AudioDequeueMessage(AudioMessage* message) {
 void Win32AudioPlayMusic(PCM* pcm) {
 	AudioMessage message;
 	message.type = 1;
-	message.ptr = &pcm->samples;
-	message.num = pcm->size / 2;
+	message.p = &pcm->samples;
+	message.i = pcm->size / 2;
 	AudioEnqueueMessage(message);
 }
 
 void Win32AudioPlaySound(PCM* pcm) {
 	AudioMessage message;
 	message.type = 2;
-	message.ptr = &pcm->samples;
-	message.num = pcm->size / 2;
+	message.p = &pcm->samples;
+	message.i = pcm->size / 2;
+	AudioEnqueueMessage(message);
+}
+
+void Win32AudioSetMusicVolume(float32 volume) {
+	AudioMessage message;
+	message.type = 3;
+	message.f = volume;
+	AudioEnqueueMessage(message);
+}
+
+void Win32AudioSetSoundVolume(float32 volume) {
+	AudioMessage message;
+	message.type = 4;
+	message.f = volume;
+	AudioEnqueueMessage(message);
+}
+
+void Win32AudioMuteMusic(uint32 value) {
+	ASSERT(value == 0 || value == 1);
+	AudioMessage message;
+	message.type = 5;
+	message.i = value;
+	AudioEnqueueMessage(message);
+}
+
+void Win32AudioMuteSound(uint32 value) {
+	ASSERT(value == 0 || value == 1);
+	AudioMessage message;
+	message.type = 6;
+	message.i = value;
 	AudioEnqueueMessage(message);
 }
 
@@ -79,12 +112,24 @@ DWORD AudioThread(LPVOID arg) {
 		AudioMessage message;
 		while (AudioDequeueMessage(&message)) {
 			if (message.type == 1) {
-				audio.music.data = (int16*)message.ptr;
-				audio.music.length = message.num;
+				audio.music.data = (int16*)message.p;
+				audio.music.length = message.i;
 			}
 			if (message.type == 2) {
-				audio.sound.data = (int16*)message.ptr;
-				audio.sound.length = message.num;
+				audio.sound.data = (int16*)message.p;
+				audio.sound.length = message.i;
+			}
+			if (message.type == 3) {
+				audio.music.volume = message.f;
+			}
+			if (message.type == 4) {
+				audio.sound.volume = message.f;
+			}
+			if (message.type == 5) {
+				audio.music.mute = message.i;
+			}
+			if (message.type == 6) {
+				audio.sound.volume = message.i;
 			}
 		}
 
@@ -92,13 +137,15 @@ DWORD AudioThread(LPVOID arg) {
 		audio.audioClient->GetCurrentPadding(&bufferPadding);
 
 		UINT32 frameCount = numBufferFrames - bufferPadding;
-		int16* writeBuffer;
+		float32* writeBuffer;
 		hr = audioRenderClient->GetBuffer(frameCount, (BYTE**)&writeBuffer);
 		ASSERT(SUCCEEDED(hr));
 
 		for (UINT32 i = 0; i < frameCount*2; i++) {
-			int16 music = i < audio.music.length ? audio.music.data[i] : 0; 
-			int16 sound = i < audio.sound.length ? audio.sound.data[i] : 0; 
+			float32 music = (float32)(i < audio.music.length ? audio.music.data[i] : 0) / 32768.0f; 
+			music *= (audio.music.volume + 1.0f)*audio.music.mute;
+			float32 sound = (float32)(i < audio.sound.length ? audio.sound.data[i] : 0) / 32768.0f; 
+			sound *= (audio.sound.volume + 1.0f)*audio.sound.mute;
 			writeBuffer[i] = music + sound;
 		}
 		uint32 musicLength = MIN(frameCount*2, audio.music.length);
@@ -134,12 +181,12 @@ void Win32AudioInit() {
 	audio.audioClient->GetDevicePeriod(&defaultPeriod, &minimumPeriod);	
 
 	WAVEFORMATEX mixFormat;
-	mixFormat.wFormatTag = WAVE_FORMAT_PCM;
+	mixFormat.wFormatTag = WAVE_FORMAT_IEEE_FLOAT;
 	mixFormat.nChannels = 2;
 	mixFormat.nSamplesPerSec = 44100;
-	mixFormat.nAvgBytesPerSec = 44100 * 4;
-	mixFormat.nBlockAlign = 4;
-	mixFormat.wBitsPerSample = 16;
+	mixFormat.nAvgBytesPerSec = 44100 * 8;
+	mixFormat.nBlockAlign = 8; 
+	mixFormat.wBitsPerSample = 32;
 	mixFormat.cbSize = 0;
 
 	DWORD initStreamFlags = AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM

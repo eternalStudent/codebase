@@ -6,7 +6,17 @@
 #include "audio/audio.cpp"
 
 void Play(UIElement* e) {
-	Win32AudioPlaySound((PCM*)e->context.p);
+	OSAudioPlaySound((PCM*)e->context.p);
+}
+
+void SetVolume1(UIElement* e) {
+	float32 value = (float32)e->x*LoadExp(-6) - 1.0f;
+	OSAudioSetMusicVolume(value);
+}
+
+void SetVolume2(UIElement* e) {
+	float32 value = (float32)e->x*LoadExp(-6) - 1.0f;
+	OSAudioSetSoundVolume(value);
 }
 
 int main() {
@@ -50,11 +60,13 @@ int main() {
 	PCM* theme = WAVLoadAudio(&persist, data3);
 	Win32AudioPlayMusic(theme);
 
-	UIElement* bloop = UICreateElement(NULL);
-	bloop->dim = { 60, 60 };
+	UIElement* bloop = UICreateSlider(NULL, 128+8);
 	bloop->pos = { 120, 120 };
-	bloop->flags = UI_MOVABLE;
-	bloop->background = RGBA_BLUE;
+	bloop->first->onMove = SetVolume1;
+
+	UIElement* bleep = UICreateSlider(NULL, 128+8);
+	bleep->pos = { 120, 250 };
+	bleep->first->onMove = SetVolume2;
 	
 	while(!OSWindowDestroyed()) {
 		if (OSIsKeyPressed(KEY_ESC)) break;
