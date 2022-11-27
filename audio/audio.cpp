@@ -1,6 +1,6 @@
 struct PCM {
 	uint32 size;
-	int16 samples;
+	int16* samples;
 };
 
 #include "wave.cpp"
@@ -12,4 +12,5 @@ struct PCM {
 #  define OSAudioPlaySound			Win32AudioPlaySound
 #  define OSAudioSetMusicVolume 	Win32AudioSetMusicVolume
 #  define OSAudioSetSoundVolume 	Win32AudioSetSoundVolume
+#  define OSAudioQueueNext		 	Win32AudioQueueNext
 #endif

@@ -5,10 +5,7 @@
 
 struct AudioMessage {
 	UINT32 type;
-	union {
-		UINT32 i;
-		FLOAT f;
-	};
+	union {UINT32 i; FLOAT f;};
 	LPVOID p;
 };
 
@@ -24,8 +21,9 @@ struct MessageQueue {
 struct {
 	IAudioClient3* audioClient;
 	MessageQueue queue;
-	struct {int16* data; UINT32 length; float32 volume; UINT32 mute;} music;
-	struct {int16* data; UINT32 length; float32 volume; UINT32 mute;} sound;
+	struct {int16* data; UINT32 length; FLOAT volume; UINT32 mute;} music;
+	struct {int16* data; UINT32 length; FLOAT volume; UINT32 mute;} sound;
+	struct {int16* data; UINT32 length;} next;
 } audio;
 
 void AudioEnqueueMessage(AudioMessage message) {
@@ -42,19 +40,19 @@ BOOL AudioDequeueMessage(AudioMessage* message) {
 	return TRUE;
 }
 
-void Win32AudioPlayMusic(PCM* pcm) {
+void Win32AudioPlayMusic(PCM pcm) {
 	AudioMessage message;
 	message.type = 1;
-	message.p = &pcm->samples;
-	message.i = pcm->size / 2;
+	message.p = pcm.samples;
+	message.i = pcm.size / 2;
 	AudioEnqueueMessage(message);
 }
 
-void Win32AudioPlaySound(PCM* pcm) {
+void Win32AudioPlaySound(PCM pcm) {
 	AudioMessage message;
 	message.type = 2;
-	message.p = &pcm->samples;
-	message.i = pcm->size / 2;
+	message.p = pcm.samples;
+	message.i = pcm.size / 2;
 	AudioEnqueueMessage(message);
 }
 
@@ -88,6 +86,14 @@ void Win32AudioMuteSound(uint32 value) {
 	AudioEnqueueMessage(message);
 }
 
+void Win32AudioQueueNext(PCM pcm) {
+	AudioMessage message;
+	message.type = 7;
+	message.p = pcm.samples;
+	message.i = pcm.size / 2;
+	AudioEnqueueMessage(message);
+}
+
 DWORD AudioThread(LPVOID arg) {
 	DWORD taskIndex;
 	HANDLE taskHandle = AvSetMmThreadCharacteristicsW(L"Pro Audio", &taskIndex);
@@ -114,6 +120,8 @@ DWORD AudioThread(LPVOID arg) {
 			if (message.type == 1) {
 				audio.music.data = (int16*)message.p;
 				audio.music.length = message.i;
+				audio.next.data = (int16*)message.p;
+				audio.next.length = message.i;
 			}
 			if (message.type == 2) {
 				audio.sound.data = (int16*)message.p;
@@ -129,7 +137,11 @@ DWORD AudioThread(LPVOID arg) {
 				audio.music.mute = message.i;
 			}
 			if (message.type == 6) {
-				audio.sound.volume = message.i;
+				audio.sound.mute = message.i;
+			}
+			if (message.type == 7) {
+				audio.next.data = (int16*)message.p;
+				audio.next.length = message.i;
 			}
 		}
 
@@ -141,20 +153,40 @@ DWORD AudioThread(LPVOID arg) {
 		hr = audioRenderClient->GetBuffer(frameCount, (BYTE**)&writeBuffer);
 		ASSERT(SUCCEEDED(hr));
 
-		for (UINT32 i = 0; i < frameCount*2; i++) {
-			float32 music = (float32)(i < audio.music.length ? audio.music.data[i] : 0) / 32768.0f; 
-			music *= (audio.music.volume + 1.0f)*audio.music.mute;
-			float32 sound = (float32)(i < audio.sound.length ? audio.sound.data[i] : 0) / 32768.0f; 
-			sound *= (audio.sound.volume + 1.0f)*audio.sound.mute;
+		UINT32 length = frameCount*2;
+		for (UINT32 i = 0; i < length; i++) {
+			float32 music = i < audio.music.length 
+				? audio.music.data[i]/32768.0f
+				: i - audio.music.length < audio.next.length
+					? audio.next.data[i - audio.music.length]/32768.0f
+					: 0.0f;
+			music *= (audio.music.volume + 1.0f)*(!audio.music.mute);
+
+			float32 sound = i < audio.sound.length 
+				? audio.sound.data[i]/32768.0f 
+				: 0.0f; 
+			sound *= (audio.sound.volume + 1.0f)*(!audio.sound.mute);
+
 			writeBuffer[i] = music + sound;
 		}
-		uint32 musicLength = MIN(frameCount*2, audio.music.length);
-		audio.music.data += musicLength;
-		audio.music.length -= musicLength;
 
-		uint32 soundLength = MIN(frameCount*2, audio.sound.length);
-		audio.sound.data += soundLength;
-		audio.sound.length -= soundLength;
+		if (audio.music.data) {
+			if (length < audio.music.length) {
+				audio.music.data += length;
+				audio.music.length -= length;
+			}
+			else {
+				UINT32 left = length - audio.music.length;
+				audio.music.data = audio.next.data + left;
+				audio.music.length = audio.next.length - left;
+			}
+		}
+
+		if (audio.sound.data) {
+			uint32 soundLength = MIN(length, audio.sound.length);
+			audio.sound.data += soundLength;
+			audio.sound.length -= soundLength;
+		}
 
 		audioRenderClient->ReleaseBuffer(frameCount, 0); // releases the previous buffer space
 	}
@@ -164,7 +196,7 @@ DWORD AudioThread(LPVOID arg) {
 	return 0;
 }
 
-void Win32AudioInit() {
+DWORD InternalAudioInit(LPVOID arg) {
 	audio = {};
 	CoInitializeEx(NULL, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
 
@@ -203,6 +235,16 @@ void Win32AudioInit() {
 
 	ASSERT(SUCCEEDED(hr));
 
+	if (arg)
+		Win32AudioPlayMusic(*(PCM*)arg);
 	HANDLE thread = CreateThread(NULL, 0, &AudioThread, NULL, 0, NULL);
-    ASSERT(thread);
+	ASSERT(thread);
+
+	return 0;
 }
+
+void Win32AudioInit(PCM pcm) {
+	HANDLE thread = CreateThread(NULL, 0, &InternalAudioInit, &pcm, 0, NULL);
+	ASSERT(thread);
+}
+

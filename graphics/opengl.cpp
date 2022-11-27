@@ -222,7 +222,7 @@ void OpenGLDrawImage(GLuint texture, Box2 crop, Box2 pos) {
 	glBindVertexArray(verticesHandle);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float32), NULL);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4*sizeof(float32), NULL);
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glUseProgram(opengl.drawImage);
@@ -236,7 +236,7 @@ void OpenGLDrawImage(GLuint texture, Box2 crop, Box2 pos) {
 	glDeleteBuffers(1, &buffersHandle);
 }
 
-void OpenGLDrawText(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint32 foreground) {
+void OpenGLDrawText(GLuint texture, Box2 crop, Box2 pos, Color background, Color foreground) {
 	Point2 p0 = AdjustCoordinates(pos.p0);
 	Point2 p1 = AdjustCoordinates(pos.p1);
 
@@ -267,7 +267,7 @@ void OpenGLDrawText(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint
 	glBindVertexArray(verticesHandle);
 
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float32), NULL);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4*sizeof(float32), NULL);
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glUseProgram(opengl.drawText);
@@ -277,18 +277,20 @@ void OpenGLDrawText(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint
 	glUniform1i(glGetUniformLocation(opengl.drawText, "image"), 0);
 
 	GLint location = glGetUniformLocation(opengl.drawText, "background");
-	Color color = RgbaToColor(background);
-	glUniform4f(location, color.r, color.g, color.b, color.a);
+	glUniform4f(location, background.r, background.g, background.b, background.a);
 
 	location = glGetUniformLocation(opengl.drawText, "foreground");
-	color = RgbaToColor(foreground);
-	glUniform4f(location, color.r, color.g, color.b, color.a);
+	glUniform4f(location, foreground.r, foreground.g, foreground.b, foreground.a);
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glDeleteVertexArrays(1, &verticesHandle);
 	glDeleteBuffers(1, &buffersHandle);
 }
+
+void OpenGLDrawText(GLuint texture, Box2 crop, Box2 pos, uint32 background, uint32 foreground) {
+	OpenGLDrawText(texture, crop, pos, RgbaToColor(background), RgbaToColor(foreground));
+}	
 
 void OpenGLDrawBox2(Box2 pos, uint32 rgba) {
 	Point2 p0 = AdjustCoordinates(pos.p0);

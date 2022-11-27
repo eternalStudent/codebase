@@ -53,6 +53,12 @@ inline float32 LoadExp(int32 exp) {
 	return data.f;
 }
 
+int32 Sign(int32 i) {
+	if (i == 0) return 0;
+	if (i < 0) return -1;
+	return 1;
+} 
+
 static float64 tab[] =
 {
 	1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9,

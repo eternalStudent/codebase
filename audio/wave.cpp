@@ -1,4 +1,4 @@
-PCM* WAVLoadAudio(Arena* arena, byte* data) {
+PCM WAVLoadAudio(byte* data) {
 	uint32 RIFF = ReadUint32LittleEndian(&data);
 	ASSERT(RIFF == 1179011410);
 	uint32 size = ReadUint32LittleEndian(&data);
@@ -14,7 +14,7 @@ PCM* WAVLoadAudio(Arena* arena, byte* data) {
 	uint32 samplesPerSec = ReadUint32LittleEndian(&data);
 	ASSERT(samplesPerSec == 44100);
 	uint32 bytesPerSec = ReadUint32LittleEndian(&data);
-	ASSERT(bytesPerSec == 44100 * 4);
+	ASSERT(bytesPerSec == 44100*4);
 	uint16 alignment = ReadUint16LittleEndian(&data);
 	ASSERT(alignment == 4);
 	uint16 bitsPerSample = ReadUint16LittleEndian(&data);
@@ -26,10 +26,8 @@ PCM* WAVLoadAudio(Arena* arena, byte* data) {
 		section = ReadUint32LittleEndian(&data);
 	}
 
-	ASSERT(section == 1635017060) ;// data
+	ASSERT(section == 1635017060); // data
 	size = ReadUint32LittleEndian(&data);
-	PCM* pcm = (PCM*)ArenaAlloc(arena, (ssize)(size+4));
-	pcm->size = size;
-	memcpy(&pcm->samples, data, size);
+	PCM pcm = {size, (int16*)data};
 	return pcm;
 }

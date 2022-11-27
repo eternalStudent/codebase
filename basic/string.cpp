@@ -243,6 +243,11 @@ void PushNewLine(StringBuilder* builder) {
 	builder->ptr+=1;
 }
 
+void PushChar(StringBuilder* builder, byte ch) {
+	*(builder->ptr) = ch;
+	builder->ptr+=1;
+}
+
 void PushBool(StringBuilder* builder, bool b) {
 	builder->ptr += BoolToAnsi(b, builder->ptr);
 }

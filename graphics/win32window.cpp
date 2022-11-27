@@ -98,6 +98,11 @@ void Win32ExitFullScreen() {
 	memset(window.keyIsDown, 0, 256);
 }
 
+void Win32SetWindowToNoneResizable() {
+	DWORD dwStyle = GetWindowLong(window.handle, GWL_STYLE);
+	SetWindowLong(window.handle, GWL_STYLE, dwStyle & ~WS_THICKFRAME);
+}
+
 BOOL GetPrimaryMonitorRect(RECT* monitorRect){
 	const POINT ptZero = {0, 0};
 	HMONITOR monitor = MonitorFromPoint(ptZero, MONITOR_DEFAULTTOPRIMARY);

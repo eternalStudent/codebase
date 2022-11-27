@@ -22,13 +22,21 @@
 #define KEY_RIGHT 				0x27
 #define KEY_DOWN				0x28
 #define KEY_DELETE				0x2E
+#define KEY_GREATER				0x3E
 #define KEY_A 					0x41
 #define KEY_C 					0x43
+#define KEY_D 					0x44
+#define KEY_E 					0x45
+#define KEY_F 					0x46
+#define KEY_G 					0x47
+#define KEY_I 					0x49
 #define KEY_N 					0x4E
 #define KEY_O 					0x4F
+#define KEY_R 					0x52
 #define KEY_S 					0x53
 #define KEY_V 					0x56
 #define KEY_X 					0x58
+#define KEY_Z 					0x5A
 
 #if defined(_WIN32)
 #  include <Windowsx.h>
@@ -42,6 +50,7 @@
 #  define OSExitFullScreen			Win32ExitFullScreen
 #  define OSEnterFullScreen 		Win32EnterFullScreen
 #  define OSSetWindowIcon			Win32SetWindowIcon
+#  define OSSetWindowToNoneResizable Win32SetWindowToNoneResizable
 
 #  define OSGetWindowDimensions 	Win32GetWindowDimensions
 #  define OSWindowDestroyed 		Win32WindowDestroyed
@@ -116,3 +125,8 @@
 #  define OSCopyToClipboard 		LinuxCopyToClipboard
 #  define OSRequestClipboardData	LinuxRequestClipboardData
 #endif
+
+bool OSIsCharTyped(byte c) {
+	String typed = OSGetTypedText();
+	return typed.length == 1 && typed.data[0] == c;
+}
