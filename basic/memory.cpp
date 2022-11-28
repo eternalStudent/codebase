@@ -1,21 +1,27 @@
 #if defined(_WIN32)
 #  include "win32memory.cpp"
-#  define OSHeapAllocate			Win32HeapAllocate
-#  define OSHeapFree				Win32HeapFree
+#  define OSAllocate			Win32Allocate
+#  define OSReserve				Win32Reserve
+#  define OSCommit				Win32Commit
+#  define OSDecommit			Win32Decommit
+#  define OSFree				Win32Free
 #endif
 
 #if defined(__gnu_linux__)
 #  include <sys/mman.h>
 #  include "linuxmemory.cpp"
-#  define OSHeapAllocate			LinuxHeapAllocate
-#  define OSHeapFree				LinuxHeapFree
+#  define OSAllocate			LinuxAllocate
+#  define OSReserve				LinuxReserve
+#  define OSCommit				LinuxCommit
+#  define OSDecommit			LinuxDecommit
+#  define OSFree				LinuxFree
 #endif
 
 #include "arena.cpp"
 #include "fixedsize.cpp"
 
 Arena CreateArena(int64 capacity) {
-	void* buffer = OSHeapAllocate(capacity);
+	void* buffer = OSAllocate(capacity);
 	Arena arena;
  	ArenaInit(&arena, buffer, capacity);
  	return arena;
