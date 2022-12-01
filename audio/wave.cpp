@@ -25,6 +25,11 @@ PCM WAVLoadAudio(byte* data) {
 		Skip(&data, size);
 		section = ReadUint32LittleEndian(&data);
 	}
+	if (section == 1954047330) { // bext
+		size = ReadUint32LittleEndian(&data);
+		Skip(&data, size);
+		section = ReadUint32LittleEndian(&data);
+	}
 
 	ASSERT(section == 1635017060); // data
 	size = ReadUint32LittleEndian(&data);

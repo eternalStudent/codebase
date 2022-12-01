@@ -27,6 +27,10 @@ void PushPoint2(StringBuilder* builder, Point2 p, int32 precision) {
     builder->ptr += COPY(")", builder->ptr);
 }
 
+int32 Distance2i(int32 x0, int32 y0, int32 x1, int32 y1) {
+    return (x0-x1)*(x0-x1) + (y0-y1)*(y0-y1);
+}
+
 union Point2i {
     struct {int32 x, y;};
     struct {int32 width, height;};

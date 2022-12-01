@@ -243,8 +243,8 @@ DWORD InternalAudioInit(LPVOID arg) {
 	return 0;
 }
 
-void Win32AudioInit(PCM pcm) {
-	HANDLE thread = CreateThread(NULL, 0, &InternalAudioInit, &pcm, 0, NULL);
+void Win32AudioInit(PCM* pcm) {
+	HANDLE thread = CreateThread(NULL, 0, &InternalAudioInit, pcm, 0, NULL);
 	ASSERT(thread);
 }
 
