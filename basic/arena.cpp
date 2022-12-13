@@ -31,6 +31,11 @@ void ArenaFreeAll(Arena* arena) {
 	arena->ptr = 0;
 }
 
+void ArenaReset(Arena* arena) {
+	memset(arena->buffer, 0, arena->ptr);
+	arena->ptr = 0;
+}
+
 void* ArenaReAlloc(Arena* arena, void* oldData, ssize oldSize, ssize newSize) {
 	void* result = ArenaAlloc(arena, newSize);
 	memcpy(result, oldData, oldSize);

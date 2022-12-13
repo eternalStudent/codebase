@@ -30,12 +30,16 @@
 #define KEY_F 					0x46
 #define KEY_G 					0x47
 #define KEY_I 					0x49
+#define KEY_L					0x4C
 #define KEY_N 					0x4E
 #define KEY_O 					0x4F
 #define KEY_R 					0x52
 #define KEY_S 					0x53
+#define KEY_T 					0x54
+#define KEY_U 					0x55
 #define KEY_V 					0x56
 #define KEY_X 					0x58
+#define KEY_Y 					0x59
 #define KEY_Z 					0x5A
 
 #if defined(_WIN32)

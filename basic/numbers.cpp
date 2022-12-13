@@ -59,6 +59,15 @@ int32 Sign(int32 i) {
 	return 1;
 } 
 
+int32 Sqrti(int32 value) {
+	int32 x = 0;
+
+	while ((x + 1)*(x + 1) <= value)
+		x = x + 1;
+
+	return x;
+}
+
 static float64 tab[] =
 {
 	1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9,
