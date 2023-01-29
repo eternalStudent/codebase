@@ -1,3 +1,10 @@
+/* NOTE:
+ *-------
+ * This code no longer represents my current understanding of opengl.
+ * Many of the implementations here are not very good, and will be replaced once
+ * I fill comfortable enough with my graphics programming knowledge.
+ */
+
 #if defined(_WIN32)
 #  include "win32opengl.cpp"
 #  define OSOpenGLInit			Win32OpenGLInit
@@ -162,10 +169,12 @@ void main()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_LINE_SMOOTH);
+	glEnable(GL_SCISSOR_TEST);
 
+#if DEBUG
 	glEnable(GL_DEBUG_OUTPUT);
 	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-	glEnable(GL_SCISSOR_TEST);
+#endif
 }
 
 void OpenGLSetColor(uint32 rgba) {

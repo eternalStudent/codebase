@@ -1,3 +1,10 @@
+/* NOTE:
+ *-------
+ * This code no longer represents my current understanding of graphics API.
+ * The implementations here are not very good, and will be replaced once
+ * I fill comfortable enough with my graphics programming knowledge.
+ */
+
 #include "geometry.cpp"
 #include "image.cpp"
 #include "window.cpp"

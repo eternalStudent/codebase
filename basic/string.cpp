@@ -207,7 +207,7 @@ float64 ParseFloat64(String str) {
 			ssize j = str.data[i+1] == '+' ? i+2 : i+1;
 			exp.data = &str.data[j];
 			exp.length = str.length - j;
-			result *= pow10((int32)ParseInt64(exp));
+			result *= Pow10((int32)ParseInt64(exp));
 			break;
 		}
 		if (radix) {

@@ -21,11 +21,19 @@ float64 NextFloat64() {
 }
  
 // [min..max)
-uint32 RandomUniform(uint32 minValue, uint32 maxValue) {
+uint32 RandomUniform_u(uint32 minValue, uint32 maxValue) {
  	ASSERT(minValue < maxValue);
 		  
 	int64 range = (int64)maxValue - minValue;
-	return (int32)(NextFloat64()*range) + minValue;
+	return (uint32)(NextFloat64()*range) + minValue;
+}
+
+// [min..max)
+int32 RandomUniform_i(int32 minValue, int32 maxValue) {
+	ASSERT(minValue < maxValue);
+
+	if (0 < minValue) return (int32)RandomUniform_u((uint32)minValue, (uint32)maxValue);
+	return (int32)RandomUniform_u(0, (uint32)(maxValue - minValue)) + minValue;
 }
 
 // [min..max]

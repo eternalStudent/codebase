@@ -26,6 +26,39 @@ typedef double float64;
 #define MIN(x,y) ((x)<(y)?(x):(y))
 #define MAX(x,y) ((x)<(y)?(y):(x))
 #define ABS(x)   ((x)<0? -(x):(x))
+#define SGN(x)	 ((0<(x))-((x)<0))
+
+inline int32 Min(int32 a, int32 b) {
+	return a < b ? a : b;
+}
+
+inline int32 Max(int32 a, int32 b) {
+	return a < b ? b : a;
+}
+
+inline int32 Abs(int32 i) {
+	return i < 0 ? -i : i;
+}
+
+inline int32 Sign(int32 i) {
+	return (0 < i) - (i < 0);
+}
+
+inline float32 Min(float32 x, float32 y) {
+	return x < y ? x : y;
+}
+
+inline float32 Max(float32 x, float32 y) {
+	return x < y ? y : x;
+}
+
+inline float32 Abs(float32 x, float32 y) {
+	return x < 0 ? -x : x;
+}
+
+inline int32 Sign(float32 x) {
+	return (0 < x) - (x < 0);
+}
 
 inline float32 INF32() {
 	union {uint32 u; float32 f;} data;
@@ -53,21 +86,6 @@ inline float32 LoadExp(int32 exp) {
 	return data.f;
 }
 
-int32 Sign(int32 i) {
-	if (i == 0) return 0;
-	if (i < 0) return -1;
-	return 1;
-} 
-
-int32 Sqrti(int32 value) {
-	int32 x = 0;
-
-	while ((x + 1)*(x + 1) <= value)
-		x = x + 1;
-
-	return x;
-}
-
 static float64 tab[] =
 {
 	1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9,
@@ -79,7 +97,7 @@ static float64 tab[] =
 	1.0e60,1.0e61,1.0e62,1.0e63,1.0e64,1.0e65,1.0e66,1.0e67,1.0e68,1.0e69,
 };
 
-float64 pow10(int32 n) {
+float64 Pow10(int32 n) {
 	int32 m;
 
 	if (n < 0) {
@@ -87,10 +105,10 @@ float64 pow10(int32 n) {
 		if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
 			return 1/tab[n];
 		m = n/2;
-		return pow10(-m)*pow10(m-n);
+		return Pow10(-m)*Pow10(m-n);
 	}
 	if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
 		return tab[n];
 	m = n/2;
-	return pow10(m)*pow10(n-m);
+	return Pow10(m)*Pow10(n-m);
 }

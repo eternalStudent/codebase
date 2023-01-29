@@ -152,16 +152,16 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
-  			DWORD time = GetMessageTime();
+			DWORD time = GetMessageTime();
 
-  			if (!PtInRect(&window.clickRect, {x, y}) || time - window.timeLastClicked > GetDoubleClickTime()) {
-  				window.clickCount = 0;
-  			}
-  			window.clickCount++;
+			if (!PtInRect(&window.clickRect, {x, y}) || time - window.timeLastClicked > GetDoubleClickTime()) {
+				window.clickCount = 0;
+			}
+			window.clickCount++;
 
-  			window.timeLastClicked = time;
-  			SetRect(&window.clickRect, x, y, x, y);
-  			InflateRect(&window.clickRect, GetSystemMetrics(SM_CXDOUBLECLK) / 2, GetSystemMetrics(SM_CYDOUBLECLK) / 2);
+			window.timeLastClicked = time;
+			SetRect(&window.clickRect, x, y, x, y);
+			InflateRect(&window.clickRect, GetSystemMetrics(SM_CXDOUBLECLK) / 2, GetSystemMetrics(SM_CYDOUBLECLK) / 2);
 		} break;
 		case WM_LBUTTONUP : {
 			window.mouseLeftButtonIsDown = 0;
@@ -195,86 +195,93 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 	return DefWindowProc(handle, message, wParam, lParam);
 }
 
-// TODO: figure out a cross-platform abstraction over resources/assets
 String LoadAsset(int i) {
-    HRSRC res = FindResource(GetModuleHandle(0), MAKEINTRESOURCE(i), RT_RCDATA);
-    HGLOBAL handle = LoadResource(0, res);
-    LPVOID data = LockResource(handle);
-    DWORD size = SizeofResource(0, res);
-    return {(byte*)data, (ssize)size};
+	HRSRC res = FindResource(GetModuleHandle(NULL), MAKEINTRESOURCE(i), RT_RCDATA);
+	HGLOBAL handle = LoadResource(NULL, res);
+	LPVOID data = LockResource(handle);
+	DWORD size = SizeofResource(NULL, res);
+	return {(byte*)data, (ssize)size};
+}
+
+String LoadAsset(LPCTSTR name) {
+	HRSRC res = FindResource(NULL, name, RT_RCDATA);
+	HGLOBAL handle = LoadResource(NULL, res);
+	LPVOID data = LockResource(handle);
+	DWORD size = SizeofResource(NULL, res);
+	return {(byte*)data, (ssize)size};
 }
 
 // NOTE: use the other one for cross-platfromness
 void Win32SetWindowIcon(int i) {
-	HRSRC res = FindResource(GetModuleHandle(0), MAKEINTRESOURCE(i), RT_ICON);
-    HGLOBAL handle = LoadResource(0, res);
-    LPVOID data = LockResource(handle);
-    DWORD size = SizeofResource(0, res);
+	HRSRC res = FindResource(GetModuleHandle(NULL), MAKEINTRESOURCE(i), RT_ICON);
+	HGLOBAL handle = LoadResource(NULL, res);
+	LPVOID data = LockResource(handle);
+	DWORD size = SizeofResource(NULL, res);
 	HICON icon = CreateIconFromResource((PBYTE)data, size, TRUE, 0x00030000);
 	SendMessage(window.handle, WM_SETICON, ICON_BIG, (LPARAM)icon);
 	SendMessage(window.handle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
 }
 
 void Win32SetWindowIcon(Image image) {
-    HDC dc = GetDC(NULL);
-    BITMAPV5HEADER bi = {};
-    bi.bV5Size        = sizeof(bi);
-    bi.bV5Width       = image.width;
-    bi.bV5Height      = image.height;
-    bi.bV5Planes      = 1;
-    bi.bV5BitCount    = 32;
-    bi.bV5Compression = BI_BITFIELDS;
-    bi.bV5RedMask     = 0x00ff0000;
-    bi.bV5GreenMask   = 0x0000ff00;
-    bi.bV5BlueMask    = 0x000000ff;
-    bi.bV5AlphaMask   = 0xff000000;
-    byte* target = NULL;
-    HBITMAP color = CreateDIBSection(dc, 
-    	(BITMAPINFO*)&bi, 
-    	DIB_RGB_COLORS, 
-    	(VOID**)&target, 
-    	NULL, 0);
-    ReleaseDC(NULL, dc);
-    if (!color) {
-        LOG("Failed to create bitmap");
-        return;
-    }
+	HDC dc = GetDC(NULL);
+	BITMAPV5HEADER bi = {};
+	bi.bV5Size        = sizeof(bi);
+	bi.bV5Width       = image.width;
+	bi.bV5Height      = image.height;
+	bi.bV5Planes      = 1;
+	bi.bV5BitCount    = 32;
+	bi.bV5Compression = BI_BITFIELDS;
+	bi.bV5RedMask     = 0x00ff0000;
+	bi.bV5GreenMask   = 0x0000ff00;
+	bi.bV5BlueMask    = 0x000000ff;
+	bi.bV5AlphaMask   = 0xff000000;
+	byte* target = NULL;
+	HBITMAP color = CreateDIBSection(dc, 
+		(BITMAPINFO*)&bi, 
+		DIB_RGB_COLORS, 
+		(VOID**)&target, 
+		NULL, 0);
+	ReleaseDC(NULL, dc);
+	if (!color) {
+		LOG("Failed to create bitmap");
+		return;
+	}
 
-    HBITMAP mask = CreateBitmap(image.width, image.height, 1, 1, NULL);
-    if (!mask) {
-        LOG("Failed to create mask bitmap");
-        DeleteObject(color);
-        return;
-    }
+	HBITMAP mask = CreateBitmap(image.width, image.height, 1, 1, NULL);
+	if (!mask) {
+		LOG("Failed to create mask bitmap");
+		DeleteObject(color);
+		return;
+	}
 
-    byte* source = image.data;
-    for (int32 i = 0;  i < image.width*image.height; i++) {
-        target[0] = source[2];
-        target[1] = source[1];
-        target[2] = source[0];
-        target[3] = source[3];
-        target += 4;
-        source += 4;
-    }
+	byte* source = image.data;
+	for (int32 i = 0;  i < image.width*image.height; i++) {
+		target[0] = source[2];
+		target[1] = source[1];
+		target[2] = source[0];
+		target[3] = source[3];
+		target += 4;
+		source += 4;
+	}
 
-    ICONINFO ii = {};
-    ii.fIcon    = TRUE;
-    ii.xHotspot = 0;
-    ii.yHotspot = 0;
-    ii.hbmMask  = mask;
-    ii.hbmColor = color;
-    HICON icon = CreateIconIndirect(&ii);
+	ICONINFO ii = {};
+	ii.fIcon    = TRUE;
+	ii.xHotspot = 0;
+	ii.yHotspot = 0;
+	ii.hbmMask  = mask;
+	ii.hbmColor = color;
+	HICON icon = CreateIconIndirect(&ii);
 
-    DeleteObject(color);
-    DeleteObject(mask);
+	DeleteObject(color);
+	DeleteObject(mask);
 
-    if (!icon) {
-        LOG("Failed to create icon");
-        return;
-    }
+	if (!icon) {
+		LOG("Failed to create icon");
+		return;
+	}
 
-    SendMessage(window.handle, WM_SETICON, ICON_BIG, (LPARAM)icon);
-    SendMessage(window.handle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
+	SendMessage(window.handle, WM_SETICON, ICON_BIG, (LPARAM)icon);
+	SendMessage(window.handle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
 }
 
 WNDCLASSA CreateWindowClass() {
