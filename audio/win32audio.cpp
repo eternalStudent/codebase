@@ -22,7 +22,12 @@ struct {
 	IAudioClient3* audioClient;
 	MessageQueue queue;
 	struct {int16* data; UINT32 length; FLOAT volume; UINT32 mute;} music;
-	struct {int16* data; UINT32 length; FLOAT volume; UINT32 mute;} sound;
+	struct {
+		struct {int16* data; UINT32 length;} buckets[32];
+		UINT32 availabity;
+		FLOAT volume; 
+		UINT32 mute;
+	} sound;
 	struct {int16* data; UINT32 length;} next;
 } audio;
 
@@ -124,8 +129,11 @@ DWORD AudioThread(LPVOID arg) {
 				audio.next.length = message.i;
 			}
 			if (message.type == 2) {
-				audio.sound.data = (int16*)message.p;
-				audio.sound.length = message.i;
+				int32 i = LowBit(~audio.sound.availabity);
+				ASSERT(i < 32);
+				audio.sound.buckets[i].data = (int16*)message.p;
+				audio.sound.buckets[i].length = message.i;
+				audio.sound.availabity |= (1 << i);
 			}
 			if (message.type == 3) {
 				audio.music.volume = message.f;
@@ -155,17 +163,24 @@ DWORD AudioThread(LPVOID arg) {
 
 		UINT32 length = frameCount*2;
 		for (UINT32 i = 0; i < length; i++) {
-			float32 music = i < audio.music.length 
-				? audio.music.data[i]/32768.0f
-				: i - audio.music.length < audio.next.length
-					? audio.next.data[i - audio.music.length]/32768.0f
-					: 0.0f;
-			music *= (audio.music.volume + 1.0f)*(!audio.music.mute);
+			
+			float32 music = 0.0f;
+			if (!audio.music.mute) {
+				music = i < audio.music.length 
+					? audio.music.data[i]/32768.0f
+					: i - audio.music.length < audio.next.length
+						? audio.next.data[i - audio.music.length]/32768.0f
+						: 0.0f;
+				music *= (audio.music.volume + 1.0f);
+			}
 
-			float32 sound = i < audio.sound.length 
-				? audio.sound.data[i]/32768.0f 
-				: 0.0f; 
-			sound *= (audio.sound.volume + 1.0f)*(!audio.sound.mute);
+			float32 sound = 0.0f;
+			if (!audio.sound.mute) for (int32 j = 0; j < 32; j++) {
+				sound += i < audio.sound.buckets[j].length 
+					? audio.sound.buckets[j].data[i]/32768.0f 
+					: 0.0f; 
+			}
+			sound *= (audio.sound.volume + 1.0f);
 
 			writeBuffer[i] = music + sound;
 		}
@@ -182,10 +197,15 @@ DWORD AudioThread(LPVOID arg) {
 			}
 		}
 
-		if (audio.sound.data) {
-			uint32 soundLength = MIN(length, audio.sound.length);
-			audio.sound.data += soundLength;
-			audio.sound.length -= soundLength;
+		for (int32 i = 0; i < 32; i++) {
+			if (audio.sound.buckets[i].data) {
+				uint32 soundLength = MIN(length, audio.sound.buckets[i].length);
+				audio.sound.buckets[i].data += soundLength;
+				audio.sound.buckets[i].length -= soundLength;
+				if (audio.sound.buckets[i].length == 0) {
+					audio.sound.availabity &= ~(1 << i);
+				}
+			}
 		}
 
 		audioRenderClient->ReleaseBuffer(frameCount, 0); // releases the previous buffer space

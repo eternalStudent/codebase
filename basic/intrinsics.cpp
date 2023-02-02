@@ -71,3 +71,7 @@ float32 floor(float32 value) {
 float32 ceil(float32 value) {
     return _mm_cvtss_f32(_mm_ceil_ss(_mm_setzero_ps(), _mm_set_ss(value)));
 }
+
+float32 fmadd(float32 a, float32 b, float32 c) {
+    return _mm_cvtss_f32(_mm_fmadd_ss(_mm_set_ss(a), _mm_set_ss(b), _mm_set_ss(c)));
+}
