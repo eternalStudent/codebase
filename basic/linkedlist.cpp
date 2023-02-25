@@ -1,6 +1,7 @@
 #define LINKEDLIST_ADD(list, n)				do{if ((list)->last) (list)->last->next=(n);\
 											else (list)->first=n;\
 											(n)->prev=(list)->last;\
+											(n)->next=NULL;\
 											(list)->last=(n);}while(0)
 
 #define LINKEDLIST_ADD_AFTER(list, m, n) 	do{(n)->prev=(m);(n)->next=(m)->next;\

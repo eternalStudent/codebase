@@ -52,7 +52,7 @@ inline float32 Max(float32 x, float32 y) {
 	return x < y ? y : x;
 }
 
-inline float32 Abs(float32 x, float32 y) {
+inline float32 Abs(float32 x) {
 	return x < 0 ? -x : x;
 }
 

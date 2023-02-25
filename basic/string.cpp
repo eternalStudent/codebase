@@ -228,6 +228,26 @@ float64 ParseFloat64(String str) {
 struct StringBuilder {
 	byte* buffer;
 	byte* ptr;
+
+	StringBuilder operator()(String string) {
+		this->ptr += StringCopy(string, this->ptr);
+		return *this;
+	}
+
+	StringBuilder operator()(byte ch) {
+		*(this->ptr) = ch;
+		this->ptr++;
+		return *this;
+	}
+
+	StringBuilder operator()(int32 i) {
+		this->ptr += Int32ToDecimal(i, this->ptr);
+		return *this;
+	}
+
+	String operator()() {
+		return {this->buffer, this->ptr - this->buffer};
+	}
 };
 
 String GetString(StringBuilder* builder) {
