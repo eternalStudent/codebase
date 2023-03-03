@@ -92,3 +92,7 @@ bool OSWriteAll(File file, byte* buffer, int64 length) {
 	} while ((0 < left) && (0 < written));
 	return true;
 }
+
+void Print(String str) {
+	OSWriteFile(STDOUT, str.data, (int32)str.length);
+}

@@ -1,7 +1,7 @@
 // Null-Terminated
 //-----------------
 
-int32 Uint32ToBinary(uint32 number, char* str) {
+int32 Uint32ToBinary(uint32 number, byte* str) {
 	int32 index = HighBit(number, 0);
 	int32 numberOfDigits = index + 1;
 
@@ -13,7 +13,7 @@ int32 Uint32ToBinary(uint32 number, char* str) {
 	return numberOfDigits;
 }
 
-int32 Uint32ToHex(uint32 number, char* str) {
+int32 Uint32ToHex(uint32 number, byte* str) {
 	int32 index = HighBit(number, 0) / 4;
 	int32 numberOfDigits = index + 1;
 
@@ -230,19 +230,37 @@ struct StringBuilder {
 	byte* ptr;
 
 	StringBuilder operator()(String string) {
-		this->ptr += StringCopy(string, this->ptr);
-		return *this;
+		StringBuilder concat = *this;
+		concat.ptr += StringCopy(string, concat.ptr);
+		return concat;
 	}
 
 	StringBuilder operator()(byte ch) {
-		*(this->ptr) = ch;
-		this->ptr++;
-		return *this;
+		StringBuilder concat = *this;
+		*(concat.ptr) = ch;
+		concat.ptr++;
+		return concat;
+	}
+
+	StringBuilder operator()(char ch) {
+		StringBuilder concat = *this;
+		*(concat.ptr) = (byte)ch;
+		concat.ptr++;
+		return concat;
 	}
 
 	StringBuilder operator()(int32 i) {
-		this->ptr += Int32ToDecimal(i, this->ptr);
-		return *this;
+		StringBuilder concat = *this;
+		concat.ptr += Int32ToDecimal(i, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(uint32 i, char f = 'd') {
+		StringBuilder concat = *this;
+		if (f == 'd') concat.ptr += Uint32ToDecimal(i, concat.ptr);
+		if (f == 'b') concat.ptr += Uint32ToBinary(i, concat.ptr);
+		if (f == 'x') concat.ptr += Uint32ToHex(i, concat.ptr);
+		return concat;
 	}
 
 	String operator()() {
