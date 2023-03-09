@@ -5,6 +5,10 @@ PCM WAVLoadAudio(byte* data) {
 	uint32 WAVE = ReadUint32LittleEndian(&data);
 	ASSERT(WAVE == 1163280727);
 	uint32 fmt_ = ReadUint32LittleEndian(&data);
+	if (fmt_ == 1263424842) {
+		Skip(&data, 0x20);
+		fmt_ = ReadUint32LittleEndian(&data);
+	}
 	ASSERT(fmt_ == 544501094);
 	size = ReadUint32LittleEndian(&data);
 	uint16 formatTag = ReadUint16LittleEndian(&data);

@@ -25,6 +25,7 @@ Image LoadImage(Arena* arena, byte* data, uint32 format) {
 
 typedef Point4 Color;
 
+// TODO: I should have separate palette files
 #define RGBA_BLACK          0xff000000
 #define RGBA_WHITE          0xffffffff
 #define RGBA_LIGHTGREY      0xff7e7872

@@ -130,7 +130,10 @@ DWORD AudioThread(LPVOID arg) {
 			}
 			if (message.type == 2) {
 				int32 i = LowBit(~audio.sound.availabity);
-				ASSERT(i < 32);
+				if (i == 32) {
+					audio.sound.availabity &= ~1;
+					i = 0;
+				}
 				audio.sound.buckets[i].data = (int16*)message.p;
 				audio.sound.buckets[i].length = message.i;
 				audio.sound.availabity |= (1 << i);
