@@ -86,7 +86,7 @@ inline float32 LoadExp(int32 exp) {
 	return data.f;
 }
 
-static float64 tab[] =
+static float64 __tab[] =
 {
 	1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9,
 	1.0e10,1.0e11,1.0e12,1.0e13,1.0e14,1.0e15,1.0e16,1.0e17,1.0e18,1.0e19,
@@ -102,13 +102,13 @@ float64 Pow10(int32 n) {
 
 	if (n < 0) {
 		n = -n;
-		if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
-			return 1/tab[n];
+		if (n < (int32)(sizeof(__tab)/sizeof(__tab[0])))
+			return 1/__tab[n];
 		m = n/2;
 		return Pow10(-m)*Pow10(m-n);
 	}
-	if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
-		return tab[n];
+	if (n < (int32)(sizeof(__tab)/sizeof(__tab[0])))
+		return __tab[n];
 	m = n/2;
 	return Pow10(m)*Pow10(n-m);
 }

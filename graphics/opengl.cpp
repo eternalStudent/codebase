@@ -1,10 +1,3 @@
-/* NOTE:
- *-------
- * This code no longer represents my current understanding of opengl.
- * Many of the implementations here are not very good, and will be replaced once
- * I fill comfortable enough with my graphics programming knowledge.
- */
-
 #if defined(_WIN32)
 #  include "win32opengl.cpp"
 #  define OSOpenGLInit			Win32OpenGLInit
@@ -16,14 +9,6 @@
 #  define OSOpenGLInit			LinuxOpenGLInit
 #  define OSOpenGLSwapBuffers	LinuxOpenGLSwapBuffers
 #endif
-
-struct {
-	GLuint drawImage;
-	GLuint drawShape;
-	GLuint drawText;
-	uint32 rgba;
-	Arena* arena;
-} opengl;
 
 GLuint CreateProgram(GLchar* vertexSource, GLchar* fragmentSource) {
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -93,6 +78,23 @@ void OpenGLUpdateTextureData(GLuint texture, int32 xoffset, int32 yoffset, int32
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, xoffset, yoffset, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
 }
+
+/* NOTE:
+ *-------
+ * This code no longer represents my current understanding of opengl.
+ * Many of the implementations here are not very good, and will be replaced once
+ * I fill comfortable enough with my graphics programming knowledge.
+ * see the code in uigraphics.cpp
+ */
+
+/*
+struct {
+	GLuint drawImage;
+	GLuint drawShape;
+	GLuint drawText;
+	uint32 rgba;
+	Arena* arena;
+} opengl;
 
 void OpenGLInit(Arena* arena) {
 	OSOpenGLInit();
@@ -553,3 +555,4 @@ void OpenGlClearCrop() {
 	Dimensions2i dim = OSGetWindowDimensions();
 	glScissor(0, 0, dim.width, dim.height);
 }
+*/

@@ -27,7 +27,7 @@
 
 #define LINKEDLIST_FOREACH(list, t, n)		for(t* n = (list)->first; n != NULL; n = n->next)
 
-#define LINKEDLIST_MOVETOLAST(list, n)		do{if ((n)->next){\
+#define LINKEDLIST_MOVE_TO_LAST(list, n)	do{if ((n)->next){\
 											if ((n)->prev) (n)->prev->next = (n)->next;\
 											else (list)->first = (n)->next;\
 											(n)->next->prev = (n)->prev;\

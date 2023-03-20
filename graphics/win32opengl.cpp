@@ -240,36 +240,38 @@ BOOL Win32OpenGLSwapBuffers() {
 	return ok;
 }
 
-#define GL_CLAMP_TO_EDGE 				  0x812F
+#define GL_CLAMP_TO_EDGE 				0x812F
 
-#define GL_RG 							  0x8227
-#define GL_DEBUG_OUTPUT_SYNCHRONOUS       0x8242
+#define GL_RG 							0x8227
+#define GL_DEBUG_OUTPUT_SYNCHRONOUS 	0x8242
 
-#define GL_TEXTURE0                       0x84C0
-#define GL_TEXTURE1                       0x84C1
-#define GL_TEXTURE2                       0x84C2
-#define GL_TEXTURE3                       0x84C3
-#define GL_TEXTURE4                       0x84C4
-#define GL_TEXTURE5                       0x84C5
-#define GL_TEXTURE6                       0x84C6
-#define GL_TEXTURE7                       0x84C7
+#define GL_TEXTURE0 					0x84C0
+#define GL_TEXTURE1 					0x84C1
+#define GL_TEXTURE2 					0x84C2
+#define GL_TEXTURE3 					0x84C3
+#define GL_TEXTURE4 					0x84C4
+#define GL_TEXTURE5 					0x84C5
+#define GL_TEXTURE6 					0x84C6
+#define GL_TEXTURE7 					0x84C7
 
-#define GL_ARRAY_BUFFER                   0x8892
-#define GL_ELEMENT_ARRAY_BUFFER           0x8893
-#define GL_STREAM_DRAW                    0x88E0
-#define GL_STREAM_READ                    0x88E1
-#define GL_STREAM_COPY                    0x88E2
-#define GL_STATIC_DRAW                    0x88E4
-#define GL_STATIC_READ                    0x88E5
-#define GL_STATIC_COPY                    0x88E6
-#define GL_DYNAMIC_DRAW                   0x88E8
-#define GL_DYNAMIC_READ                   0x88E9
-#define GL_DYNAMIC_COPY                   0x88EA
+#define GL_ARRAY_BUFFER 				0x8892
+#define GL_ELEMENT_ARRAY_BUFFER 		0x8893
+#define GL_STREAM_DRAW					0x88E0
+#define GL_STREAM_READ					0x88E1
+#define GL_STREAM_COPY					0x88E2
+#define GL_STATIC_DRAW					0x88E4
+#define GL_STATIC_READ					0x88E5
+#define GL_STATIC_COPY					0x88E6
+#define GL_DYNAMIC_DRAW 				0x88E8
+#define GL_DYNAMIC_READ 				0x88E9
+#define GL_DYNAMIC_COPY 				0x88EA
 
-#define GL_FRAGMENT_SHADER                0x8B30
-#define GL_VERTEX_SHADER                  0x8B31
-#define GL_COMPILE_STATUS                 0x8B81
-#define GL_LINK_STATUS                    0x8B82
-#define GL_VALIDATE_STATUS                0x8B83
+#define GL_FRAGMENT_SHADER				0x8B30
+#define GL_VERTEX_SHADER				0x8B31
+#define GL_COMPILE_STATUS				0x8B81
+#define GL_LINK_STATUS					0x8B82
+#define GL_VALIDATE_STATUS				0x8B83
 
-#define GL_DEBUG_OUTPUT 				  0x92E0
+#define GL_FRAMEBUFFER_SRGB 			0x8DB9
+
+#define GL_DEBUG_OUTPUT 				0x92E0

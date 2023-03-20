@@ -27,9 +27,16 @@ Arena CreateArena(int64 capacity) {
  	return arena;
 }
 
+FixedSize CreateFixedSize(int32 capacity, int32 size) {
+	void* buffer = OSAllocate(capacity*size);
+	memset(buffer, 0, capacity*size);
+	FixedSize allocator;
+	FixedSizeInit(&allocator, (byte*)buffer, capacity, size);
+	return allocator;
+}
+
 FixedSize CreateFixedSize(Arena* arena, int32 capacity, int32 size) {
-	ArenaAlign(arena, 8);
-	void* buffer = ArenaAlloc(arena, capacity*size);
+	void* buffer = ArenaAlloc(arena, capacity*size, 8);
 	memset(buffer, 0, capacity*size);
 	FixedSize allocator;
 	FixedSizeInit(&allocator, (byte*)buffer, capacity, size);

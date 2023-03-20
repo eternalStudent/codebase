@@ -1,3 +1,11 @@
+/*
+ * NOTE:
+ * non-growing arena, with no last ptr to re-alloc
+ *
+ * TODO:
+ * experiment with additional arena types
+ */
+
 struct Arena {
 	byte* buffer;
 	ssize ptr;			// base-address realtive to the buffer
@@ -10,17 +18,18 @@ void ArenaInit(Arena* arena, void* buffer, ssize capacity) {
 	arena->capacity = capacity;
 }
 
-void ArenaAlign(Arena* arena, int32 divisibility) {
-	ASSERT(divisibility == 2 || divisibility == 4 || divisibility == 8 || divisibility == 16);
-	uint32 modulo = arena->ptr & (divisibility - 1);
-	if (modulo != 0) arena->ptr += (divisibility - modulo);
-}
-
-byte* ArenaAlloc(Arena* arena, ssize size) {
+byte* ArenaAlloc(Arena* arena, ssize size, int32 alignment = 0) {
 	if (size == 0) return NULL;
 
-	if (arena->capacity < arena->ptr+size) return NULL;
+	int32 moveToAlign = 0;
+	if (alignment) {
+		uint32 modulo = arena->ptr & (alignment - 1);
+		moveToAlign = alignment - modulo;
+	}
 
+	if (arena->capacity < arena->ptr + size + moveToAlign) return NULL;
+
+	arena->ptr += moveToAlign;
 	byte* data = arena->buffer + arena->ptr;
 	arena->ptr += size;
 

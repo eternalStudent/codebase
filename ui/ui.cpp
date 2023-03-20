@@ -1,48 +1,43 @@
-#define UI_FLIPY(y)        (ui.windowElement->height-(y)-1)         
+/*
+ * TODO:
+ * Previous version supported editable text
+ * accordion, tree-view, splitter
+ * drop-down, menu-bar, list-box, combo-box, spinner
+ * tooltip, context-menu
+ */
 
-#define UI_MOVABLE			(1 << 0)
-#define UI_RESIZABLE		(1 << 1)
-#define UI_SHUFFLEABLE		(1 << 2)
-#define UI_CLICKABLE		(1 << 3)
-#define UI_HIDE_OVERFLOW 	(1 << 4)
-#define UI_SCROLLABLE		((1 << 5) | UI_HIDE_OVERFLOW)
-#define UI_INFINITESCROLL	((1 << 6) | UI_SCROLLABLE)
-#define UI_EDITABLE 		(1 << 7)
-#define UI_BRING_PARENT_TO_FRONT	(1 << 8)
+#define UI_X_MOVABLE		(1ull << 0)
+#define UI_Y_MOVABLE		(1ull << 1)
+#define UI_MOVABLE			(UI_X_MOVABLE | UI_Y_MOVABLE)
+#define UI_RESIZABLE		(1ull << 2)
+#define UI_SHUFFLABLE		(1ull << 3)
+#define UI_CLICKABLE		(1ull << 4)
+#define UI_HIDE_OVERFLOW	(1ull << 5)
+#define UI_SCROLLABLE		((1ull << 6) | UI_HIDE_OVERFLOW)
+#define UI_INFINITE_SCROLL  ((1ull << 7) | UI_SCROLLABLE)
 
-#define UI_HIDDEN			(1 << 9)
+#define UI_CENTER			(1ull << 10)
+#define UI_MIDDLE			(1ull << 11)
+#define UI_FIT_CONTENT		(1ull << 14)
+#define UI_MIN_CONTENT		(1ull << 15)
+#define UI_ELEVATOR 		(1ull << 16)
 
-// layout flags, should probably be replaced by a layout system
-#define UI_CENTER			(1 << 10)
-#define UI_MIDDLE			(1 << 11)
-#define UI_RIGHT			(1 << 12)
-#define UI_BOTTOM			(1 << 13)
-#define UI_FIT_CONTENT		(1 << 14)
-#define UI_MIN_CONTENT		(1 << 15)
-
-#define UI_ELEVATOR 		(1 << 16)
-#define UI_ADDENDUM			(1 << 17)
-
-
-#include "font.cpp"
+#define UI_GRADIENT 		(1ull << 32)
+#define UI_HOVER_STYLE		(1ull << 33)
+#define UI_ACTIVE_STYLE		(1ull << 34)
 
 struct UIStyle {
+	Color background;
 	float32 radius;
-	uint32 background;
 	float32 borderWidth;
-	uint32 borderColor;
-};
-
-union UIBox {
-	struct {int32 x, y, width, height;};
-	struct {Point2i pos; Dimensions2i dim;};
+	Color borderColor;
+	Color color2;
 };
 
 struct UIText {
-	Font* font;
+	BakedFont* font;
+	Color color;
 	String string;
-	uint32 color;
-	StringList editable;
 };
 
 struct UIImage {
@@ -50,172 +45,128 @@ struct UIImage {
 	Box2 crop;
 };
 
-#define UI_LEFT_POINTING_TRIANGLE 		1
-#define UI_RIGHT_POINTING_TRIANGLE		2
-#define UI_UP_POINTING_TRIANGLE 		3
-#define UI_DOWN_POINTING_TRIANGLE 		4
-#define UI_SQUARE 						5
-#define UI_BULLET 						6
-#define UI_DIAGONAL 					7
-
-struct UISymbol {
-	union {
-		struct {int32 x0, y0;};
-		Point2i pos;
-	};
-	uint32 color;
-	int32 type;
-};
-
 struct UIElement {
 	union {
-		struct {int32 x, y, width, height;};
-		struct {Point2i pos; Dimensions2i dim;};
-		UIBox box;
-	};
-
-	union {
-		struct{ int32 minWidth, minHeight;};
-		Dimensions2i minDim;
-	};
-
-	union {
-		struct {
-			float32 radius;
-			uint32 background;
-			float32 borderWidth;
-			uint32 borderColor;
+		union {
+			struct {Point2 pos; Dimensions2 dim;};
+			struct {float32 x, y, width, height;};
 		};
-		UIStyle style;
 	};
 
-	// TODO: add cursorIcon?
-	String name; // NOTE: for debugging
+	Point2 scroll;
 
-	uint32 flags;
+	union {
+		UIStyle style;
+		struct {
+			Color background;
+			float32 radius;
+			float32 borderWidth;
+			Color borderColor;
+			Color color2;
+		};
+	};
+
+	uint64 flags;
+
+	UIStyle hover;
+	UIStyle active;
+	UIStyle focused;
+
+	union {	
+		bool isChecked;
+		bool isSelected;
+		bool isActive;
+	};
+
+	UIText text;
+	byte icon;
+	UIImage image;
 
 	void (*onClick)(UIElement*);
-	void (*onHover)(UIElement*);
-	void (*onResize)(UIElement*);
 	void (*onMove)(UIElement*);
+
+	opaque64 context;
 
 	UIElement* parent;
 	UIElement* first;
 	UIElement* last;
-	UIElement* next;
 	UIElement* prev;
-
-	UIText text;
-	UIImage image;
-	UISymbol symbol;
-	opaque64 context;
-
-	Point2i scrollPos;
+	UIElement* next;
 };
 
 struct {
 	FixedSize allocator;
-	FixedSize stringNodeAllocator;
-	struct {byte* start;byte* current;} buffer; 
-	Arena* scratch;
+	BakedFont iconsFont;
+	byte icons[Icon_count];
 
-	UIStyle originalStyle;
+	UIElement* rootElement;
 
-	UIElement* windowElement;
+	UIElement* hovered;
+	UIElement* focused;
 
-	UIElement* active;
-	Point2i originalPos;
-	Point2i grabPos;
-	int32 keyCount;
+	Point2 originalPos;
+	Point2 grabPos;
 
 	bool isGrabbing;
 	bool isResizing;
-	bool isSelecting;
-
-	UIElement* selected;
-	ssize start;
-	ssize end;
+	bool rootElementIsWindow;
 } ui;
 
-Box2i GetAbsolutePosition(UIElement* element) {
-	if (element == NULL) return {0, 0, ui.windowElement->width, ui.windowElement->height};
+// Util
+//-------------
+
+Point2 GetScreenPosition(UIElement* element) {
 	UIElement* parent = element->parent;
-	Box2i parentPos = GetAbsolutePosition(parent);
-	if (parent == NULL) parent = ui.windowElement;
+	if (parent == NULL) return {element->x, element->y};
 
-	int32 x0 = (element->flags & UI_RIGHT) 
-		? parentPos.x1 - element->x - parent->scrollPos.x - element->width
-		: parentPos.x0 + element->x - parent->scrollPos.x;
-	int32 y0 = (element->flags & UI_BOTTOM) 
-		? parentPos.y1 - element->y - parent->scrollPos.y - element->height
-		: parentPos.y0 + element->y - parent->scrollPos.y;
-	int32 x1 = (element->flags & UI_RIGHT)
-		? parentPos.x1 - element->x - parent->scrollPos.x
-		: parentPos.x0 + element->x - parent->scrollPos.x + element->width;
-	int32 y1 = (element->flags & UI_BOTTOM) 
-		? parentPos.y1 - element->y - parent->scrollPos.y
-		: parentPos.y0 + element->y - parent->scrollPos.y + element->height;
-
-	return {x0, y0, x1, y1};
+	Point2 parentPos = GetScreenPosition(parent);
+	return {parentPos.x + element->x - parent->scroll.x, parentPos.y + element->y - parent->scroll.y};
 }
 
-bool IsInBottomRight(Box2i box, Point2i pos) {
-	return box.x1-4 <= pos.x && box.y1-4 <= pos.y;
-}
+Box2 GetScreenHitBox(UIElement* element) {
+	UIElement* parent = element->parent;
+	if (parent == NULL) 
+		return {element->x, element->y, element->x + element->width, element->y + element->height};
 
-ssize GetTextIndex(UIElement* textElement, Point2i pos, Point2i cursorPos) {
-	UIText text = textElement->text;
-	StringList list;
-	StringNode node;
-	if (text.editable.totalLength) {
-		list = text.editable;
-	}
-	else if (text.string.length || textElement->flags & UI_EDITABLE) {
-		list = CreateStringList(text.string, &node);
-	}
-	else return -1;
-	float32 x_end = (float32)(cursorPos.x - pos.x + textElement->scrollPos.x);
-	float32 y_end = (float32)(cursorPos.y - (pos.y + text.font->height) + textElement->scrollPos.y);
-	return GetCharIndex(text.font, list, x_end, y_end);
-}
-
-void SetPosition(UIElement* element, int32 x, int32 y) {
-	if (!element->parent) {
-		element->pos = {x,y};
+	Box2 parentBox = GetScreenHitBox(parent);
+	if (parent->flags & UI_HIDE_OVERFLOW) {
+		float32 x0 = parentBox.x0 + MAX(element->x, 0);
+		float32 y0 = parentBox.y0 + MAX(element->y, 0);
+		float32 x1 = MIN(parentBox.x0 + element->x + element->width, parentBox.x1);
+		float32 y1 = MIN(parentBox.y0 + element->y + element->height, parentBox.y1);
+		return {x0, y0, x1, y1};
 	}
 	else {
-		UIElement* parent = element->parent;
-		if (parent->flags & UI_INFINITESCROLL) {
-			element->pos = {x, y};
-			return;
-		}
-
-		if (x < 0) element->x = 0;
-		else if (x+element->width > parent->width) element->x = parent->width-element->width;
-		else element->x = x;
-
-		if (y < 0) element->y = 0;
-		else if (y+element->height > parent->height) element->y = parent->height-element->height;
-		else element->y = y;
+		float32 x0 = parentBox.x0 + element->x;
+		float32 y0 = parentBox.y0 + element->y;
+		float32 x1 = parentBox.x0 + element->x + element->width;
+		float32 y1 = parentBox.y0 + element->y + element->height;
+		return {x0, y0, x1, y1};
 	}
 }
 
-bool IsAncestorHidden(UIElement* e) {
-	while (e) {
-		if (e->flags & UI_HIDDEN) return true;
-		e = e->parent;
-	}
-	return false;
+// NOTE: both for drawing and for intercepting hit-box
+bool HasQuad(UIElement* e) {
+	return (e->background.a) || (e->borderWidth && e->borderColor.a) || (e->flags & UI_CLICKABLE);
 }
 
-UIElement* GetElementByPosition(Point2i p) {
-	UIElement* element = ui.windowElement;
+bool HasText(UIElement* e) {
+	return e->text.string.data && e->text.string.length && e->text.color.a;
+}
+
+bool HasImage(UIElement* e) {
+	return e->image.atlas != 0;
+}
+
+UIElement* GetElementByPosition(Point2i cursorPos) {
+	UIElement* element = ui.rootElement;
 	while (element->last) element = element->last;
 
 	while (element) {
-		if (!IsAncestorHidden(element)) {
-			Box2i b = GetAbsolutePosition(element);
-			if (INSIDE2(b, p)) break;
+		if (HasQuad(element) || HasImage(element)) {
+			Box2 box = GetScreenHitBox(element);
+			if (box.x0 <= cursorPos.x && cursorPos.x <= box.x1 && box.y0 <= cursorPos.y && cursorPos.y <= box.y1)
+				break;
 		}
 
 		if (element->prev) {
@@ -225,55 +176,42 @@ UIElement* GetElementByPosition(Point2i p) {
 		else element = element->parent;
 	}
 
-	if (element == ui.windowElement) return NULL;
 	return element;
 }
 
-Point2i GetRelativePosition(Point2i cursorPos, UIElement* element) {
-	Box2i absolute = GetAbsolutePosition(element);
-	return {cursorPos.x - absolute.x0, cursorPos.y - absolute.y0};
-}
-
-void BringToFront(UIElement* element) {
-	if (element->parent->last == element) return;
-
-	UIElement* parent = element->parent;
-	UIElement* prev = element->prev;
-	UIElement* next = element->next;
-
-	if (parent->first == element) parent->first = next;
-
-	if (prev) prev->next = next;
-	next->prev = prev;
-	element->prev = parent->last;
-	element->next = NULL;
-	parent->last->next = element;
-	parent->last = element;
-}
-
-UIElement* GetScrollableAnscestor(UIElement* e) {
-	while (e && !(e->flags & UI_SCROLLABLE))
-		e = e->parent;
-	return e;
-}
-
-Dimensions2i GetContentDim(UIElement* e) {
-	int32 width = 0;
-	int32 height = 0;
-	if (e->text.editable.totalLength) {
-		TextMetrics metrics = GetTextMetrics(e->text.font, e->text.editable);
-		width = (int32)(metrics.maxx + 0.5f);
-		height = (int32)(metrics.endy + 0.5f);
+void SetPosition(UIElement* element, float32 x, float32 y) {
+	if (!element->parent) {
+		element->pos = {x,y};
 	}
-	if (e->text.string.length) {
+	else {
+		UIElement* parent = element->parent;
+
+		if (element->flags & UI_X_MOVABLE) {
+			if (x < 0) element->x = 0;
+			else if (x+element->width > parent->width) element->x = parent->width-element->width;
+			else element->x = x;
+		}
+
+		if (element->flags & UI_Y_MOVABLE) {
+			if (y < 0) element->y = 0;
+			else if (y+element->height > parent->height) element->y = parent->height-element->height;
+			else element->y = y;
+		}
+	}
+}
+
+Dimensions2 GetContentDim(UIElement* e) {
+	float32 width = 0;
+	float32 height = 0;
+	if (HasText(e)) {
 		StringNode node = {e->text.string, NULL, NULL};
 		StringList list = {&node, &node, e->text.string.length};
 		TextMetrics metrics = GetTextMetrics(e->text.font, list);
-		width = (int32)(metrics.maxx + 0.5f);
-		height = (int32)(metrics.endy + 0.5f);
+		width = metrics.maxx;
+		height = metrics.endy;
 	}
 	LINKEDLIST_FOREACH(e, UIElement, child) {
-		if (child->flags & UI_ADDENDUM) continue;
+		//if (child->flags & UI_ADDENDUM) continue;
 		width  = MAX(child->x + child->width, width);
 		height = MAX(child->y + child->height, height);
 	}
@@ -281,1401 +219,400 @@ Dimensions2i GetContentDim(UIElement* e) {
 }
 
 // Render
-//---------
+//------------
 
-void RenderText(UIElement* textElement, Point2i pos) {
-	UIText text = textElement->text;
+UIStyle GetCurrentStyle(UIElement* element) {
+	if ((element->flags & UI_HOVER_STYLE) && ui.hovered == element)
+		return element->hover;
 
-	StringNode node;
-	StringList list;
-	if (text.editable.totalLength) {
-		list = text.editable;
-	}
-	else if (text.string.length) {
-		list = CreateStringList(text.string, &node);
-	}
-	else return;
+	if ((element->flags & UI_ACTIVE_STYLE) && element->isActive)
+		return element->active;
 
-	Font* font = text.font;
-	uint32 color = text.color;
-
-	float32 x = (float32)(pos.x - textElement->scrollPos.x);
-	float32 y = (float32)(UI_FLIPY(pos.y + font->height - textElement->scrollPos.y));
-	RenderText(font, list, x, y, color);
-	
-	// Handle selected text
-	if (ui.selected && ui.selected == textElement) {
-		ssize start = MIN(ui.start, ui.end);
-		ssize end = MAX(ui.start, ui.end);
-		ASSERT(0 <= start && start <= end && end <= list.totalLength);
-
-		float32 x0 = x;
-		float32 y1 = y + font->height - 3;
-		float32 x1 = x;
-		ssize i = 0;
-		int32 phase = 0;
-		LINKEDLIST_FOREACH(&list, StringNode, current) {
-			String string = current->string;
-			for (ssize j = 0; j < string.length; j++, i++) {
-				byte b = string.data[j];
-
-				if (phase == 0) {
-					if (i == start) {
-						phase = 1;
-						x1 = x0;
-					}
-					else {
-						if (b == 10) {
-							x0 = x;
-							y1 -= font->height;
-						}
-						x0 += GetCharWidth(font, b);
-					}
-				}
-
-				if (phase == 1) {
-					if (i == end) {
-						if (start != end)
-							GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
-						phase = 2;
-					}
-					else {
-						if (b == 10) {
-							if (start != end)
-								GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
-							x0 = x;
-							x1 = x;
-							y1 -= font->height;
-						}
-						x1 += GetCharWidth(font, b);
-					}
-				}
-
-				if (phase == 2) break;
-			}
-
-			if (phase == 2) break;
-		}
-		if (end == list.totalLength && start != end) {
-			GfxDrawBox2({x0, y1 - font->height, x1, y1}, 0x44ffffff);
-		}
-		
-		
-		if (ui.start < ui.end)
-			GfxDrawBox2({x1-1, y1 - font->height-2, x1+1, y1+2}, RGBA_ORANGE);
-		else
-			GfxDrawBox2({x0-1, y1 - font->height-2, x0+1, y1+2}, RGBA_ORANGE);
-	}
-}
-
-void RenderImage(UIElement* imageElement, Point2i pos) {
-	UIImage image = imageElement->image;
-	if (!image.atlas) return;
-
-	Box2 renderBox = Box2{
-		(float32)pos.x, 
-		(float32)UI_FLIPY(pos.y+imageElement->height), 
-		(float32)(pos.x+imageElement->width), 
-		(float32)UI_FLIPY(pos.y)};
-	GfxDrawImage(image.atlas, image.crop, renderBox);
-}
-
-void RenderSymbol(UISymbol symbol, Point2i pos) {
-	if (symbol.type == 0) return;
-
-	float32 x0 = (float32)(symbol.pos.x + pos.x);
-	float32 y0 = (float32)(symbol.pos.y + pos.y);
-	switch (symbol.type) {
-		case UI_LEFT_POINTING_TRIANGLE: {
-			GfxDrawTriangle(
-				{
-					{x0, UI_FLIPY(y0 + 5.0f)},
-					{x0 + 5.0f, UI_FLIPY(y0)},
-					{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
-				}, symbol.color);
-		} break;
-		case UI_RIGHT_POINTING_TRIANGLE: {
-			GfxDrawTriangle(
-				{
-					{x0, UI_FLIPY(y0)},
-					{x0 + 9.0f, UI_FLIPY(y0 + 5.0f)},
-					{x0, UI_FLIPY(y0 + 9.0f)}
-				}, symbol.color);
-		} break;
-		case UI_UP_POINTING_TRIANGLE: {
-			GfxDrawTriangle(
-				{
-					{x0 + 5.0f, UI_FLIPY(y0)},
-					{x0, UI_FLIPY(y0 + 9.0f)},
-					{x0 + 9.0f, UI_FLIPY(y0 + 9.0f)}
-				}, symbol.color);
-		} break;
-		case UI_DOWN_POINTING_TRIANGLE: {
-			GfxDrawTriangle(
-				{
-					{x0, UI_FLIPY(y0)},
-					{x0 + 9.0f, UI_FLIPY(y0)},
-					{x0 + 5.0f, UI_FLIPY(y0 + 9.0f)}
-				}, symbol.color);
-		} break;
-		case UI_SQUARE: {
-			GfxDrawBox2({x0, UI_FLIPY(y0 + 9.0f), x0 + 9.0f, UI_FLIPY(y0)}, symbol.color);
-		} break;
-		case UI_BULLET: {
-			GfxDrawDisc({{x0, UI_FLIPY(y0 + 5.0f)}, 5.0f}, symbol.color, 0, 360);
-		} break;
-		case UI_DIAGONAL: {
-			Point2 points[2] = {{(float32)pos.x, (float32)UI_FLIPY(pos.y)}, {(float32)x0, (float32)UI_FLIPY(y0)}};
-			Line2 line = {points, 2};
-			GfxDrawLine(line, 1, symbol.color);
-		} break;
-	}
-}
-
-int32 __center(UIElement* element) {
-	return (element->parent->width - element->width)/2;
-}
-
-int32 __middle(UIElement* element) {
-	return (element->parent->height - element->height)/2;
+	return element->style;
 }
 
 void RenderElement(UIElement* element) {
-	if (element->flags & UI_HIDDEN) return;
-	if (element->flags & UI_CENTER) element->x = __center(element);
-	if (element->flags & UI_MIDDLE) element->y = __middle(element);
-	Dimensions2i contentDim = GetContentDim(element);
-	if (element->flags & UI_FIT_CONTENT) {
-		int32 newWidth = MAX(element->minWidth, contentDim.width);
-		int32 newHeight = MAX(element->minHeight, contentDim.height);
-		if (newWidth != element->width || newHeight != element->height) {
-			element->dim = {newWidth, newHeight};
-			if (element->onResize) element->onResize(element);
-		}
-	}
-	if (element->flags & UI_MIN_CONTENT) {
-		if (!element->width) element->width = element->minWidth;
-		if (!element->height) element->height = element->minHeight;
-		int32 newWidth = MAX(element->width, contentDim.width);
-		int32 newHeight = MAX(element->height, contentDim.height);
-		if (newWidth != element->width || newHeight != element->height) {
-			element->dim = {newWidth, newHeight};
-			if (element->onResize) element->onResize(element);
-		}
-	}
+	UIElement* parent = element->parent;
+	Dimensions2 contentDim = GetContentDim(element);
+
+	if (element->flags & UI_FIT_CONTENT) 
+		element->dim = contentDim;
+	if (element->flags & UI_MIN_CONTENT) 
+		element->dim = {MAX(element->width, contentDim.width), MAX(element->height, contentDim.height)};
+	if (element->flags & UI_CENTER) element->x = MAX((parent->width - element->width)/2.0f, 0);
+	if (element->flags & UI_MIDDLE) element->y = MAX((parent->height - element->height)/2.0f, 0);
 	if (element->flags & UI_ELEVATOR) {
 		UIElement* scrollBar = element->parent;
 		UIElement* pane = scrollBar->prev;
-		Dimensions2i paneDim = GetContentDim(pane);
+		Dimensions2 paneDim = GetContentDim(pane);
 
-		float32 length = (float32)(pane->height*scrollBar->height)/(float32)paneDim.height;
-		float32 pos = (float32)((scrollBar->height - length)*pane->scrollPos.y)/(float32)(paneDim.height - pane->height); 
-
-		element->height = (int32)length;
-
-		if (pos + length > scrollBar->height) element->y = scrollBar->height - element->height;
-		else element->y = (int32)pos;
-	}
-	Box2i box = GetAbsolutePosition(element);
-
-	RenderImage(element, box.p0);
-
-	Box2 renderBox = Box2{(float32)box.x0, (float32)UI_FLIPY(box.y1), (float32)box.x1, (float32)UI_FLIPY(box.y0)};
-	if (element->radius) {
-		GfxDrawBox2Rounded(renderBox, element->radius, element->background);
-		if (element->borderWidth && element->borderColor) 
-			GfxDrawBox2RoundedLines(renderBox, element->radius, element->borderWidth, element->borderColor);
-	}
-	else {
-		GfxDrawBox2(renderBox, element->background);
-		if (element->borderWidth && element->borderColor) 
-			GfxDrawBox2Lines(renderBox, element->borderWidth, element->borderColor);
+		element->height = (pane->height*scrollBar->height)/paneDim.height;
 	}
 
-	if (element->flags & UI_HIDE_OVERFLOW) GfxCropScreen(box.x0, UI_FLIPY(box.y1), element->width, element->height);
-	LINKEDLIST_FOREACH(element, UIElement, child) RenderElement(child);
-	RenderText(element, box.p0);
-	RenderSymbol(element->symbol, box.p0);
-	if (element->flags & UI_HIDE_OVERFLOW) GfxClearCrop();
-}
+	Point2 pos = GetScreenPosition(element);
 
-// Text
-//-----------
-
-ssize GetTextLength() {
-	if (ui.selected->text.editable.totalLength)
-		return ui.selected->text.editable.totalLength;
-	return ui.selected->text.string.length;
-}
-
-StringNode* CreateStringNode() {
-	StringNode* result = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
-	ASSERT(result);
-	return result;
-}
-
-void DestroyStringNode(StringNode* node) {
-	FixedSizeFree(&ui.stringNodeAllocator, node);
-}
-
-void UpdateTextScrollPos() {
-	if (!(ui.selected->flags & UI_SCROLLABLE)) return;
-	UIText text = ui.selected->text;
-	int32 elementWidth = ui.selected->width;
-	int32 elementHeight = ui.selected->height;
-	Font* font = text.font;
-	StringNode node;
-	StringList list;
-
-	if (text.editable.totalLength) {
-		list = text.editable;
+	if (HasQuad(element)) {
+		UIStyle style = GetCurrentStyle(element);
+		GfxDrawQuad(pos, element->dim, style.background, style.radius, style.borderWidth, style.borderColor,
+			element->flags & UI_GRADIENT ? style.color2 : style.background);
 	}
-	else {
-		list = CreateStringList(text.string, &node);
+	if (HasText(element))
+		RenderText(pos, element->text.font, element->text.color, element->text.string);
+	if (element->icon) {
+		RenderGlyph(pos, &ui.iconsFont, {0, 0, 0, 1}, element->icon);
+	}
+	if (HasImage(element)) {
+		GfxDrawImage(pos, element->dim, element->image.atlas, element->image.crop);
 	}
 
-	TextMetrics metrics = GetTextMetrics(font, list, ui.end);
-	float32 textLineWidth = metrics.endx;
-	float32 nextLetter = 0.0f;
-	if (ui.end < list.totalLength) {
-		byte b = GetChar(list, ui.end + 1);
-		if (b == 10) b = 32;
-		nextLetter = GetCharWidth(font, b);
-	}
-
-	// right
-	int32 posRelativeToElement = (int32)(textLineWidth + nextLetter + 0.5f);
-	if (elementWidth < posRelativeToElement - ui.selected->scrollPos.x) {
-		ui.selected->scrollPos.x = posRelativeToElement - elementWidth; 
-	}
-
-	// left
-	if (GetChar(list, ui.end - 1) != 10) {
-		textLineWidth = GetTextMetrics(font, list, MAX(0, ui.end - 1)).endx;
-		posRelativeToElement = (int32)(textLineWidth + 0.5f);
-	}
-	if (posRelativeToElement < ui.selected->scrollPos.x) {
-		ui.selected->scrollPos.x = MAX(posRelativeToElement, 0);
-	}
-
-	// down
-	if (elementHeight < metrics.endy - ui.selected->scrollPos.y) {
-		ui.selected->scrollPos.y = (int32)(metrics.endy + 0.5f) - elementHeight;
-	}
-
-	// up
-	if (metrics.endy - font->height < ui.selected->scrollPos.y) {
-		ui.selected->scrollPos.y = MAX((int32)(metrics.endy - 1.5f*font->height + 0.5f), 0);
-	}
-}
-
-void DeleteSelectedText() {
-	StringList* list = &ui.selected->text.editable;
-	ssize start = MIN(ui.start, ui.end);
-	ssize end = MAX(ui.start, ui.end);
-	if (end == start + 1) {
-		ui.start = end;
-		ui.end = end;
-		start = end;
-	}
-	if (start == end) {
-		if (end == 0) {
-			return;
-		}
-		else if (end == list->totalLength) {
-			StringNode* node = list->last;
-			if (node->string.data + node->string.length == ui.buffer.current) 
-				ui.buffer.current--;
-			if (node->string.length == 1) {
-				LINKEDLIST_REMOVE(list, node);
-				FixedSizeFree(&ui.stringNodeAllocator, node);
-			}
-			else {
-				node->string.length--;
-			}
-		}
-		else {
-			ssize i = 0;
-			LINKEDLIST_FOREACH(list, StringNode, node) {
-				if (end == i + node->string.length) {
-					if (node->string.data + node->string.length == ui.buffer.current) 
-						ui.buffer.current--;
-					if (node->string.length == 1) {
-						LINKEDLIST_REMOVE(list, node);
-						FixedSizeFree(&ui.stringNodeAllocator, node);
-					}
-					else {
-						node->string.length--;
-					}
-					break;
-				}
-				else if (end - i < node->string.length) {
-					ssize length1 = end - i - 1;
-					ssize length2 = node->string.length - length1 - 1;
-
-					if (length1 == 0) {
-						node->string.data++;
-						node->string.length--;
-					}
-					else {
-						node->string.length = length1;
-						StringNode* node2 = CreateStringNode();
-						LINKEDLIST_ADD_AFTER(list, node, node2);
-						node2->string.data = node->string.data + end - i;
-						node2->string.length = length2;
-					}
-					break;
-				}
-				i += node->string.length;
-			}
-		}
-		list->totalLength--;
-		ui.end--;
-		ui.start--;
-	}
-	else {
-		ASSERT(end != 0);
-		ssize length = end - start;
-		if (end == list->totalLength) {
-			StringNode* node = list->last;
-			if (node->string.data + node->string.length == ui.buffer.current) 
-				ui.buffer.current -= MIN(node->string.length, length);
-			while (length) {
-				if (length < node->string.length) {				
-					node->string.length -= length;
-					break;
-				}
-				length -= node->string.length;
-				LINKEDLIST_REMOVE(list, node);
-				FixedSizeFree(&ui.stringNodeAllocator, node);
-				node = list->last;
-			}
-		}
-		else {
-			ssize i = 0;
-			StringNode* node = NULL;
-			for (node = list->first; node != NULL; node = node->next) {
-				if (start - i < node->string.length) {
-					if (end - i < node->string.length) {
-						if (start == i) {
-							node->string.data += length;
-							node->string.length -= length;
-						}
-						else {
-							ssize length1 = start - i;
-							ssize length2 = node->string.length - length1 - length;
-							ASSERT(length2 > 0);
-
-							node->string.length = length1;
-							StringNode* node1 = CreateStringNode();
-							node1->string.data = node->string.data + node->string.length + length;
-							node1->string.length = length2;
-							LINKEDLIST_ADD_AFTER(list, node, node1);
-						}
-						length = 0;
-					}
-					else {
-						length -= node->string.length - (start - i);
-						if (start == i) {
-							LINKEDLIST_REMOVE(list, node);
-							FixedSizeFree(&ui.stringNodeAllocator, node);
-						}
-						else {
-							node->string.length = start - i;
-						}
-					}
-					break;
-				}
-				i += node->string.length;
-			}
-
-			node = node->next;
-			while (length) {
-				if (length < node->string.length) {
-					node->string.data += length;
-					node->string.length -= length;
-					break;
-				}
-				else {
-					StringNode* next = node->next;
-					length -= node->string.length;
-					LINKEDLIST_REMOVE(list, node);
-					FixedSizeFree(&ui.stringNodeAllocator, node);
-					node = next;
-				}
-			}
-		}
-		list->totalLength -= length;
-		ui.end = start;
-		ui.start = start;
-	}
-}
-
-void InsertText(String newString) {
-	if (!newString.length) 
-		return;
-	StringCopy(newString, ui.buffer.current);
-	StringList* list = &ui.selected->text.editable;
-	if (ui.start != ui.end) {
-		// TODO: if the selected length is smaller or equal to newString length, insert it in place.
-		DeleteSelectedText();
-		ASSERT(ui.start == ui.end);
-	}
-	if (ui.end == list->totalLength) {
-	 	if (list->last == NULL || list->last->string.data + list->last->string.length != ui.buffer.current) {
-	 		StringNode* node = CreateStringNode();
-	 		LINKEDLIST_ADD(list, node);
-	 		node->string.data = ui.buffer.current;
-	 	}
-	 	list->last->string.length += newString.length;
-	}
-	else if (ui.end == 0) {
-		StringNode* node = CreateStringNode();
-	 	LINKEDLIST_ADD_TO_START(list, node);
-		node->string.data = ui.buffer.current;
-		node->string.length = newString.length;
-	}
-	else {
-		ssize i = 0;
-		LINKEDLIST_FOREACH(list, StringNode, current) {
-			String string = current->string;
-			if (ui.end == i + string.length) {
-				if (string.data + string.length == ui.buffer.current) {
-					current->string.length += newString.length;
-				}
-				else {
-					StringNode* node = CreateStringNode();
-					LINKEDLIST_ADD_AFTER(list, current, node);
-					node->string.data = ui.buffer.current;
-					node->string.length = newString.length;
-				}
-				break;
-			}
-			else if (ui.end < i + string.length) {
-				ssize length1 = ui.end - i;
-				ssize length2 = string.length - length1;
-				current->string.length = length1;
-				StringNode* node1 = CreateStringNode();
-				LINKEDLIST_ADD_AFTER(list, current, node1);
-				node1->string.data = current->string.data + current->string.length;
-				node1->string.length = length2;
-				StringNode* node2 = CreateStringNode();
-				LINKEDLIST_ADD_AFTER(list, current, node2);
-				node2->string.data = ui.buffer.current;
-				node2->string.length = newString.length;
-				break;
-			}
-			i += string.length;
-		}
-	}
-	ui.buffer.current += newString.length;
-	list->totalLength += newString.length;
-	ui.end += newString.length;
-	ui.start += newString.length;
-	UpdateTextScrollPos();
-}
-
-void CopySelectedTextToClipboard() {
-	String string;
-	ssize start = MIN(ui.start, ui.end);
-	ssize end = MAX(ui.start, ui.end);
-	if (ui.selected->text.editable.totalLength) {
-		StringList list = ui.selected->text.editable;
-		byte* buffer = (byte*)ArenaAlloc(ui.scratch, list.totalLength);
-		StringListCopy(list, buffer);
-		string = {buffer, list.totalLength};
-		// TODO: don't copy the entire text
-	}
-	else {
-		string = ui.selected->text.string;
-	}
-	
-	String sub = {string.data + start, end - start};
-	OSCopyToClipboard(sub);
+	if (element->flags & UI_HIDE_OVERFLOW)
+		GfxCropScreen((int32)pos.x, (int32)pos.y, (int32)element->width, (int32)element->height);
+	LINKEDLIST_FOREACH(element, UIElement, child) 
+		RenderElement(child);
+	if (element->flags & UI_HIDE_OVERFLOW)
+		GfxClearCrop();
 }
 
 // API
-//-----------
+//------------
 
-void UIInit(Arena* persist, Arena* scratch) {
+void UIInit(Arena* persist, Arena* scratch, AtlasBitmap* atlas) {
+	ui = {};
 	ui.allocator = CreateFixedSize(persist, 200, sizeof(UIElement));
-	ui.stringNodeAllocator = CreateFixedSize(persist, 100, sizeof(StringNode));
-	byte* buffer = (byte*)ArenaAlloc(persist, 512);
-	ui.buffer = {buffer, buffer};
-	ui.scratch = scratch;
+	ui.iconsFont = LoadAndBakeIconsFont(scratch, atlas, 24);
+	for (byte i = 0; i < Icon_count; i++) ui.icons[i] = i;
 }
 
-void UIRenderElements() {
-	RenderImage(ui.windowElement, {0, 0});
-	LINKEDLIST_FOREACH(ui.windowElement, UIElement, child) RenderElement(child);
-	RenderText(ui.windowElement, {0, 0});	
+UIElement* UICreateWindowElement(Color background) {
+	FixedSizeReset(&ui.allocator);
+	ui.rootElementIsWindow = true;
+	ui.rootElement = (UIElement*)FixedSizeAlloc(&ui.allocator);
+	ui.rootElement->pos = {0, 0};
+	Dimensions2i windowDim = OSGetWindowDimensions();
+	ui.rootElement->dim = {(float32)windowDim.width, (float32)windowDim.height};
+	ui.rootElement->background = background;
+	GfxSetBackgroundColor(background);
+	return ui.rootElement;
 }
 
-void UISetWindowElement(uint32 background) {
-	ui.windowElement = (UIElement*)FixedSizeAlloc(&ui.allocator);
-	ui.windowElement->pos = {0, 0};
-	ui.windowElement->background = background;
-	GfxSetColor(background);
-}
+UIElement* UICreateElement(
+		UIElement* parent, 
+		Point2 pos = {}, 
+		Dimensions2 dim = {}, 
+		UIStyle style = {}, 
+		uint32 flags = 0) {
 
-void UICreateWindow(const char* title, Dimensions2i dimensions, uint32 background) {
-	OSCreateWindow(title, dimensions.width, dimensions.height);
-	GfxInit(ui.scratch);
-	UISetWindowElement(background);
-}
+	ASSERT(parent || ui.rootElement);
 
-void UICreateWindowFullScreen(const char* title, uint32 background) {
-	OSCreateWindowFullScreen(title);
-	GfxInit(ui.scratch);
-	UISetWindowElement(background);
-}
-
-UIElement* UICreateElement(UIElement* parent) {
 	UIElement* element = (UIElement*)FixedSizeAlloc(&ui.allocator);
 	ASSERT(element != NULL);
 
-	if (parent == NULL) parent = ui.windowElement;
+	if (parent == NULL) parent = ui.rootElement;
 	LINKEDLIST_ADD(parent, element);
 	element->parent = parent;
+
+	element->pos = pos;
+	element->dim = dim;
+	element->style = style;
+	element->flags = flags;
 
 	return element;
 }
 
-void UIAddLocalElement(UIElement* element, UIElement* parent) {
-	ASSERT(element != NULL);
-
-	if (parent == NULL) parent = ui.windowElement;
-	LINKEDLIST_ADD(parent, element);
-	element->parent = parent;
+UIElement* UIAddText(UIElement* parent, UIText text) {
+	UIElement* textElement = UICreateElement(parent);
+	textElement->text = text;
+	textElement->flags = UI_FIT_CONTENT | UI_MIDDLE | UI_CENTER;
+	return textElement;
 }
 
-StringList UICreateEditableText(String string) {
-	StringNode* node = CreateStringNode();
-	StringCopy(string, ui.buffer.current);
-	*node = {{ui.buffer.current, string.length}, NULL, NULL};
-	ui.buffer.current += string.length;
-	return {node, node, string.length};
+UIElement* UIAddText(UIElement* parent, UIText text, float32 x) {
+	UIElement* textElement = UICreateElement(parent);
+	textElement->x = x;
+	textElement->text = text;
+	textElement->flags = UI_FIT_CONTENT | UI_MIDDLE;
+	return textElement;
 }
 
-void UIDestroyEditableText(StringList list) {
-	LINKEDLIST_FOREACH(&list, StringNode, child) DestroyStringNode(child);
+UIElement* UIAddImage(UIElement* parent, Point2 pos, Dimensions2 dim, TextureId atlas, Box2 crop) {
+	UIElement* imageElement = UICreateElement(parent, pos, dim);
+	imageElement->image = {atlas, crop};
+	return imageElement;
 }
 
-void UIDestroyElement(UIElement* element) {
-	if (ui.active == element) ui.active = NULL;
-	if (ui.selected == element) ui.selected = NULL;
-
-	UIDestroyEditableText(element->text.editable);
-	LINKEDLIST_REMOVE(element->parent, element);
-	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
-
-	FixedSizeFree(&ui.allocator, element);
+void UIEnableGradient(UIElement* element, Color color2) {
+	element->flags |= UI_GRADIENT;
+	element->color2 = color2;
 }
 
-void UIRemoveLocalElement(UIElement* element) {
-	if (ui.active == element) ui.active = NULL;
-	if (ui.selected == element) ui.selected = NULL;
-
-	LINKEDLIST_REMOVE(element->parent, element);
-	LINKEDLIST_FOREACH(element, UIElement, child) UIRemoveLocalElement(child);
+void UIEnableHoverStyle(UIElement* element, UIStyle hover) {
+	element->flags |= UI_HOVER_STYLE;
+	element->hover = hover;
 }
 
-UIElement* UIUpdateActiveElement() {
+void UIEnableActiveStyle(UIElement* element, UIStyle active) {
+	element->flags |= UI_ACTIVE_STYLE;
+	element->active = active;
+}
+
+void UIUpdate() {
 	Point2i cursorPos = OSGetCursorPosition();
-	ui.windowElement->dim = OSGetWindowDimensions();
-	UIElement* prev = ui.active;
+	if (ui.rootElementIsWindow) {
+		Dimensions2i dim = OSGetWindowDimensions();
+		ui.rootElement->dim = {(float32)dim.width, (float32)dim.height};
+	}
 	
 	if (!ui.isResizing && !ui.isGrabbing) {
-		ui.active = GetElementByPosition(cursorPos);
+		ui.hovered = GetElementByPosition(cursorPos);
 	}
-	if (prev != ui.active) {
-		if (prev)       prev->style = ui.originalStyle;
-		if (ui.active)  ui.originalStyle = ui.active->style;
+	UIElement* element = ui.hovered;
+
+	if (!element) {
+		if (1 < cursorPos.x && cursorPos.x < ui.rootElement->width-1 && 1 < cursorPos.y && cursorPos.y < ui.rootElement->height-1)
+			OSSetCursorIcon(CUR_ARROW);
+
+		return;
 	}
-	UIElement* element = ui.active;
-	Box2i pos = GetAbsolutePosition(element);
+
+	Point2 absPos = GetScreenPosition(element);
+	Point2 p1 = {absPos.x + element->width, absPos.y + element->height};
+	bool isInBottomRight = p1.x - MIN(4, element->radius) <= cursorPos.x && p1.y - MIN(4, element->radius) <= cursorPos.y;
 
 	// Handle mouse hover
-	bool isInBottomRight = false;
-	ssize textIndex = -1;
-	if (element) {
-		textIndex = GetTextIndex(element, pos.p0, cursorPos);
-		if(IsInBottomRight(pos, cursorPos) && (element->flags & UI_RESIZABLE)) {
-			OSSetCursorIcon(CUR_RESIZE);
-			isInBottomRight = true;
-		}
-		else if (element->onHover) element->onHover(element);
-		else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
-		else if (element->flags & UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
-		else if (textIndex != -1) {
-			OSSetCursorIcon(CUR_TEXT);
-		}
-		else OSSetCursorIcon(CUR_ARROW);
-	}
-	else if (1 < cursorPos.x && cursorPos.x < ui.windowElement->width-1 && 1 < cursorPos.y && cursorPos.y < ui.windowElement->height-1)
-		OSSetCursorIcon(CUR_ARROW);
+	if (isInBottomRight && (element->flags & UI_RESIZABLE)) OSSetCursorIcon(CUR_RESIZE);
+	else if ((element->flags & UI_MOVABLE) == UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
+	else if (element->flags & UI_X_MOVABLE) OSSetCursorIcon(CUR_MOVESIDE);
+	else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
+	else OSSetCursorIcon(CUR_ARROW);
 
-	// Handle mouse pressed
+	// Handle left click
 	if (OSIsMouseLeftClicked()) {
-		ui.selected = NULL;
-		if (element) {
-			if (element->flags & UI_SHUFFLEABLE) BringToFront(element);
-			if (element->flags & UI_BRING_PARENT_TO_FRONT) BringToFront(element->parent);
-			if (element->flags & UI_CLICKABLE) {
-				if (element->onClick)
-					element->onClick(element);
-			}
-			else if (textIndex != -1) {
-				ui.end = textIndex;
-				ui.start = ui.end;
-				ui.selected = element;
-				ui.isSelecting = true;
-			}
-			else if (isInBottomRight && (element->flags & UI_RESIZABLE)) {
-				ui.isResizing = true;
-				ui.originalPos = element->pos;
-			}
-			else if (element->flags & UI_MOVABLE) {
-				ui.isGrabbing = true;
-				ui.grabPos = cursorPos;
-				ui.originalPos = element->pos;
-			}
+		if (element->flags & UI_SHUFFLABLE) {
+			LINKEDLIST_MOVE_TO_LAST(element->parent, element);
+		}
+
+		if (element->onClick) {
+			element->onClick(element);
+		}
+
+		if (isInBottomRight && (element->flags & UI_RESIZABLE)) {
+			ui.isResizing = true;
+			ui.originalPos = element->pos;
+		}
+		else if (element->flags & UI_MOVABLE) {
+			ui.isGrabbing = true;
+			ui.grabPos = {(float32)cursorPos.x, (float32)cursorPos.y};
+			ui.originalPos = element->pos;
 		}
 	}
 
-	// Handle double click
-	if (element && OSIsMouseDoubleClicked() && textIndex != -1) {
-		ui.selected = element;
-		UIText text = ui.selected->text;
-		if (text.editable.totalLength) {
-			StringListFindWord(text.editable, textIndex, &ui.start, &ui.end);
-		}
-		else {
-			StringNode node;
-			StringList list = CreateStringList(text.string, &node);
-			StringListFindWord(list, textIndex, &ui.start, &ui.end);
-		}
-	}
-
-	// Handle triple click
-	if (element && OSIsMouseTripleClicked() && textIndex != -1) {
-		ui.selected = element;
-		UIText text = ui.selected->text;
-		if (text.editable.totalLength) {
-			StringList list = text.editable;
-			if (ui.start != 0) {
-				ssize index = StringListGetLastIndexOf(list, 0, ui.end, 10);
-				ui.start = index != -1 ? index + 1 : 0;
-			}
-			if (ui.end != list.totalLength) {
-				ssize index = StringListGetIndexOf(list, ui.end, list.totalLength, 10);
-				ui.end = index != -1 ? index : list.totalLength;
-			}
-		}
-		else {
-			String string = text.string;
-			while (0 < ui.start && string.data[ui.start - 1] != 10)
-				ui.start--;
-			while (ui.end < string.length && string.data[ui.end] != 10)
-				ui.end++;
-		}
-	}
-	
 	// Handle mouse released
 	if (!OSIsMouseLeftButtonDown()) {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
-		ui.isSelecting = false;
-	}
-
-	// Handle scrolling
-	int32 mouseWheelDelta = OSGetMouseWheelDelta();
-	int32 mouseHWheelDelta = OSGetMouseHWheelDelta();
-	if (mouseWheelDelta || mouseHWheelDelta) {
-		UIElement* scrollable = GetScrollableAnscestor(element);
-		if (scrollable) {
-			Dimensions2i contentDim = GetContentDim(scrollable);
-
-			if (mouseWheelDelta) {
-				scrollable->scrollPos.y -= mouseWheelDelta;
-				if ((scrollable->flags & UI_INFINITESCROLL) != UI_INFINITESCROLL) {
-					if (scrollable->scrollPos.y < 0) scrollable->scrollPos.y = 0;
-					if (scrollable->scrollPos.y > contentDim.height - scrollable->height)
-						scrollable->scrollPos.y = MAX(contentDim.height - scrollable->height, 0);
-				}
-			}
-
-			if (mouseHWheelDelta) {
-				scrollable->scrollPos.x += mouseHWheelDelta;
-				if ((scrollable->flags & UI_INFINITESCROLL) != UI_INFINITESCROLL) {
-					if (scrollable->scrollPos.x < 0) scrollable->scrollPos.x = 0;
-					if (scrollable->scrollPos.x > contentDim.width - scrollable->width)
-						scrollable->scrollPos.x = MAX(contentDim.width - scrollable->width, 0);
-				}
-			}
-		}
 	}
 
 	// Handle grabbing
 	if (ui.isGrabbing && 
 			(cursorPos.x != ui.grabPos.x || cursorPos.y != ui.grabPos.y)) {
-		ASSERT(element);
-		int32 newx  = ui.originalPos.x + cursorPos.x - ui.grabPos.x;
-		int32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
+		float32 newx  = ui.originalPos.x + cursorPos.x - ui.grabPos.x;
+		float32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
 		SetPosition(element, newx, newy);
 		if (element->onMove) element->onMove(element);
 	}
 
 	// Handle resizing
 	if (ui.isResizing) {
-		ASSERT(element);
-		Point2i relativeCursorPos = GetRelativePosition(cursorPos, element->parent);
-		int32 x0 = MIN(ui.originalPos.x, relativeCursorPos.x);
-		int32 y0 = MIN(ui.originalPos.y, relativeCursorPos.y);
-		int32 x1 = MAX(ui.originalPos.x, relativeCursorPos.x);
-		int32 y1 = MAX(ui.originalPos.y, relativeCursorPos.y);
+		Point2 relativeCursorPos = {cursorPos.x - element->parent->x, cursorPos.y - element->parent->y};
+		float32 x0 = MIN(ui.originalPos.x, relativeCursorPos.x);
+		float32 y0 = MIN(ui.originalPos.y, relativeCursorPos.y);
+		float32 x1 = MAX(ui.originalPos.x, relativeCursorPos.x);
+		float32 y1 = MAX(ui.originalPos.y, relativeCursorPos.y);
 
 		element->x = MAX(x0, 0);
 		element->y = MAX(y0, 0);
 		element->width = MIN(x1 - element->x, element->parent->width - element->x);
 		element->height = MIN(y1 - element->y, element->parent->height - element->y);
-
-		if (element->onResize) element->onResize(element);
 	}
 
-	// Handle text selection
-	if (ui.isSelecting) {
-		static int32 selectionCount = 0;
-		if (element && (element->text.string.length || element->text.editable.totalLength)) {
-			selectionCount = 0;
-			ASSERT(element == ui.selected && textIndex != -1);
-			ui.end = textIndex;
-		}
-		else {
-			if (selectionCount == 0) {
-				selectionCount = 6;
-				Box2i selectedPos = GetAbsolutePosition(ui.selected);
-				if (cursorPos.x < selectedPos.x1) {
-					ui.end = MAX(ui.end - 1, 0);
-					UpdateTextScrollPos();
-				}
-				if (selectedPos.x1 < cursorPos.x) {
-					ssize length = GetTextLength();
-					byte nextChar;
-					if (ui.selected->text.editable.totalLength) {
-						nextChar = GetChar(ui.selected->text.editable, ui.end+1);
-					}
-					else {
-						nextChar = ui.selected->text.string.data[ui.end + 1];
-					}
-					if (ui.end < length && nextChar != 10) {
-						ui.end++;
-						UpdateTextScrollPos();
-					}
-				}
-				// TODO: handle ups and downs
-			}
-			else selectionCount--;
-		}
-	}
+	// Handle scrolling
+	int32 mouseWheelDelta = OSGetMouseWheelDelta();
+	int32 mouseHWheelDelta = OSGetMouseHWheelDelta();
+	if (mouseWheelDelta || mouseHWheelDelta) {
+		UIElement* scrollable = element;
+		while (scrollable && !(scrollable->flags & UI_SCROLLABLE))
+			scrollable = scrollable->parent;
+		if (scrollable) {
+			Dimensions2 contentDim = GetContentDim(scrollable);
 
-	// Handle arrow keys
-	if (OSIsKeyPressed(KEY_LEFT)) {
-		if (OSIsKeyDown(KEY_LEFT) || ui.keyCount == 0 ) {
-			ui.keyCount = 6;
-			if (ui.selected) {
-				ui.end = MAX(0, ui.end - 1);
-
-				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
-				UpdateTextScrollPos();
-			}
-		}
-		else ui.keyCount--;
-	}
-	if (OSIsKeyDown(KEY_RIGHT)) {
-		if (OSIsKeyPressed(KEY_RIGHT) || ui.keyCount == 0) {
-			ui.keyCount = 6;
-			if (ui.selected) {
-				ui.end = MIN(ui.end + 1, ui.selected->text.editable.totalLength);
-
-				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
-				UpdateTextScrollPos();
-			}
-		}
-		else ui.keyCount--;
-	}
-	if (OSIsKeyDown(KEY_UP)) {
-		if (OSIsKeyPressed(KEY_UP) || ui.keyCount == 0) {
-			ui.keyCount = 6;
-			if (ui.selected) {
-				UIText text = ui.selected->text;
-				String string = text.string;
-				Font* font = text.font;
-				StringNode node;
-				StringList list = text.editable.totalLength ? text.editable : CreateStringList(string, &node);
-				TextMetrics metrics = GetTextMetrics(font, list, ui.end);
-				ssize end = GetCharIndex(font, list, metrics.endx, metrics.endy - 2.5f*font->height);
-				if (end != -1) ui.end = end;
-
-				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
-				UpdateTextScrollPos();
-			}
-		}
-		else ui.keyCount--;
-	}
-	if (OSIsKeyDown(KEY_DOWN)) {
-		if (OSIsKeyPressed(KEY_DOWN) || ui.keyCount == 0) {
-			ui.keyCount = 6;
-			if (ui.selected) {
-				UIText text = ui.selected->text;
-				String string = text.string;
-				Font* font = text.font;
-				StringNode node;
-				StringList list = text.editable.totalLength ? text.editable : CreateStringList(string, &node);
-				TextMetrics metrics = GetTextMetrics(font, list, ui.end);
-				ssize end = GetCharIndex(font, list, metrics.endx, metrics.endy - 0.5f*font->height);
-				if (end != -1) ui.end = end;
-
-				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
-				UpdateTextScrollPos();
-			}
-		}
-		else ui.keyCount--;
-	}
-
-	if (OSIsKeyDown(KEY_BACKSPACE)) {
-		if (OSIsKeyPressed(KEY_BACKSPACE) || ui.keyCount == 0) {
-			ui.keyCount = 6;
-			if (ui.selected && ui.selected->flags & UI_EDITABLE) {
-				DeleteSelectedText();
-				UpdateTextScrollPos();
-			}
-		}
-		else ui.keyCount--;
-	}
-	if (OSIsKeyDown(KEY_DELETE)) {
-		if (OSIsKeyPressed(KEY_DELETE) || ui.keyCount == 0) {
-			ui.keyCount = 6;
-			if (ui.selected && ui.selected->flags & UI_EDITABLE) {
-				ssize end = MAX(ui.start, ui.end);
-				if (ui.end != ui.start || end != GetTextLength()) {
-					if (ui.end == ui.start) {
-						ui.end++;
-						ui.start++;
-					}
-					DeleteSelectedText();
-					UpdateTextScrollPos();
+			if (mouseWheelDelta) {
+				scrollable->scroll.y -= mouseWheelDelta;
+				if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
+					if (scrollable->scroll.y < 0) scrollable->scroll.y = 0;
+					if (scrollable->scroll.y > contentDim.height - scrollable->height)
+						scrollable->scroll.y = MAX(contentDim.height - scrollable->height, 0);
 				}
 			}
-		}
-		else ui.keyCount--;
-	}
 
-	if (OSIsKeyPressed(KEY_END) && ui.selected) {
-		if (OSIsKeyDown(KEY_CTRL)) {
-			ui.end = GetTextLength();
-		}
-		else {
-			if (ui.selected->text.editable.totalLength) {
-				StringList list = ui.selected->text.editable;
-				if (ui.end != list.totalLength) {
-					ssize index = StringListGetIndexOf(list, ui.end, list.totalLength, 10);
-					ui.end = index != -1 ? index : list.totalLength;
+			if (mouseHWheelDelta) {
+				scrollable->scroll.x += mouseHWheelDelta;
+				if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
+					if (scrollable->scroll.x < 0) scrollable->scroll.x = 0;
+					if (scrollable->scroll.x > contentDim.width - scrollable->width)
+						scrollable->scroll.x = MAX(contentDim.width - scrollable->width, 0);
 				}
 			}
-			else {
-				String string = ui.selected->text.string;
-				while (ui.end < string.length && string.data[ui.end] != 10)
-					ui.end++;
-			}
-			
+
+			// update scrollbar
+			// TODO: horizontal update as well
+			UIElement* scrollBar = scrollable->next;
+			UIElement* thumb = scrollBar->first;
+
+			thumb->y = ((scrollBar->height - thumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
 		}
-
-		if (!OSIsKeyDown(KEY_SHIFT)) {
-			ui.start = ui.end;
-		}
-		UpdateTextScrollPos();
 	}
-
-	if (OSIsKeyPressed(KEY_HOME) && ui.selected) {
-		if (OSIsKeyDown(KEY_CTRL)) {
-			ui.end = 0;
-		}
-		else {
-			if (ui.selected->text.editable.totalLength) {
-				StringList list = ui.selected->text.editable;
-				if (ui.end != 0) {
-					ssize index = StringListGetLastIndexOf(list, 0, ui.end, 10);
-					ui.end = index != -1 ? index + 1 : 0;
-				}
-			}
-			else {
-				String string = ui.selected->text.string;
-				while (0 < ui.end && string.data[ui.end - 1] != 10)
-					ui.end--;
-			}
-			
-		}
-
-		if (!OSIsKeyDown(KEY_SHIFT)) {
-			ui.start = ui.end;
-		}
-		UpdateTextScrollPos();
-	}
-
-	// Handle copy
-	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C) && ui.selected) {
-		CopySelectedTextToClipboard();
-	}
-
-	// Handle paste
-	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_V) && ui.selected) {
-		OSRequestClipboardData(InsertText);
-	}
-
-	// Handle cut
-	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_X) && ui.selected) {
-		CopySelectedTextToClipboard();
-		DeleteSelectedText();
-		UpdateTextScrollPos();
-	}
-
-	// Handle select all
-	if (OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_A) && ui.selected) {
-		UIText text = ui.selected->text;
-		ui.end = GetTextLength();
-		ui.start = 0;
-	}
-
-	// Handle typing
-	if (ui.selected && ui.selected->flags & UI_EDITABLE) {
-		String typed = OSGetTypedText();
-		InsertText(typed);
-	}
-
-	return element;
 }
 
-void UIDrawLine(Point2i p0, Point2i p1, float32 lineWidth, uint32 rgba) {
-	Point2 points[2] = {{(float32)p0.x, (float32)UI_FLIPY(p0.y)}, {(float32)p1.x, (float32)UI_FLIPY(p1.y)}};
-	Line2 line = {points, 2};
-	GfxDrawLine(line, lineWidth, rgba);
+void UIRender() {
+	if (ui.rootElementIsWindow) 
+		LINKEDLIST_FOREACH(ui.rootElement, UIElement, child) RenderElement(child);
+	else 
+		RenderElement(ui.rootElement);
 }
 
-void UIDrawRect(Point2i p0, Point2i p1, float32 lineWidth, uint32 rgba) {
-	GfxDrawBox2Lines({(float32)p0.x, (float32)UI_FLIPY(p1.y), (float32)p1.x, (float32)UI_FLIPY(p0.y)}, lineWidth, rgba);
-}
-
-Box2i UIGetAbsolutePosition(UIElement* element) {
-	return GetAbsolutePosition(element);
-}
-
-void UISelectTextElement(UIElement* element) {
-	ui.selected = element;
-	ui.end = GetTextLength();
-	ui.start = ui.end;
-}
-
-UIElement* UICloneElement(UIElement* element, UIElement* parent) {
-	UIElement* cloned = UICreateElement(parent);
-	UIElement* prev = cloned->prev;
-	memcpy(cloned, element, sizeof(UIElement));
-	cloned->prev = prev;
-	cloned->parent = parent == NULL ? ui.windowElement : parent;
-	cloned->next = NULL;
-	cloned->first = NULL;
-	cloned->last = NULL;
-
-	if (element->text.editable.totalLength) {
-		StringListCopy(element->text.editable, ui.buffer.current);
-		cloned->text.editable = UICreateEditableText({ui.buffer.current, element->text.editable.totalLength});
-		ui.buffer.current += element->text.editable.totalLength;
-	}
-
-	LINKEDLIST_FOREACH(element, UIElement, child) 
-		UICloneElement(child, cloned);
-
-	return cloned;
-}
-
-// specific elements
+// Specific Widgets
 //-------------------
 
-UIBox __pad(UIElement* parent, int32 l, int32 r, int32 t, int32 b) {
-	return UIBox{l, t, parent->width - (l+r), parent->height - (t+b)};
+UIElement* UICreateButton(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style) {
+	UIElement* button = UICreateElement(parent, pos, dim, style, UI_CLICKABLE);
+	UIEnableGradient(button, {
+		style.background.r*0.5f + 0.5f, 
+		style.background.g*0.5f + 0.5f, 
+		style.background.b*0.5f + 0.5f,
+		style.background.a});
+
+	UIEnableHoverStyle(button, {button->color2, style.radius, style.borderWidth, style.borderColor, style.background});
+	return button;
 }
 
-UIBox __pad(UIElement* parent, int32 pad) {
-	return __pad(parent, pad, pad, pad, pad);
+void __check_box(UIElement* e) {
+	if (e->isChecked) {
+		e->isChecked = false;
+		e->icon = Icon_check_empty;
+	}
+	else {
+		e->isChecked = true;
+		e->icon = Icon_check;
+	}
 }
 
-void __toggle(UIElement* e) {
-	byte* context = (byte*)e->context.p;
-	*context = !(*context);
-	e->background = *context ? RGBA_DARKGREY : 0;
-	ui.originalStyle = e->style;
+UIElement* UICreateCheckbox(UIElement* parent, Point2 pos = {}) {
+	UIElement* checkbox = UICreateElement(parent, pos);
+	checkbox->icon = Icon_check_empty;
+	checkbox->isChecked = false;
+	checkbox->flags = UI_FIT_CONTENT | UI_CLICKABLE;
+	checkbox->onClick = __check_box;
+
+	return checkbox;
 }
 
-UIElement* UICreateCheckbox(UIElement* parent, UIText text, byte* context) {
-	UIElement* container = UICreateElement(parent);
-	container->flags = UI_FIT_CONTENT;
-	container->height = 24;
-	container->name = STR("container");
-
-	UIElement* checkbox = UICreateElement(container);
-	checkbox->dim = {24, 24};
-	checkbox->background = RGBA_LIGHTGREY;
-	checkbox->radius = 6;
-	checkbox->name = STR("checkbox");
-
-	UIElement* check = UICreateElement(checkbox);
-	check->box = __pad(checkbox, 4);
-	check->flags = UI_CLICKABLE;
-	check->radius = 3;
-	check->onClick = __toggle;
-	check->context.p = context;
-	check->name = STR("check");
-
-	UIElement* textElement = UICreateElement(container);
-	textElement->pos = {37, -4};
-	textElement->text = text;
-
-	return container;
+void __select_button(UIElement* e) {
+	UIElement* radioGroup = e->parent;
+	LINKEDLIST_FOREACH(radioGroup, UIElement, button) {
+		if (button == e) {
+			button->isChecked = true;
+			button->icon = Icon_dot_circled;
+		}
+		else {
+			button->isChecked = false;
+			button->icon = Icon_circle_empty;
+		}
+	}
 }
 
-void __move_sideway(UIElement* e) {
-	OSSetCursorIcon(CUR_MOVESIDE);
+UIElement* UICreateRadioButton(UIElement* radioGroup, Point2 pos = {}) {
+	UIElement* radioButton = UICreateElement(radioGroup, pos);
+	radioButton->icon = Icon_circle_empty;
+	radioButton->isChecked = false;
+	radioButton->flags = UI_FIT_CONTENT | UI_CLICKABLE;
+	radioButton->onClick = __select_button;
+
+	return radioButton;
 }
 
-UIElement* UICreateSlider(UIElement* parent, int32 width) {
-	UIElement* slider = UICreateElement(parent);
-	slider->dim = {width, 16};
-	slider->background = RGBA_LIGHTGREY;
-	slider->name = STR("slider");
-
-	UIElement* sled = UICreateElement(slider);
-	sled->pos = {(width - 8)/2, 0};
-	sled->dim = {8, 16};
-	sled->radius = 4;
-	sled->background = RGBA_WHITE;
-	sled->flags = UI_MOVABLE;
-	sled->onHover = __move_sideway;
-	sled->name = STR("sled");
+UIElement* UICreateSlider(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style, float32 thumbWidth) {
+	float32 half_height = dim.height/2.f;
+	float32 quater_height = half_height/2.f;
+	UIElement* slider = UICreateElement(parent, {pos.x, pos.y - quater_height}, {dim.width, half_height}, style);
+	UICreateElement(slider, {(dim.width - thumbWidth)/2.f, -quater_height}, {thumbWidth, dim.height}, style, 
+		UI_X_MOVABLE);
 
 	return slider;
 }
 
-void __hover1(UIElement* e) {
-	e->background = RGBA_GREY;
-	OSSetCursorIcon(CUR_HAND);
+UIElement* UICreateVSlider(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style, float32 thumbHeight) {
+	float32 half_width = dim.width/2.f;
+	float32 quater_width = half_width/2.f;
+	UIElement* slider = UICreateElement(parent, {pos.x - quater_width, pos.y}, {half_width, dim.height}, style);
+	UICreateElement(slider, {-quater_width, (dim.height - thumbHeight)/2.f}, {dim.width, thumbHeight}, style, 
+		UI_Y_MOVABLE);
+
+	return slider;
 }
 
-void __hover2(UIElement* e) {
-	e->background = RGBA_LIGHTGREY;
-	OSSetCursorIcon(CUR_HAND);
-}
-
-UIElement* UICreateButton(UIElement* parent, Dimensions2i dim) {
-	UIElement* button = UICreateElement(parent);
-	button->dim = dim;
-	button->background = RGBA_LIGHTGREY;
-	button->radius = 12.0f;
-	button->borderWidth = 1;
-	button->borderColor = RGBA_WHITE;
-	button->onHover = __hover1;
-	button->flags = UI_CLICKABLE;
-	button->name = STR("button");
-	return button;
-}
-
-void __switch(UIElement* e) {
-	UIElement* parent = e->parent;
-	LINKEDLIST_FOREACH(parent, UIElement, child) {
-		child->background = RGBA_LIGHTGREY;
-		child->onHover = __hover1;
+void __activate_tab(UIElement* e) {
+	UIElement* tabControl = e->parent;
+	LINKEDLIST_FOREACH(tabControl, UIElement, header) {
+		header->isActive = header == e;
 	}
-	e->background = RGBA_DARKGREY;
-	e->onHover = NULL;
-	ui.originalStyle = e->style;
 }
 
-UIElement* UICreateTabControl(UIElement* parent, Dimensions2i dim) {
-	UIElement* control = UICreateElement(parent);
-	control->dim = dim;
-	control->background = RGBA_LIGHTGREY;
-	control->flags = UI_MOVABLE | UI_RESIZABLE | UI_FIT_CONTENT;
-	control->borderColor = RGBA_WHITE;
-	control->borderWidth = 1;
-	control->name = STR("tab control");
+UIElement* UICreateTab(UIElement* tabControl, Dimensions2 dim, UIStyle style, UIText header) {
+	Color bg = style.background;
+	UIStyle nonactive = {{
+		0.5f*bg.r + 0.5f,
+		0.5f*bg.g + 0.5f,
+		0.5f*bg.b + 0.5f,
+		bg.a,
+	}, style.radius, style.borderWidth, style.borderColor};
+	UIStyle hover = {{
+		0.75f*bg.r + 0.25f,
+		0.75f*bg.g + 0.25f,
+		0.75f*bg.b + 0.25f,
+		bg.a,
+	}, style.radius, style.borderWidth, style.borderColor};
+	UIStyle active = style;
 
-	return control;
-}
+	UIElement* lastTab = tabControl->last;
+	float32 x = lastTab ? lastTab->x + lastTab->width : 0;
+	UIElement* tab = UICreateElement(tabControl, {x, 2}, {dim.width, dim.height + style.radius}, nonactive, 
+		UI_CLICKABLE | UI_SHUFFLABLE);
+	UIAddText(tab, header);
+	UIEnableHoverStyle(tab, hover);
+	UIEnableActiveStyle(tab, active);
+	tab->onClick = __activate_tab;
+	__activate_tab(tab);
 
-UIElement* UICreateTab(UIElement* parent, Dimensions2i dim, String title, Font* font) {
-	UIElement* last = parent->last;
-
-	UIElement* header = UICreateElement(parent);
-	header->x = last ? last->x+last->width+1 : 24;
-	header->dim = dim;
-	header->radius = 3;
-	header->flags = UI_CLICKABLE | UI_SHUFFLEABLE;
-	header->onHover = __hover1;
-	header->onClick = __switch;
-	header->background = RGBA_LIGHTGREY;
-	header->name = STR("tab header");
-
-	UIElement* textElement = UICreateElement(header);
-    textElement->text.string = title;
-    textElement->x = 3;
-    textElement->text.font = font;
-
-    UIElement* body = UICreateElement(header);
-    body->x = -header->x;
-    body->y = dim.height;
-    body->height = parent->height - (dim.height+1);
-    body->width = parent->width-2;
-    body->background = RGBA_DARKGREY;
-    body->name = STR("tab body");
-
-    return body;
-}
-
-void UISetActiveTab(UIElement* active) {
-	BringToFront(active->parent);
-	__switch(active->parent);
+	UIElement* tabBody = UICreateElement(tab, {-x, dim.height}, {tabControl->width, tabControl->height - dim.height - 2}, active);
+	return tabBody;
 }
 
 void __scroll(UIElement* e) {
-	OSSetCursorIcon(CUR_ARROW);
 	UIElement* scrollBar = e->parent;
 	UIElement* pane = scrollBar->prev;
-	Dimensions2i contentDim = GetContentDim(pane);
-	float32 y = (float32)((contentDim.height - pane->height)*e->y)/(float32)(scrollBar->height - e->height); 
-	pane->scrollPos.y = (int32)y;
+	Dimensions2 contentDim = GetContentDim(pane);
+	float32 y = ((contentDim.height - pane->height)*e->y)/(scrollBar->height - e->height); 
+	pane->scroll.y = y;
 }
 
-void __arrow(UIElement* e) {
-	OSSetCursorIcon(CUR_ARROW);
-}
+UIElement* UICreateScrollPane(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style) {
+	// TODO: hide scrollbar by default, and only show it when content is bigger than pane.
+	// TODO: also add horizontal scrollbar
+	UIElement* container = UICreateElement(parent, pos, {dim.width + 15, dim.height});
+	UIElement* scrollPane = UICreateElement(container, {}, dim, style, UI_SCROLLABLE);
+	UIElement* scrollBar = UICreateElement(container, {dim.width + 4, 6}, {7, dim.height - 12}, {{0, 0, 0, 0.5f}, 3});
+	UIElement* thumb = UICreateElement(scrollBar, {}, {7, 14}, {{1, 1, 1, 0.5f}, 3}, UI_Y_MOVABLE | UI_ELEVATOR);
+	thumb->onMove = __scroll;
 
-UIElement* UICreateScrollingPane(UIElement* parent, Dimensions2i dim, Point2i pos) {
-	UIElement* container = UICreateElement(parent);
-	container->dim = {dim.width + 15, dim.height};
-	container->pos = pos;
-	container->name = STR("scrolling pane container");
-
-	UIElement* pane = UICreateElement(container);
-	pane->dim = dim;
-	pane->flags = UI_SCROLLABLE;
-	pane->name = STR("scrolling pane");
-
-	UIElement* scrollBar = UICreateElement(container);
-	scrollBar->x = dim.width + 4;
-	scrollBar->y = 6;
-	scrollBar->dim = {7, dim.height - 12};
-	scrollBar->background = 0x33ffffff;
-	scrollBar->radius = 3.0f;
-	scrollBar->name = STR("scroll bar");
-
-	UIElement* elevator = UICreateElement(scrollBar);
-	elevator->dim = {7, 14};
-	elevator->flags = UI_MOVABLE | UI_ELEVATOR;
-	elevator->onHover = __arrow;
-	elevator->onMove = __scroll;
-	elevator->background = 0x33ffffff;
-	elevator->radius = 3.0f;
-	elevator->name = STR("elevator");
-
-	return pane;
-}
-
-void __display_or_hide(UIElement* e) {
-	UIElement* element = e->next;
-	if (element->flags & UI_HIDDEN) {
-		element->flags &= ~UI_HIDDEN;
-		e->parent->symbol.type = UI_UP_POINTING_TRIANGLE;
-	}
-	else {
-		element->flags |= UI_HIDDEN;
-		e->parent->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-	}
-}
-
-UIElement* UICreateDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, UIText text) {
-	UIElement* container = UICreateElement(parent);
-	container->dim = dim;
-	container->pos = pos;
-	container->name = STR("dropdown container");
-	container->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-	container->symbol.pos = {dim.width + 3, 15};
-	container->symbol.color = RGBA_WHITE;
-
-	UIElement* dropdown = UICreateElement(container);
-	dropdown->dim = dim;
-	dropdown->flags = UI_CLICKABLE | UI_BRING_PARENT_TO_FRONT;
-	dropdown->onClick = __display_or_hide;
-	dropdown->background = RGBA_GREY;
-	dropdown->name = STR("dropdown");
-	
-	UIElement* textElement = UICreateElement(dropdown);
-	textElement->x = 5;
-	textElement->text = text;
-
-	UIElement* hidden = UICreateScrollingPane(container, {dim.width, 100}, {0, dim.height});
-	hidden->parent->flags |= UI_HIDDEN;
-	hidden->background = RGBA_GREY;
-
-	return dropdown;
-}
-
-void __select(UIElement* e) {
-	UIElement* list = e->parent;
-	UIElement* listContainer = list->parent;
-	UIElement* dropdown = listContainer->parent;
-	UIElement* visible = dropdown->first;
-
-	visible->first->text.string = e->first->text.string;
-
-	listContainer->flags |= UI_HIDDEN;
-	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-}
-
-UIElement* UIAddDropdownItem(UIElement* dropdown, UIText text) {
-	UIElement* list = dropdown->next->first;
-	UIElement* last = list->last;
-
-	UIElement* item = UICreateElement(list);
-	item->dim = dropdown->dim;
-	if (last) item->y = last->y + last->height;
-	item->flags = UI_CLICKABLE;
-	item->onClick = __select;
-	item->onHover = __hover2;
-
-	UIElement* textElement = UICreateElement(item);
-	textElement->x = 5;
-	textElement->text = text;
-
-	return item;
-}
-
-UIElement* UICreateColorDropdown(UIElement* parent, Dimensions2i dim, Point2i pos, uint32 color, uint32 border) {
-	UIElement* container = UICreateElement(parent);
-	container->dim = dim;
-	container->pos = pos;
-	container->name = STR("dropdown container");
-	container->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-	container->symbol.pos = {dim.width + 3, dim.height/2 - 3};
-	container->symbol.color = RGBA_WHITE;
-
-	UIElement* dropdown = UICreateElement(container);
-	dropdown->dim = dim;
-	dropdown->flags = UI_CLICKABLE | UI_BRING_PARENT_TO_FRONT;
-	dropdown->onClick = __display_or_hide;
-	dropdown->background = color;
-	dropdown->name = STR("dropdown");
-	
-	dropdown->borderColor = border;
-	dropdown->borderWidth = 1;
-
-	UIElement* hidden = UICreateScrollingPane(container, {dim.width, 100}, {0, dim.height});
-	hidden->parent->flags |= UI_HIDDEN;
-
-	return dropdown;
-}
-
-void __select_color(UIElement* e) {
-	UIElement* list = e->parent;
-	UIElement* listContainer = list->parent;
-	UIElement* dropdown = listContainer->parent;
-	UIElement* visible = dropdown->first;
-
-	visible->background = e->background;
-	visible->symbol = e->symbol;
-
-	listContainer->flags |= UI_HIDDEN;
-	dropdown->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-	OSResetMouse();
-}
-
-void __hover3(UIElement* e) {
-	e->borderColor = e->parent->parent->prev->borderColor;
-	e->borderWidth = 1;
-}
-
-UIElement* UIAddColorDropdownItem(UIElement* dropdown, uint32 color) {
-	UIElement* list = dropdown->next->first;
-	UIElement* last = list->last;
-
-	UIElement* item = UICreateElement(list);
-	item->dim = dropdown->dim;
-	if (last) item->y = last->y + last->height;
-	item->flags = UI_CLICKABLE;
-	item->onClick = __select_color;
-	item->onHover = __hover3;
-	item->background = color;
-
-	return item;
-}
-
-void __expnad_or_collapse(UIElement* e) {
-	int32 height = 0;
-	UIElement* children = e->first;
-	if (e->parent != ui.windowElement) {
-		LINKEDLIST_FOREACH(children, UIElement, child) height += child->height;
-	}
-	if (e->symbol.type == UI_RIGHT_POINTING_TRIANGLE) {
-		e->first->flags &= ~UI_HIDDEN;
-		e->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-		if (e->parent != ui.windowElement) {
-			e = e->next;
-			while (e) {
-				e->y += height;
-				e = e-> next;
-			}
-		}
-	}
-	else if (e->symbol.type == UI_DOWN_POINTING_TRIANGLE) {
-		e->first->flags |= UI_HIDDEN;
-		e->symbol.type = UI_RIGHT_POINTING_TRIANGLE;
-		if (e->parent != ui.windowElement) {
-			e = e->next;
-			while (e) {
-				e->y -= height;
-				e = e-> next;
-			}
-		}
-	}
-}
-
-UIElement* UICreateTreeItem(UIElement* parent, Dimensions2i dim) {
-	UIElement* item;
-	if (parent) {
-		UIElement* last = parent->first->last;
-		item = UICreateElement(parent->first);
-		item->x = parent->x + 12;
-		item->y = last ? last->y + last->height : parent->height;
-		UIElement* e = parent->next;
-		while (e) {
-			e->y += dim.height;
-			e = e->next;
-		}
-		parent->symbol.type = UI_DOWN_POINTING_TRIANGLE;
-	}
-	else {
-		item = UICreateElement(NULL);
-	}
-	item->symbol = {{3, 9}, RGBA_WHITE, 0};
-	item->dim = dim;
-	item->flags = UI_CLICKABLE;
-	item->onHover = __arrow;
-	item->onClick = __expnad_or_collapse;
-
-	UIElement* children = UICreateElement(item);
-	children->name = STR("children");
-
-	return item;
+	return scrollPane;
 }

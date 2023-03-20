@@ -1,3 +1,5 @@
+// TODO: this file should be split into numbers and bits
+
 #include <emmintrin.h>
 #include <memory.h>
 
@@ -60,6 +62,8 @@ int32 BitCount(uint32 value) {
 #endif
 }
 
+// TODO: these should be moved to numbers
+
 float32 sqrt(float32 value) {
     return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(value)));
 } 
@@ -74,4 +78,13 @@ float32 ceil(float32 value) {
 
 float32 fmadd(float32 a, float32 b, float32 c) {
     return _mm_cvtss_f32(_mm_fmadd_ss(_mm_set_ss(a), _mm_set_ss(b), _mm_set_ss(c)));
+}
+
+float32 round(float32 value) {
+    return _mm_cvtss_f32(_mm_round_ss(_mm_setzero_ps(), _mm_set_ss(value),
+                        _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC ));
+}
+
+int32 ToInt(float32 value) {
+    return _mm_cvtss_si32(_mm_set_ss(value));
 }

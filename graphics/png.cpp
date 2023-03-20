@@ -64,7 +64,7 @@ int32 paeth(int32 a, int32 b, int32 c) {
 
 static byte depth_scale_table[9] = {0, 0xff, 0x55, 0, 0x11, 0,0,0, 0x01};
 
-int32 create_png_image_raw(Arena* arena, byte** data, PNG* png, byte*raw, uint32 raw_len, int32 out_n, uint32 x, uint32 y, int32 depth, int32 color) {
+int32 create_png_image_raw(Arena* arena, PNG* png, byte*raw, uint32 raw_len, int32 out_n, uint32 x, uint32 y, int32 depth, int32 color) {
    int32 bytes = (depth == 16 ? 2 : 1);
    uint32 i,j,stride = x*out_n*bytes;
    uint32 img_len, img_width_bytes;
@@ -281,12 +281,12 @@ int32 create_png_image_raw(Arena* arena, byte** data, PNG* png, byte*raw, uint32
    return 1;
 }
 
-int32 create_png_image(Arena* arena, byte** data, PNG* png, byte* image_data, uint32 image_data_len, int32 out_n, int32 depth, int32 color, int32 interlaced) {
+int32 create_png_image(Arena* arena, PNG* png, byte* image_data, uint32 image_data_len, int32 out_n, int32 depth, int32 color, int32 interlaced) {
    int32 bytes = (depth == 16 ? 2 : 1);
    int32 out_bytes = out_n*bytes;
    int32 p;
    if (!interlaced)
-      return create_png_image_raw(arena, data, png, image_data, image_data_len, out_n, png->img_x, png->img_y, depth, color);
+      return create_png_image_raw(arena, png, image_data, image_data_len, out_n, png->img_x, png->img_y, depth, color);
 
    // de-interlacing
    byte* final = (byte*)ArenaAlloc(arena, png->img_x*png->img_y*out_bytes);
@@ -302,7 +302,7 @@ int32 create_png_image(Arena* arena, byte** data, PNG* png, byte* image_data, ui
       y = (png->img_y - yorig[p] + yspc[p]-1) / yspc[p];
       if (x && y) {
          uint32 img_len = ((((png->img_n * x * depth) + 7) >> 3) + 1) * y;
-         if (!create_png_image_raw(arena, data, png, image_data, image_data_len, out_n, x, y, depth, color)) {
+         if (!create_png_image_raw(arena, png, image_data, image_data_len, out_n, x, y, depth, color)) {
             return 0;
          }
          for (j = 0; j < y; ++j) {
@@ -322,7 +322,7 @@ int32 create_png_image(Arena* arena, byte** data, PNG* png, byte* image_data, ui
    return 1;
 }
 
-int32 compute_transparency(byte** data, PNG* png, byte tc[3], int32 out_n) {
+int32 compute_transparency(PNG* png, byte tc[3], int32 out_n) {
    uint32 i, pixel_count = png->img_x * png->img_y;
    byte *p = png->out;
 
@@ -346,7 +346,7 @@ int32 compute_transparency(byte** data, PNG* png, byte tc[3], int32 out_n) {
    return 1;
 }
 
-int32 compute_transparency16(byte** data, PNG* png, uint16 tc[3], int32 out_n) {
+int32 compute_transparency16(PNG* png, uint16 tc[3], int32 out_n) {
    uint32 i, pixel_count = png->img_x * png->img_y;
    uint16* p = (uint16*)png->out;
 
@@ -370,7 +370,7 @@ int32 compute_transparency16(byte** data, PNG* png, uint16 tc[3], int32 out_n) {
    return 1;
 }
 
-int32 expand_png_palette(Arena* arena, PNG* png, byte *palette, int32 len, int32 pal_img_n) {
+int32 expand_png_palette(Arena* arena, PNG* png, byte *palette, int32 pal_img_n) {
    uint32 i, pixel_count = png->img_x * png->img_y;
    byte *temp_out, *orig = png->out;
 
@@ -412,7 +412,7 @@ void convert_iphone_png_to_rgb(int32 flag_true_if_should_convert) {
    de_iphone_flag = flag_true_if_should_convert;
 }
 
-void de_iphone(byte** data, PNG* png) {
+void de_iphone(PNG* png) {
    uint32 i, pixel_count = png->img_x * png->img_y;
    byte *p = png->out;
 
@@ -588,23 +588,23 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
                png->img_out_n = png->img_n + 1;
             else
                png->img_out_n = png->img_n;
-            if (!create_png_image(arena, data, png, png->expanded, raw_len, png->img_out_n, png->depth, color, interlace)) return 0;
+            if (!create_png_image(arena, png, png->expanded, raw_len, png->img_out_n, png->depth, color, interlace)) return 0;
             if (has_trans) {
                if (png->depth == 16) {
-                  if (!compute_transparency16(data, png, tc16, png->img_out_n)) return 0;
+                  if (!compute_transparency16(png, tc16, png->img_out_n)) return 0;
                }
                else {
-                  if (!compute_transparency(data, png, tc, png->img_out_n)) return 0;
+                  if (!compute_transparency(png, tc, png->img_out_n)) return 0;
                }
             }
             if (is_iphone && de_iphone_flag && png->img_out_n > 2)
-               de_iphone(data, png);
+               de_iphone(png);
             if (pal_img_n) {
                // pal_img_n == 3 or 4
                png->img_n = pal_img_n; // record the actual colors we had
                png->img_out_n = pal_img_n;
                png->img_out_n = 4;
-               if (!expand_png_palette(arena, png, palette, pal_len, png->img_out_n))
+               if (!expand_png_palette(arena, png, palette, png->img_out_n))
                   return 0;
             }
             else if (has_trans) {

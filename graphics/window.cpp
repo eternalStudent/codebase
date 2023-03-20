@@ -1,10 +1,14 @@
-#define CUR_ARROW 				0
-#define CUR_MOVE				1	 					
-#define CUR_RESIZE				2
-#define CUR_HAND				3
-#define CUR_MOVESIDE			4
-#define CUR_MOVEUPDN			5
-#define CUR_TEXT				6
+#include "geometry.cpp"
+#include "image.cpp"
+
+#define CUR_NONE				0
+#define CUR_ARROW 				1
+#define CUR_MOVE				2	 					
+#define CUR_RESIZE				3
+#define CUR_HAND				4
+#define CUR_MOVESIDE			5
+#define CUR_MOVEUPDN			6
+#define CUR_TEXT				7
 
 #define KEY_BACKSPACE 			0x08
 #define KEY_TAB 				0x09

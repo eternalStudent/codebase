@@ -24,7 +24,10 @@ struct {
 	DWORD mouseWheelDelta;
 	DWORD mouseHWheelDelta;
 
-	HCURSOR cursors[7];
+	BOOL iconSet;
+	int32 icon;
+
+	HCURSOR cursors[8];
 } window;
 
 HWND Win32GetWindowHandle() {
@@ -182,14 +185,17 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		case WM_ACTIVATE: {
 			window.clickCount = 0;
 			// TODO: probably more stuff should be reset here
-		}
+		} break;
 		case WM_CHAR: {
 			if (wParam == 13) wParam = 10;
 			if (32 <= wParam && wParam <= 127 || 9 <= wParam && wParam <= 10) {
 				window.typed[window.strlength] = (CHAR)wParam;
 				window.strlength++;
 			}
-		}
+		} break;
+		case WM_MOUSEMOVE: {
+			if (window.iconSet) SetCursor(window.cursors[window.icon]);
+		} break;
 	}
 
 	return DefWindowProc(handle, message, wParam, lParam);
@@ -300,6 +306,7 @@ BOOL Win32WindowDestroyed() {
 }
 
 void LoadCursors() {
+	window.cursors[CUR_NONE] = NULL;
 	window.cursors[CUR_ARROW] = LoadCursorA(NULL, IDC_ARROW);
 	window.cursors[CUR_MOVE] = LoadCursorA(NULL, IDC_SIZEALL);	
 	window.cursors[CUR_RESIZE] = LoadCursorA(NULL, IDC_SIZENWSE);
@@ -380,6 +387,11 @@ void Win32ProcessWindowEvents() {
 
 void Win32SetCursorIcon(int32 icon) {
 	SetCursor(window.cursors[icon]);
+}
+
+void Win32SetWindowCursorIcon(int32 icon) {
+	window.iconSet = TRUE;
+	window.icon = icon;
 }
 
 HANDLE Win32OpenFileDialog() {
