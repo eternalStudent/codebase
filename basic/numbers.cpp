@@ -60,55 +60,73 @@ inline int32 Sign(float32 x) {
 	return (0 < x) - (x < 0);
 }
 
-inline float32 INF32() {
-	union {uint32 u; float32 f;} data;
-	data.u = 0x7f800000;
-	return data.f;
-}
-
-inline float32 PI() {
-	union {uint32 u; float32 f;} data;
-	data.u = 0x40490FDB;
-	return data.f;
-}
-
-inline float32 DEG_TO_RAD() {
-	union {uint32 u; float32 f;} data;
-	data.u = 0x3C8EFA35;
-	return data.f;
-}
-
-// =2^exp
-inline float32 LoadExp(int32 exp) {
+inline float32 Exp2(int32 exp) {
 	uint32 exp_part = (uint32)(exp+127);
 	union {uint32 u; float32 f;} data;
 	data.u = exp_part << 23;
 	return data.f;
 }
 
-static float64 __tab[] =
-{
-	1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9,
-	1.0e10,1.0e11,1.0e12,1.0e13,1.0e14,1.0e15,1.0e16,1.0e17,1.0e18,1.0e19,
-	1.0e20,1.0e21,1.0e22,1.0e23,1.0e24,1.0e25,1.0e26,1.0e27,1.0e28,1.0e29,
-	1.0e30,1.0e31,1.0e32,1.0e33,1.0e34,1.0e35,1.0e36,1.0e37,1.0e38,1.0e39,
-	1.0e40,1.0e41,1.0e42,1.0e43,1.0e44,1.0e45,1.0e46,1.0e47,1.0e48,1.0e49,
-	1.0e50,1.0e51,1.0e52,1.0e53,1.0e54,1.0e55,1.0e56,1.0e57,1.0e58,1.0e59,
-	1.0e60,1.0e61,1.0e62,1.0e63,1.0e64,1.0e65,1.0e66,1.0e67,1.0e68,1.0e69,
-};
+int32 Log10(uint64 n) {
+	if (n < 10000000000) 
+		return (n >= 1000000000) 
+			? 10 
+			: (n >= 100000000) 
+				? 9 
+				: (n >= 10000000) 
+					? 8 
+					: (n >= 1000000) 
+						? 7 
+						: (n >= 100000) 
+							? 6 
+							: (n >= 10000) 
+								? 5 
+								: (n >= 1000) 
+									? 4 
+									: (n >= 100) 
+										? 3 
+										: (n >= 10) 
+											? 2 : 1;
+	else 
+		return (n >= 1000000000000000000) 
+			? 19 
+			: (n >= 100000000000000000) 
+				? 18 
+				: (n >= 10000000000000000) 
+					? 17 
+					: (n >= 1000000000000000) 
+						? 16 
+						: (n >= 100000000000000) 
+							? 15 
+							: (n >= 10000000000000) 
+								? 14
+								: (n >= 1000000000000) 
+									? 13 
+									: (n >= 100000000000) 
+										? 12 : 11;
+}
 
 float64 Pow10(int32 n) {
+	static float64 tab[] = {
+		1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9,
+		1.0e10,1.0e11,1.0e12,1.0e13,1.0e14,1.0e15,1.0e16,1.0e17,1.0e18,1.0e19,
+		1.0e20,1.0e21,1.0e22,1.0e23,1.0e24,1.0e25,1.0e26,1.0e27,1.0e28,1.0e29,
+		1.0e30,1.0e31,1.0e32,1.0e33,1.0e34,1.0e35,1.0e36,1.0e37,1.0e38,1.0e39,
+		1.0e40,1.0e41,1.0e42,1.0e43,1.0e44,1.0e45,1.0e46,1.0e47,1.0e48,1.0e49,
+		1.0e50,1.0e51,1.0e52,1.0e53,1.0e54,1.0e55,1.0e56,1.0e57,1.0e58,1.0e59,
+		1.0e60,1.0e61,1.0e62,1.0e63,1.0e64,1.0e65,1.0e66,1.0e67,1.0e68,1.0e69,
+	};
 	int32 m;
 
 	if (n < 0) {
 		n = -n;
-		if (n < (int32)(sizeof(__tab)/sizeof(__tab[0])))
-			return 1/__tab[n];
+		if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
+			return 1/tab[n];
 		m = n/2;
 		return Pow10(-m)*Pow10(m-n);
 	}
-	if (n < (int32)(sizeof(__tab)/sizeof(__tab[0])))
-		return __tab[n];
+	if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
+		return tab[n];
 	m = n/2;
 	return Pow10(m)*Pow10(n-m);
 }

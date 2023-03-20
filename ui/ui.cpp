@@ -6,6 +6,10 @@
  * tooltip, context-menu
  */
 
+#include "../common/ui/uigraphics.cpp"
+#include "../common/ui/font.cpp"
+#include "../common/ui/icons.cpp"
+
 #define UI_X_MOVABLE		(1ull << 0)
 #define UI_Y_MOVABLE		(1ull << 1)
 #define UI_MOVABLE			(UI_X_MOVABLE | UI_Y_MOVABLE)

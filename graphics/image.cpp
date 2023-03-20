@@ -1,7 +1,7 @@
 struct Image {
 	union {
 		Dimensions2i dimensions;
-		struct { int32 width, height;};
+		struct {int32 width, height;};
 	};
 	int32 channels;
 	byte* data;
@@ -10,4 +10,6 @@ struct Image {
 #include "bitmap.cpp"
 #include "png.cpp"
 
-typedef Point4 Color;
+struct Color {
+	float32 r, g, b, a;
+};

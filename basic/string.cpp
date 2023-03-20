@@ -26,55 +26,8 @@ int32 Uint32ToHex(uint32 number, byte* str) {
 	return numberOfDigits;
 }
 
-inline int32 GetNumberOfDecimalDigits(uint32 number) {
-	if (number < 100000) {
-		// up to 5 digits
-		if (number < 1000) {
-			// up to 3 digits
-			if (number < 100) {
-				// up to 2 digits
-				if (number < 10)
-					return 1;
-				else
-					return 2;
-			}
-			else
-				return 3;
-		}
-		else {
-			// more than 3 digits
-			if (number < 10000)
-				return 4;
-			else
-				return 5;
-		}
-	}
-	else {
-		//more than 5 digits
-		if (number < 100000000) {
-			// up to 8 digits
-			if (number < 10000000) {
-				// up to 7 digits
-				if (number < 1000000)
-					return 6;
-				else
-					return 7;
-			}
-			else
-				return 8;
-		}
-		else {
-			// more than 8 digits
-			if (number < 1000000000)
-				return 9;
-			else
-				return 10;
-		}
-	}
-}
-
-int32 Uint32ToDecimal(uint32 number, byte* str) {
-	int32 numberOfDigits = GetNumberOfDecimalDigits(number);
+int32 UnsignedToDecimal(uint64 number, byte* str) {
+	int32 numberOfDigits = Log10(number);
 	int32 index = numberOfDigits - 1;
 
 	str[numberOfDigits] = 0;
@@ -86,12 +39,12 @@ int32 Uint32ToDecimal(uint32 number, byte* str) {
 	return numberOfDigits;
 }
 
-int32 Int32ToDecimal(int32 number, byte* str) {
+int32 SignedToDecimal(int64 number, byte* str) {
 	if (number < 0) {
 		*str = '-';
-		return Uint32ToDecimal((uint32)(-number), str + 1) + 1;
+		return UnsignedToDecimal((uint32)(-number), str + 1) + 1;
 	}
-	return Uint32ToDecimal((uint32)number, str);
+	return UnsignedToDecimal((uint32)number, str);
 }
 
 // very naive implementation
@@ -109,7 +62,7 @@ int32 Float32ToDecimal(float32 number, int32 precision, byte* str) {
 	// output integer part
 	uint32 integer = (uint32)number; //potential overflowing in the general case
 	number -= integer;
-	int32 integerCount = Uint32ToDecimal(integer, str);
+	int32 integerCount = UnsignedToDecimal(integer, str);
 	count += integerCount;
 
 	// output fraction part
@@ -133,7 +86,7 @@ int32 Float32ToDecimal(float32 number, int32 precision, byte* str) {
 #define COPY(source, dest) (memcpy(dest, source, sizeof(source)-1), sizeof(source)-1)
 
 inline int32 BoolToAnsi(bool b, byte* str){
-	if (b){
+	if (b) {
 		return COPY("true", str);
 	}
 	else {
@@ -249,15 +202,15 @@ struct StringBuilder {
 		return concat;
 	}
 
-	StringBuilder operator()(int32 i) {
+	StringBuilder operator()(int64 i) {
 		StringBuilder concat = *this;
-		concat.ptr += Int32ToDecimal(i, concat.ptr);
+		concat.ptr += SignedToDecimal(i, concat.ptr);
 		return concat;
 	}
 
 	StringBuilder operator()(uint32 i, char f = 'd') {
 		StringBuilder concat = *this;
-		if (f == 'd') concat.ptr += Uint32ToDecimal(i, concat.ptr);
+		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);
 		if (f == 'b') concat.ptr += Uint32ToBinary(i, concat.ptr);
 		if (f == 'x') concat.ptr += Uint32ToHex(i, concat.ptr);
 		return concat;
@@ -267,36 +220,6 @@ struct StringBuilder {
 		return {this->buffer, this->ptr - this->buffer};
 	}
 };
-
-String GetString(StringBuilder* builder) {
-	return {builder->buffer, builder->ptr-builder->buffer};
-}
-
-void PushString(StringBuilder* builder, String str) {
-	builder->ptr += StringCopy(str, builder->ptr);
-}
-
-void PushNewLine(StringBuilder* builder) {
-	*(builder->ptr) = 10;
-	builder->ptr+=1;
-}
-
-void PushChar(StringBuilder* builder, byte ch) {
-	*(builder->ptr) = ch;
-	builder->ptr+=1;
-}
-
-void PushBool(StringBuilder* builder, bool b) {
-	builder->ptr += BoolToAnsi(b, builder->ptr);
-}
-
-void PushInt32(StringBuilder* builder, int32 i) {
-	builder->ptr += Int32ToDecimal(i, builder->ptr);
-}
-
-void PushFloat32(StringBuilder* builder, float32 f, int32 precision) {
-	builder->ptr += Float32ToDecimal(f, precision, builder->ptr);
-}
 
 // StringList
 //------------
