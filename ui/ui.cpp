@@ -1,14 +1,16 @@
 /*
  * TODO:
- * Previous version supported editable text
- * accordion, tree-view, splitter
- * drop-down, menu-bar, list-box, combo-box, spinner
+ * transition animation
+ * accordion, tree-view
+ * EDITABLE TEXT!!! spinner
+ * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
+ * theme/palette
  */
 
-#include "../common/ui/uigraphics.cpp"
-#include "../common/ui/font.cpp"
-#include "../common/ui/icons.cpp"
+#include "uigraphics.cpp"
+#include "font.cpp"
+#include "icons.cpp"
 
 #define UI_X_MOVABLE		(1ull << 0)
 #define UI_Y_MOVABLE		(1ull << 1)
@@ -24,11 +26,13 @@
 #define UI_MIDDLE			(1ull << 11)
 #define UI_FIT_CONTENT		(1ull << 14)
 #define UI_MIN_CONTENT		(1ull << 15)
-#define UI_ELEVATOR 		(1ull << 16)
+#define UI_X_THUMB			(1ull << 16)
+#define UI_Y_THUMB			(1ull << 17)
 
 #define UI_GRADIENT 		(1ull << 32)
 #define UI_HOVER_STYLE		(1ull << 33)
-#define UI_ACTIVE_STYLE		(1ull << 34)
+#define UI_ACTIVE_STYLE 	(1ull << 34)
+#define UI_CURSOR 			(1ull << 35)
 
 struct UIStyle {
 	Color background;
@@ -75,6 +79,7 @@ struct UIElement {
 	UIStyle hover;
 	UIStyle active;
 	UIStyle focused;
+	int32 cursor;
 
 	union {	
 		bool isChecked;
@@ -245,9 +250,16 @@ void RenderElement(UIElement* element) {
 		element->dim = {MAX(element->width, contentDim.width), MAX(element->height, contentDim.height)};
 	if (element->flags & UI_CENTER) element->x = MAX((parent->width - element->width)/2.0f, 0);
 	if (element->flags & UI_MIDDLE) element->y = MAX((parent->height - element->height)/2.0f, 0);
-	if (element->flags & UI_ELEVATOR) {
+	if (element->flags & UI_X_THUMB) {
 		UIElement* scrollBar = element->parent;
-		UIElement* pane = scrollBar->prev;
+		UIElement* pane = scrollBar->parent->first;
+		Dimensions2 paneDim = GetContentDim(pane);
+
+		element->width = (pane->width*scrollBar->width)/paneDim.width;
+	}
+	if (element->flags & UI_Y_THUMB) {
+		UIElement* scrollBar = element->parent;
+		UIElement* pane = scrollBar->parent->first;
 		Dimensions2 paneDim = GetContentDim(pane);
 
 		element->height = (pane->height*scrollBar->height)/paneDim.height;
@@ -359,6 +371,11 @@ void UIEnableActiveStyle(UIElement* element, UIStyle active) {
 	element->active = active;
 }
 
+void UISetCursor(UIElement* element, int32 cursor) {
+	element->flags |= UI_CURSOR;
+	element->cursor = cursor;
+}
+
 void UIUpdate() {
 	Point2i cursorPos = OSGetCursorPosition();
 	if (ui.rootElementIsWindow) {
@@ -383,9 +400,11 @@ void UIUpdate() {
 	bool isInBottomRight = p1.x - MIN(4, element->radius) <= cursorPos.x && p1.y - MIN(4, element->radius) <= cursorPos.y;
 
 	// Handle mouse hover
-	if (isInBottomRight && (element->flags & UI_RESIZABLE)) OSSetCursorIcon(CUR_RESIZE);
+	if (element->flags & UI_CURSOR) OSSetCursorIcon(element->cursor);
+	else if (isInBottomRight && (element->flags & UI_RESIZABLE)) OSSetCursorIcon(CUR_RESIZE);
 	else if ((element->flags & UI_MOVABLE) == UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
 	else if (element->flags & UI_X_MOVABLE) OSSetCursorIcon(CUR_MOVESIDE);
+	else if (element->flags & UI_Y_MOVABLE) OSSetCursorIcon(CUR_MOVEUPDN);
 	else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
 	else OSSetCursorIcon(CUR_ARROW);
 
@@ -468,11 +487,13 @@ void UIUpdate() {
 			}
 
 			// update scrollbar
-			// TODO: horizontal update as well
-			UIElement* scrollBar = scrollable->next;
-			UIElement* thumb = scrollBar->first;
+			UIElement* yscrollBar = scrollable->next;
+			UIElement* ythumb = yscrollBar->first;
+			ythumb->y = ((yscrollBar->height - ythumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
 
-			thumb->y = ((scrollBar->height - thumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
+			UIElement* xscrollBar = yscrollBar->next;
+			UIElement* xthumb = xscrollBar->first;
+			xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
 		}
 	}
 }
@@ -511,10 +532,8 @@ void __check_box(UIElement* e) {
 }
 
 UIElement* UICreateCheckbox(UIElement* parent, Point2 pos = {}) {
-	UIElement* checkbox = UICreateElement(parent, pos);
+	UIElement* checkbox = UICreateElement(parent, pos, {}, {}, UI_FIT_CONTENT | UI_CLICKABLE);
 	checkbox->icon = Icon_check_empty;
-	checkbox->isChecked = false;
-	checkbox->flags = UI_FIT_CONTENT | UI_CLICKABLE;
 	checkbox->onClick = __check_box;
 
 	return checkbox;
@@ -523,22 +542,16 @@ UIElement* UICreateCheckbox(UIElement* parent, Point2 pos = {}) {
 void __select_button(UIElement* e) {
 	UIElement* radioGroup = e->parent;
 	LINKEDLIST_FOREACH(radioGroup, UIElement, button) {
-		if (button == e) {
-			button->isChecked = true;
-			button->icon = Icon_dot_circled;
-		}
-		else {
-			button->isChecked = false;
-			button->icon = Icon_circle_empty;
-		}
+		button->isChecked = button == e;
+		button->icon = button == e 
+			? Icon_dot_circled
+			: Icon_circle_empty;
 	}
 }
 
 UIElement* UICreateRadioButton(UIElement* radioGroup, Point2 pos = {}) {
-	UIElement* radioButton = UICreateElement(radioGroup, pos);
+	UIElement* radioButton = UICreateElement(radioGroup, pos, {}, {}, UI_FIT_CONTENT | UI_CLICKABLE);
 	radioButton->icon = Icon_circle_empty;
-	radioButton->isChecked = false;
-	radioButton->flags = UI_FIT_CONTENT | UI_CLICKABLE;
 	radioButton->onClick = __select_button;
 
 	return radioButton;
@@ -571,25 +584,24 @@ void __activate_tab(UIElement* e) {
 	}
 }
 
-UIElement* UICreateTab(UIElement* tabControl, Dimensions2 dim, UIStyle style, UIText header) {
-	Color bg = style.background;
+UIElement* UICreateTab(UIElement* tabControl, Dimensions2 headerDim, UIStyle active, UIText header) {
+	Color bg = active.background;
 	UIStyle nonactive = {{
 		0.5f*bg.r + 0.5f,
 		0.5f*bg.g + 0.5f,
 		0.5f*bg.b + 0.5f,
 		bg.a,
-	}, style.radius, style.borderWidth, style.borderColor};
+	}, active.radius, active.borderWidth, active.borderColor};
 	UIStyle hover = {{
 		0.75f*bg.r + 0.25f,
 		0.75f*bg.g + 0.25f,
 		0.75f*bg.b + 0.25f,
 		bg.a,
-	}, style.radius, style.borderWidth, style.borderColor};
-	UIStyle active = style;
+	}, active.radius, active.borderWidth, active.borderColor};
 
 	UIElement* lastTab = tabControl->last;
 	float32 x = lastTab ? lastTab->x + lastTab->width : 0;
-	UIElement* tab = UICreateElement(tabControl, {x, 2}, {dim.width, dim.height + style.radius}, nonactive, 
+	UIElement* tab = UICreateElement(tabControl, {x, 2}, {headerDim.width, headerDim.height + active.radius}, nonactive, 
 		UI_CLICKABLE | UI_SHUFFLABLE);
 	UIAddText(tab, header);
 	UIEnableHoverStyle(tab, hover);
@@ -597,13 +609,21 @@ UIElement* UICreateTab(UIElement* tabControl, Dimensions2 dim, UIStyle style, UI
 	tab->onClick = __activate_tab;
 	__activate_tab(tab);
 
-	UIElement* tabBody = UICreateElement(tab, {-x, dim.height}, {tabControl->width, tabControl->height - dim.height - 2}, active);
+	UIElement* tabBody = UICreateElement(tab, {-x, headerDim.height}, {tabControl->width, tabControl->height - headerDim.height - 2}, {bg});
 	return tabBody;
 }
 
-void __scroll(UIElement* e) {
+void __scroll_x(UIElement* e) {
 	UIElement* scrollBar = e->parent;
-	UIElement* pane = scrollBar->prev;
+	UIElement* pane = scrollBar->parent->first;
+	Dimensions2 contentDim = GetContentDim(pane);
+	float32 x = ((contentDim.width - pane->width)*e->x)/(scrollBar->width - e->width); 
+	pane->scroll.x = x;
+}
+
+void __scroll_y(UIElement* e) {
+	UIElement* scrollBar = e->parent;
+	UIElement* pane = scrollBar->parent->first;
 	Dimensions2 contentDim = GetContentDim(pane);
 	float32 y = ((contentDim.height - pane->height)*e->y)/(scrollBar->height - e->height); 
 	pane->scroll.y = y;
@@ -611,12 +631,58 @@ void __scroll(UIElement* e) {
 
 UIElement* UICreateScrollPane(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style) {
 	// TODO: hide scrollbar by default, and only show it when content is bigger than pane.
-	// TODO: also add horizontal scrollbar
-	UIElement* container = UICreateElement(parent, pos, {dim.width + 15, dim.height});
+	UIElement* container = UICreateElement(parent, pos, {dim.width + 15, dim.height + 15});
 	UIElement* scrollPane = UICreateElement(container, {}, dim, style, UI_SCROLLABLE);
-	UIElement* scrollBar = UICreateElement(container, {dim.width + 4, 6}, {7, dim.height - 12}, {{0, 0, 0, 0.5f}, 3});
-	UIElement* thumb = UICreateElement(scrollBar, {}, {7, 14}, {{1, 1, 1, 0.5f}, 3}, UI_Y_MOVABLE | UI_ELEVATOR);
-	thumb->onMove = __scroll;
+
+	UIElement* yscrollBar = UICreateElement(container, {dim.width + 4, 6}, {7, dim.height - 12}, {{0, 0, 0, 0.25f}, 3});
+	UIElement* ythumb = UICreateElement(yscrollBar, {}, {7, 14}, {{1, 1, 1, 0.33f}, 3}, UI_Y_MOVABLE | UI_Y_THUMB);
+	UIEnableHoverStyle(ythumb, {{1, 1, 1, 0.5f}, 3});
+	UISetCursor(ythumb, CUR_ARROW);
+	ythumb->onMove = __scroll_y;
+
+	UIElement* xscrollBar = UICreateElement(container, {6, dim.height + 4}, {dim.width - 12, 7}, {{0, 0, 0, 0.25f}, 3});
+	UIElement* xthumb = UICreateElement(xscrollBar, {}, {14, 7}, {{1, 1, 1, 0.33f}, 3}, UI_X_MOVABLE | UI_X_THUMB);
+	UIEnableHoverStyle(xthumb, {{1, 1, 1, 0.5f}, 3});
+	UISetCursor(xthumb, CUR_ARROW);
+	xthumb->onMove = __scroll_x;
 
 	return scrollPane;
+}
+
+void __move_vsplitter(UIElement* e) {
+	UIElement* A = e->prev;
+	UIElement* B = e->next;
+
+	if (A) A->width = e->x - A->x;
+	if (B) {
+		float32 x1 = B->x + B->width;
+		B->x = e->x + e->width;
+		B->width = x1 - B->x;
+	}
+}
+
+UIElement* UICreateVSplitter(UIElement* parent, float32 x, float32 width) {
+	UIElement* splitter = UICreateElement(parent, {x - width/2, 0}, {width, parent->height}, {{1, 1, 1, 1}}, UI_X_MOVABLE);
+	splitter->onMove = __move_vsplitter;
+	__move_vsplitter(splitter);
+	return splitter;
+}
+
+void __move_hsplitter(UIElement* e) {
+	UIElement* A = e->prev;
+	UIElement* B = e->next;
+
+	if (A) A->height = e->y - A->y;
+	if (B) {
+		float32 y1 = B->y + B->height;
+		B->y = e->y + e->height;
+		B->height = y1 - B->y;
+	}
+}
+
+UIElement* UICreateHSplitter(UIElement* parent, float32 y, float32 height) {
+	UIElement* splitter = UICreateElement(parent, {0, y - height/2}, {parent->width, height}, {{1, 1, 1, 1}}, UI_Y_MOVABLE);
+	splitter->onMove = __move_hsplitter;
+	__move_hsplitter(splitter);
+	return splitter;
 }
