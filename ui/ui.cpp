@@ -85,7 +85,6 @@ struct UIElement {
 
 	UIStyle hover;
 	UIStyle active;
-	UIStyle focused;
 	int32 cursor;
 	float32 margin;
 
@@ -114,7 +113,6 @@ struct UIElement {
 struct {
 	FixedSize allocator;
 	BakedFont iconsFont;
-	byte icons[Icon_count];
 
 	UIElement* rootElement;
 
@@ -400,7 +398,6 @@ void UIInit(Arena* persist, Arena* scratch, AtlasBitmap* atlas) {
 	ui = {};
 	ui.allocator = CreateFixedSize(persist, 200, sizeof(UIElement));
 	ui.iconsFont = LoadAndBakeIconsFont(scratch, atlas, 24);
-	for (byte i = 0; i < Icon_count; i++) ui.icons[i] = i;
 }
 
 UIElement* UICreateWindowElement(Color background) {
