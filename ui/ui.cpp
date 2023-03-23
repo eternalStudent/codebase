@@ -1,7 +1,6 @@
 /*
  * TODO:
- * transition animation
- * accordion, tree-view
+ * accordion
  * EDITABLE TEXT!!! spinner
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
@@ -25,17 +24,18 @@
 
 #define UI_CENTER			(1ull << 10)
 #define UI_MIDDLE			(1ull << 11)
+#define UI_HORIZONTAL_STACK	(1ull << 12)
+#define UI_VERTICAL_STACK	(1ull << 13)
 #define UI_FIT_CONTENT		(1ull << 14)
 #define UI_MIN_CONTENT		(1ull << 15)
 #define UI_X_THUMB			(1ull << 16)
 #define UI_Y_THUMB			(1ull << 17)
-#define UI_HORIZONTAL_STACK	(1ull << 18)
-#define UI_VERTICAL_STACK	(1ull << 19)
 
 #define UI_GRADIENT 		(1ull << 32)
 #define UI_HOVER_STYLE		(1ull << 33)
 #define UI_ACTIVE_STYLE 	(1ull << 34)
 #define UI_CURSOR 			(1ull << 35)
+#define UI_TRANSITION		(1ull << 36)
 
 struct UIStyle {
 	Color background;
@@ -65,6 +65,9 @@ struct UIElement {
 	};
 
 	Point2 scroll;
+
+	float32 transition;
+	Point2 prevPos;
 
 	union {
 		UIStyle style;
@@ -127,14 +130,6 @@ struct {
 
 // Util
 //-------------
-
-Point2 GetScreenPosition(UIElement* element) {
-	UIElement* parent = element->parent;
-	if (parent == NULL) return {element->x, element->y};
-
-	Point2 parentPos = GetScreenPosition(parent);
-	return {parentPos.x + element->x - parent->scroll.x, parentPos.y + element->y - parent->scroll.y};
-}
 
 Box2 GetScreenHitBox(UIElement* element) {
 	UIElement* parent = element->parent;
@@ -252,24 +247,35 @@ UIStyle GetCurrentStyle(UIElement* element) {
 	return element->style;
 }
 
+Point2 GetInterpolatedPos(UIElement* e) {
+	return (1 - e->transition)*e->prevPos + e->transition*e->pos;
+}
+
+Point2 GetScreenPosition(UIElement* element) {
+	UIElement* parent = element->parent;
+	if (parent == NULL) return {element->x, element->y};
+
+	Point2 parentPos = GetScreenPosition(parent);
+	Point2 pos = element->flags & UI_TRANSITION
+		? GetInterpolatedPos(element)
+		: element->pos;
+	Point2 scrollPos = parent->scroll;
+
+	return {parentPos.x + pos.x - scrollPos.x, parentPos.y + pos.y - scrollPos.y};
+}
+
 void RenderElement(UIElement* element) {
 	if (element->flags & UI_HIDDEN) return;
 
 	UIElement* parent = element->parent;
-	Dimensions2 contentDim = GetContentDim(element);
 
+	// update width and height
+	//------------------------
+	Dimensions2 contentDim = GetContentDim(element);
 	if (element->flags & UI_FIT_CONTENT) 
 		element->dim = contentDim;
 	if (element->flags & UI_MIN_CONTENT) 
 		element->dim = {MAX(element->width, contentDim.width), MAX(element->height, contentDim.height)};
-	if (element->flags & UI_CENTER) element->x = MAX((parent->width - element->width)/2.0f, 0);
-	if (element->flags & UI_MIDDLE) element->y = MAX((parent->height - element->height)/2.0f, 0);
-	if ((element->flags & UI_HORIZONTAL_STACK) && element->prev) {
-		element->x = element->prev->x + element->prev->width + element->margin;
-	}
-	if ((element->flags & UI_VERTICAL_STACK) && element->prev) {
-		element->y = element->prev->y + element->prev->height + element->margin;
-	}
 	if (element->flags & UI_X_THUMB) {
 		UIElement* scrollBar = parent;
 		UIElement* pane = scrollBar->parent->first;
@@ -285,8 +291,38 @@ void RenderElement(UIElement* element) {
 		element->height = (pane->height*scrollBar->height)/paneDim.height;
 	}
 
-	Point2 pos = GetScreenPosition(element);
+	// update x and y
+	//----------------
+	float32 x = element->x;
+	float32 y = element->y;
+	if (element->flags & UI_CENTER) 
+		x = MAX((parent->width - element->width)/2.0f, 0);
+	if (element->flags & UI_MIDDLE) 
+		y = MAX((parent->height - element->height)/2.0f, 0);
+	if ((element->flags & UI_HORIZONTAL_STACK) && element->prev)
+		x = element->prev->x + element->prev->width + element->margin;
+	if ((element->flags & UI_VERTICAL_STACK) && element->prev)
+		y = element->prev->y + element->prev->height + element->margin;
 
+	if (element->flags & UI_TRANSITION) {
+		if (x != element->x || y != element->y) {
+			element->prevPos = GetInterpolatedPos(element);
+			element->transition = 0;
+		}
+
+		if (element->transition < 1) {
+			element->transition += 0.125f;
+		}
+		else {
+			element->transition = 0;
+			element->prevPos = element->pos;
+		}
+	}
+	element->pos = {x, y};
+
+	// draw
+	//-------
+	Point2 pos = GetScreenPosition(element);
 	if (HasQuad(element)) {
 		UIStyle style = GetCurrentStyle(element);
 		GfxDrawQuad(pos, element->dim, style.background, style.radius, style.borderWidth, style.borderColor,
@@ -301,6 +337,8 @@ void RenderElement(UIElement* element) {
 		GfxDrawImage(pos, element->dim, element->image.atlas, element->image.crop);
 	}
 
+	// children
+	//----------
 	if (element->flags & UI_HIDE_OVERFLOW)
 		GfxCropScreen((int32)pos.x, (int32)pos.y, (int32)element->width, (int32)element->height);
 	LINKEDLIST_FOREACH(element, UIElement, child) 
@@ -401,6 +439,11 @@ void UIEnableActiveStyle(UIElement* element, UIStyle active) {
 void UISetCursor(UIElement* element, int32 cursor) {
 	element->flags |= UI_CURSOR;
 	element->cursor = cursor;
+}
+
+void UIEnableTransition(UIElement* element) {
+	element->flags |= UI_TRANSITION;
+	element->prevPos = element->pos;
 }
 
 void UIUpdate() {
@@ -742,7 +785,9 @@ UIElement* UICreateTreeRoot(UIElement* parent, Point2 pos, Point2 subTreeOffset)
 
 UIElement* UICreateTreeItem(UIElement* parent) {
 	ASSERT(parent && parent->first);
-	UIElement*item = UICreateElement(parent->first, {}, {}, {}, UI_FIT_CONTENT | UI_VERTICAL_STACK);
+	UIElement*item = UICreateElement(parent->first, {}, {}, {}, 
+		UI_FIT_CONTENT | UI_VERTICAL_STACK);
+	UIEnableTransition(item);
 	parent->icon = Icon_down_dir;
 	item->onClick = __expand_or_collapse;
 
