@@ -19,8 +19,9 @@
 #define UI_SHUFFLABLE		(1ull << 3)
 #define UI_CLICKABLE		(1ull << 4)
 #define UI_HIDE_OVERFLOW	(1ull << 5)
-#define UI_SCROLLABLE		((1ull << 6) | UI_HIDE_OVERFLOW)
-#define UI_INFINITE_SCROLL  ((1ull << 7) | UI_SCROLLABLE)
+#define UI_SCROLLABLE	   ((1ull << 6) | UI_HIDE_OVERFLOW)
+#define UI_INFINITE_SCROLL ((1ull << 7) | UI_SCROLLABLE)
+#define UI_HIDDEN			(1ull << 8)
 
 #define UI_CENTER			(1ull << 10)
 #define UI_MIDDLE			(1ull << 11)
@@ -28,6 +29,8 @@
 #define UI_MIN_CONTENT		(1ull << 15)
 #define UI_X_THUMB			(1ull << 16)
 #define UI_Y_THUMB			(1ull << 17)
+#define UI_HORIZONTAL_STACK	(1ull << 18)
+#define UI_VERTICAL_STACK	(1ull << 19)
 
 #define UI_GRADIENT 		(1ull << 32)
 #define UI_HOVER_STYLE		(1ull << 33)
@@ -80,6 +83,7 @@ struct UIElement {
 	UIStyle active;
 	UIStyle focused;
 	int32 cursor;
+	float32 margin;
 
 	union {	
 		bool isChecked;
@@ -156,7 +160,7 @@ Box2 GetScreenHitBox(UIElement* element) {
 
 // NOTE: both for drawing and for intercepting hit-box
 bool HasQuad(UIElement* e) {
-	return (e->background.a) || (e->borderWidth && e->borderColor.a) || (e->flags & UI_CLICKABLE);
+	return (e->background.a) || (e->borderWidth && e->borderColor.a) || (e->flags & UI_CLICKABLE) || e->onClick;
 }
 
 bool HasText(UIElement* e) {
@@ -167,12 +171,20 @@ bool HasImage(UIElement* e) {
 	return e->image.atlas != 0;
 }
 
+bool IsAncestorHidden(UIElement* e) {
+	while (e) {
+		if (e->flags & UI_HIDDEN) return true;
+		e = e->parent;
+	}
+	return false;
+}
+
 UIElement* GetElementByPosition(Point2i cursorPos) {
 	UIElement* element = ui.rootElement;
 	while (element->last) element = element->last;
 
 	while (element) {
-		if (HasQuad(element) || HasImage(element)) {
+		if (HasQuad(element) || HasImage(element) && !IsAncestorHidden(element)) {
 			Box2 box = GetScreenHitBox(element);
 			if (box.x0 <= cursorPos.x && cursorPos.x <= box.x1 && box.y0 <= cursorPos.y && cursorPos.y <= box.y1)
 				break;
@@ -220,7 +232,7 @@ Dimensions2 GetContentDim(UIElement* e) {
 		height = metrics.endy;
 	}
 	LINKEDLIST_FOREACH(e, UIElement, child) {
-		//if (child->flags & UI_ADDENDUM) continue;
+		if (child->flags & UI_HIDDEN) continue;
 		width  = MAX(child->x + child->width, width);
 		height = MAX(child->y + child->height, height);
 	}
@@ -241,6 +253,8 @@ UIStyle GetCurrentStyle(UIElement* element) {
 }
 
 void RenderElement(UIElement* element) {
+	if (element->flags & UI_HIDDEN) return;
+
 	UIElement* parent = element->parent;
 	Dimensions2 contentDim = GetContentDim(element);
 
@@ -250,15 +264,21 @@ void RenderElement(UIElement* element) {
 		element->dim = {MAX(element->width, contentDim.width), MAX(element->height, contentDim.height)};
 	if (element->flags & UI_CENTER) element->x = MAX((parent->width - element->width)/2.0f, 0);
 	if (element->flags & UI_MIDDLE) element->y = MAX((parent->height - element->height)/2.0f, 0);
+	if ((element->flags & UI_HORIZONTAL_STACK) && element->prev) {
+		element->x = element->prev->x + element->prev->width + element->margin;
+	}
+	if ((element->flags & UI_VERTICAL_STACK) && element->prev) {
+		element->y = element->prev->y + element->prev->height + element->margin;
+	}
 	if (element->flags & UI_X_THUMB) {
-		UIElement* scrollBar = element->parent;
+		UIElement* scrollBar = parent;
 		UIElement* pane = scrollBar->parent->first;
 		Dimensions2 paneDim = GetContentDim(pane);
 
 		element->width = (pane->width*scrollBar->width)/paneDim.width;
 	}
 	if (element->flags & UI_Y_THUMB) {
-		UIElement* scrollBar = element->parent;
+		UIElement* scrollBar = parent;
 		UIElement* pane = scrollBar->parent->first;
 		Dimensions2 paneDim = GetContentDim(pane);
 
@@ -347,6 +367,13 @@ UIElement* UIAddText(UIElement* parent, UIText text, float32 x) {
 	textElement->x = x;
 	textElement->text = text;
 	textElement->flags = UI_FIT_CONTENT | UI_MIDDLE;
+	return textElement;
+}
+
+UIElement* UIAddText(UIElement* parent, UIText text, Point2 pos) {
+	UIElement* textElement = UICreateElement(parent, pos);
+	textElement->text = text;
+	textElement->flags = UI_FIT_CONTENT;
 	return textElement;
 }
 
@@ -510,13 +537,14 @@ void UIRender() {
 
 UIElement* UICreateButton(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style) {
 	UIElement* button = UICreateElement(parent, pos, dim, style, UI_CLICKABLE);
-	UIEnableGradient(button, {
-		style.background.r*0.5f + 0.5f, 
-		style.background.g*0.5f + 0.5f, 
-		style.background.b*0.5f + 0.5f,
-		style.background.a});
-
-	UIEnableHoverStyle(button, {button->color2, style.radius, style.borderWidth, style.borderColor, style.background});
+	UIStyle hover = style;
+	hover.background = {
+		0.5f*style.background.r,
+		0.5f*style.background.g,
+		0.5f*style.background.b,
+		style.background.a
+	};
+	UIEnableHoverStyle(button, hover);
 	return button;
 }
 
@@ -662,7 +690,7 @@ void __move_vsplitter(UIElement* e) {
 }
 
 UIElement* UICreateVSplitter(UIElement* parent, float32 x, float32 width) {
-	UIElement* splitter = UICreateElement(parent, {x - width/2, 0}, {width, parent->height}, {{1, 1, 1, 1}}, UI_X_MOVABLE);
+	UIElement* splitter = UICreateElement(parent, {x - width/2, 0}, {width, parent->height}, {{0.5f, 0.5f, 0.5f, 1}, 0, 1, {0, 0, 0, 1}}, UI_X_MOVABLE);
 	splitter->onMove = __move_vsplitter;
 	__move_vsplitter(splitter);
 	return splitter;
@@ -681,8 +709,44 @@ void __move_hsplitter(UIElement* e) {
 }
 
 UIElement* UICreateHSplitter(UIElement* parent, float32 y, float32 height) {
-	UIElement* splitter = UICreateElement(parent, {0, y - height/2}, {parent->width, height}, {{1, 1, 1, 1}}, UI_Y_MOVABLE);
+	UIElement* splitter = UICreateElement(parent, {0, y - height/2}, {parent->width, height}, {{0.5f, 0.5f, 0.5f, 1}, 0, 1, {0, 0, 0, 1}}, UI_Y_MOVABLE);
 	splitter->onMove = __move_hsplitter;
 	__move_hsplitter(splitter);
 	return splitter;
+}
+
+void __expand_or_collapse(UIElement* e) {
+	UIElement* children = e->first;
+	if (e->icon == Icon_right_dir) {
+		children->flags &= ~UI_HIDDEN;
+		e->icon = Icon_down_dir;
+	}
+	else if (e->icon == Icon_down_dir) {
+		children->flags |= UI_HIDDEN;
+		e->icon = Icon_right_dir;
+	}
+}
+
+// NOTE: the idea here is that the tree-item element has a "children" 
+// child element to make it easier to iterate over the "children",
+// but the user doesn't use it directly, so the parent-tree-item is not
+// the parent element.
+UIElement* UICreateTreeRoot(UIElement* parent, Point2 pos, Point2 subTreeOffset) {
+	UIElement* root = UICreateElement(parent, pos, {}, {}, UI_FIT_CONTENT);
+	root->onClick = __expand_or_collapse;
+
+	UICreateElement(root, subTreeOffset, {}, {}, UI_FIT_CONTENT); // children container
+
+	return root;
+}
+
+UIElement* UICreateTreeItem(UIElement* parent) {
+	ASSERT(parent && parent->first);
+	UIElement*item = UICreateElement(parent->first, {}, {}, {}, UI_FIT_CONTENT | UI_VERTICAL_STACK);
+	parent->icon = Icon_down_dir;
+	item->onClick = __expand_or_collapse;
+
+	UICreateElement(item, parent->first->pos, {}, {}, UI_FIT_CONTENT); // children container
+
+	return item;
 }
