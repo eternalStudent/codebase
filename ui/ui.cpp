@@ -240,14 +240,28 @@ bool IsInteractable(UIElement* e) {
 		&& ((e->flags & (UI_CLICKABLE | UI_MOVABLE)) || e->onClick);
 }
 
+UIElement* GetNext(UIElement* e) {
+	if (e->first && !(e->flags & UI_HIDDEN)) 
+		return e->first;
+	if (e->next) return e->next;
+	do {
+		e = e->parent;
+	} while(e && !e->next);
+	return e ? e->next : NULL;
+}
+
 UIElement* FindFirstInteractable(UIElement* e) {
 	if (e->flags & UI_HIDDEN)
 		return NULL;
 	if (IsInteractable(e))
 		return e;
-	LINKEDLIST_FOREACH(e, UIElement, child) {
-		UIElement* interactable = FindFirstInteractable(child);
-		if (interactable) return interactable;
+	for (UIElement* current = GetNext(e); 
+			current != NULL; 
+				current = GetNext(current)) {
+		if (current->flags & UI_HIDDEN)
+			continue;
+		if (IsInteractable(current))
+			return current;
 	}
 	return NULL;
 }
@@ -305,14 +319,22 @@ void RenderElement(UIElement* element) {
 		UIElement* pane = scrollBar->parent->first;
 		Dimensions2 paneDim = GetContentDim(pane);
 
-		element->width = (pane->width*scrollBar->width)/paneDim.width;
+		if (paneDim.width <= pane->width) scrollBar->flags |= UI_HIDDEN;
+		else {
+			scrollBar->flags &= ~UI_HIDDEN;
+			element->width = (pane->width*scrollBar->width)/paneDim.width;
+		}
 	}
 	if (element->flags & UI_Y_THUMB) {
 		UIElement* scrollBar = parent;
 		UIElement* pane = scrollBar->parent->first;
 		Dimensions2 paneDim = GetContentDim(pane);
 
-		element->height = (pane->height*scrollBar->height)/paneDim.height;
+		if (paneDim.height <= pane->height) scrollBar->flags |= UI_HIDDEN;
+		else {
+			scrollBar->flags &= ~UI_HIDDEN;
+			element->height = (pane->height*scrollBar->height)/paneDim.height;
+		}
 	}
 
 	// update x and y
@@ -523,7 +545,7 @@ void UIUpdate() {
 			ui.grabPos = {(float32)cursorPos.x, (float32)cursorPos.y};
 			ui.originalPos = element->pos;
 		}
-		ui.focused = NULL;
+		//ui.focused = NULL;
 	}
 
 	// Handle mouse released
@@ -597,22 +619,8 @@ void UIUpdate() {
 	// Handle tab
 	if (OSIsKeyPressed(KEY_TAB)) {
 		if (ui.focused) {
-			bool found = false;
-			UIElement* e = ui.focused;
-			while (e) {
-				UIElement* interactable = FindFirstInteractable(e);
-				if (interactable) {
-					ui.focused = interactable;
-					found = true;
-					break;
-				}
-				if (e->next) e = e->next;
-				else if (e->parent) e = e->parent->next;
-				else break;
-			}
-			if (!found) ui.focused = NULL;
+			ui.focused = FindFirstInteractable(ui.focused);
 		}
-
 		if (!ui.focused) {
 			ui.focused = FindFirstInteractable(ui.rootElement);
 		}
@@ -672,6 +680,7 @@ UIElement* UICreateButton(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyl
 		style.background.a
 	};
 	UIEnableHoverStyle(button, hover);
+
 	button->name = STR("button");
 	return button;
 }
@@ -733,6 +742,7 @@ UIElement* UICreateVSlider(UIElement* parent, Point2 pos, Dimensions2 dim, UISty
 	UICreateElement(slider, {-quater_width, (dim.height - thumbHeight)/2.f}, {dim.width, thumbHeight}, style, 
 		UI_Y_MOVABLE);
 
+	slider->name = STR("slider");
 	return slider;
 }
 
@@ -773,6 +783,9 @@ UIElement* UICreateTab(UIElement* tabControl, Dimensions2 headerDim, UIStyle act
 
 	UIElement* tabBody = UICreateElement(tab, {-x, headerDim.height}, {tabControl->width, tabControl->height - headerDim.height - 2}, {bg});
 	__activate_tab(tab);
+
+	tab->name = STR("tab");
+	tabBody->name = STR("tab body");
 	return tabBody;
 }
 
@@ -793,7 +806,6 @@ void __scroll_y(UIElement* e) {
 }
 
 UIElement* UICreateScrollPane(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style) {
-	// TODO: hide scrollbar by default, and only show it when content is bigger than pane.
 	UIElement* container = UICreateElement(parent, pos, {dim.width + 15, dim.height + 15});
 	UIElement* scrollPane = UICreateElement(container, {}, dim, style, UI_SCROLLABLE);
 
