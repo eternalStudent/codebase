@@ -1,6 +1,5 @@
 /*
  * TODO:
- * accordion
  * EDITABLE TEXT!!! spinner
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
@@ -57,6 +56,8 @@ struct UIImage {
 };
 
 struct UIElement {
+	String name;
+
 	union {
 		union {
 			struct {Point2 pos; Dimensions2 dim;};
@@ -234,17 +235,40 @@ Dimensions2 GetContentDim(UIElement* e) {
 	return {width, height};
 }
 
+bool IsInteractable(UIElement* e) {
+	return e != ui.focused 
+		&& ((e->flags & (UI_CLICKABLE | UI_MOVABLE)) || e->onClick);
+}
+
+UIElement* FindFirstInteractable(UIElement* e) {
+	if (e->flags & UI_HIDDEN)
+		return NULL;
+	if (IsInteractable(e))
+		return e;
+	LINKEDLIST_FOREACH(e, UIElement, child) {
+		UIElement* interactable = FindFirstInteractable(child);
+		if (interactable) return interactable;
+	}
+	return NULL;
+}
+
 // Render
 //------------
 
 UIStyle GetCurrentStyle(UIElement* element) {
+	UIStyle style = element->style;
 	if ((element->flags & UI_HOVER_STYLE) && ui.hovered == element)
-		return element->hover;
+		style = element->hover;
 
 	if ((element->flags & UI_ACTIVE_STYLE) && element->isActive)
-		return element->active;
+		style = element->active;
 
-	return element->style;
+	if (element == ui.focused) {
+		style.borderWidth++;
+		style.borderColor = {1, 0, 0, 1};
+	}
+
+	return style;
 }
 
 Point2 GetInterpolatedPos(UIElement* e) {
@@ -374,7 +398,7 @@ UIElement* UICreateElement(
 		Point2 pos = {}, 
 		Dimensions2 dim = {}, 
 		UIStyle style = {}, 
-		uint32 flags = 0) {
+		uint64 flags = 0) {
 
 	ASSERT(parent || ui.rootElement);
 
@@ -436,6 +460,8 @@ void UIEnableActiveStyle(UIElement* element, UIStyle active) {
 	element->active = active;
 }
 
+// NOTE: right now I'm using this to override the cursor with arrow
+// so it might be an overkill to specify the cursor.
 void UISetCursor(UIElement* element, int32 cursor) {
 	element->flags |= UI_CURSOR;
 	element->cursor = cursor;
@@ -497,6 +523,7 @@ void UIUpdate() {
 			ui.grabPos = {(float32)cursorPos.x, (float32)cursorPos.y};
 			ui.originalPos = element->pos;
 		}
+		ui.focused = NULL;
 	}
 
 	// Handle mouse released
@@ -566,6 +593,63 @@ void UIUpdate() {
 			xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
 		}
 	}
+
+	// Handle tab
+	if (OSIsKeyPressed(KEY_TAB)) {
+		if (ui.focused) {
+			bool found = false;
+			UIElement* e = ui.focused;
+			while (e) {
+				UIElement* interactable = FindFirstInteractable(e);
+				if (interactable) {
+					ui.focused = interactable;
+					found = true;
+					break;
+				}
+				if (e->next) e = e->next;
+				else if (e->parent) e = e->parent->next;
+				else break;
+			}
+			if (!found) ui.focused = NULL;
+		}
+
+		if (!ui.focused) {
+			ui.focused = FindFirstInteractable(ui.rootElement);
+		}
+	}
+
+	// Handle space
+	if (OSIsKeyPressed(KEY_SPACE) && ui.focused) {
+		if (ui.focused->onClick) ui.focused->onClick(ui.focused);
+		if (ui.focused->flags & UI_SHUFFLABLE)
+			LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
+	}
+
+	// Handle Arrow Keys
+	if (OSIsKeyDown(KEY_UP) && ui.focused) {
+		if (ui.focused->flags & UI_Y_MOVABLE) {
+			SetPosition(ui.focused, ui.focused->x, ui.focused->y - 6);
+			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+		}
+	}
+	if (OSIsKeyDown(KEY_DOWN) && ui.focused) {
+		if (ui.focused->flags & UI_Y_MOVABLE) {
+			SetPosition(ui.focused, ui.focused->x, ui.focused->y + 6);
+			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+		}
+	}
+	if (OSIsKeyDown(KEY_LEFT) && ui.focused) {
+		if (ui.focused->flags & UI_X_MOVABLE) {
+			SetPosition(ui.focused, ui.focused->x - 6, ui.focused->y);
+			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+		}
+	}
+	if (OSIsKeyDown(KEY_RIGHT) && ui.focused) {
+		if (ui.focused->flags & UI_X_MOVABLE) {
+			SetPosition(ui.focused, ui.focused->x + 6, ui.focused->y);
+			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+		}
+	}
 }
 
 void UIRender() {
@@ -588,6 +672,7 @@ UIElement* UICreateButton(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyl
 		style.background.a
 	};
 	UIEnableHoverStyle(button, hover);
+	button->name = STR("button");
 	return button;
 }
 
@@ -607,6 +692,7 @@ UIElement* UICreateCheckbox(UIElement* parent, Point2 pos = {}) {
 	checkbox->icon = Icon_check_empty;
 	checkbox->onClick = __check_box;
 
+	checkbox->name = STR("checkbox");
 	return checkbox;
 }
 
@@ -625,6 +711,7 @@ UIElement* UICreateRadioButton(UIElement* radioGroup, Point2 pos = {}) {
 	radioButton->icon = Icon_circle_empty;
 	radioButton->onClick = __select_button;
 
+	radioButton->name = STR("radio");
 	return radioButton;
 }
 
@@ -635,6 +722,7 @@ UIElement* UICreateSlider(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyl
 	UICreateElement(slider, {(dim.width - thumbWidth)/2.f, -quater_height}, {thumbWidth, dim.height}, style, 
 		UI_X_MOVABLE);
 
+	slider->name = STR("slider");
 	return slider;
 }
 
@@ -652,6 +740,10 @@ void __activate_tab(UIElement* e) {
 	UIElement* tabControl = e->parent;
 	LINKEDLIST_FOREACH(tabControl, UIElement, header) {
 		header->isActive = header == e;
+		if (header == e)
+			header->first->next->flags &= ~UI_HIDDEN;
+		else
+			header->first->next->flags |= UI_HIDDEN;
 	}
 }
 
@@ -678,9 +770,9 @@ UIElement* UICreateTab(UIElement* tabControl, Dimensions2 headerDim, UIStyle act
 	UIEnableHoverStyle(tab, hover);
 	UIEnableActiveStyle(tab, active);
 	tab->onClick = __activate_tab;
-	__activate_tab(tab);
 
 	UIElement* tabBody = UICreateElement(tab, {-x, headerDim.height}, {tabControl->width, tabControl->height - headerDim.height - 2}, {bg});
+	__activate_tab(tab);
 	return tabBody;
 }
 
@@ -761,6 +853,8 @@ UIElement* UICreateHSplitter(UIElement* parent, float32 y, float32 height) {
 void __expand_or_collapse(UIElement* e) {
 	UIElement* children = e->first;
 	if (e->icon == Icon_right_dir) {
+		// TODO: need to find a good way to do this with transition
+		// animation
 		children->flags &= ~UI_HIDDEN;
 		e->icon = Icon_down_dir;
 	}
@@ -770,10 +864,6 @@ void __expand_or_collapse(UIElement* e) {
 	}
 }
 
-// NOTE: the idea here is that the tree-item element has a "children" 
-// child element to make it easier to iterate over the "children",
-// but the user doesn't use it directly, so the parent-tree-item is not
-// the parent element.
 UIElement* UICreateTreeRoot(UIElement* parent, Point2 pos, Point2 subTreeOffset) {
 	UIElement* root = UICreateElement(parent, pos, {}, {}, UI_FIT_CONTENT);
 	root->onClick = __expand_or_collapse;
