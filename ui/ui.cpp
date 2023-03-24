@@ -281,19 +281,14 @@ UIElement* FindFirstInteractable(UIElement* e) {
 //--------
 
 ssize GetTextIndex(UIElement* textElement, Point2 pos, Point2i cursorPos) {
+	if (!HasText(textElement)) return -1;
+
 	UIText text = textElement->text;
-	StringList list;
-	StringNode node;
-	if (text.editable.totalLength) {
-		list = text.editable;
-	}
-	else if (text.string.length || (text.flags & TEXT_EDITABLE)) {
-		list = CreateStringList(text.string, &node);
-	}
-	else return -1;
 	float32 x_end = cursorPos.x - pos.x + textElement->scroll.x;
 	float32 y_end = cursorPos.y - (pos.y + text.font->height) + textElement->scroll.y;
-	return GetCharIndex(text.font, list, x_end, y_end);
+	return text.flags & TEXT_WRAPPING
+		? GetCharIndex(text.font, text.string, x_end, y_end, textElement->width) 
+		: GetCharIndex(text.font, text.string, x_end, y_end);
 }
 
 // Render
@@ -480,30 +475,17 @@ UIElement* UIAddText(UIElement* parent, UIText text) {
 	return textElement;
 }
 
-UIElement* UIAddText(UIElement* parent, UIText text, float32 x) {
+UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	UIElement* textElement = UICreateElement(parent);
-	textElement->x = x;
-	textElement->text = text;
-	textElement->flags = UI_FIT_CONTENT | UI_MIDDLE;
-	return textElement;
-}
-
-UIElement* UIAddText(UIElement* parent, UIText text, Point2 pos) {
-	UIElement* textElement = UICreateElement(parent, pos);
+	textElement->x = xmargin;
 	textElement->text = text;
 	textElement->flags = UI_FIT_CONTENT;
-	return textElement;
-}
 
-UIElement* UIAddWrappingText(UIElement* parent, UIText text, float32 margin) {
-	UIElement* textElement = UICreateElement(parent);
-	textElement->x = margin;
-	textElement->y = 0;
-	textElement->width = parent->width - 2*margin;
-	textElement->height = parent->height;
-	textElement->text = text;
-	textElement->text.flags |= TEXT_WRAPPING;
-	textElement->flags = UI_FIT_CONTENT;
+	if (text.flags & TEXT_WRAPPING) {
+		textElement->width = parent->width - 2*xmargin;
+		textElement->height = parent->height;
+	}
+
 	return textElement;
 }
 

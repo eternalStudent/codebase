@@ -171,15 +171,55 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 	};
 }
 
-ssize GetCharIndex(BakedFont* font, StringList list, float32 x_end, float32 y_end) {
+ssize GetCharIndex(BakedFont* font, String string, float32 x_end, float32 y_end,
+				   float32 wrapX = -1) {
+
 	float32 x = 0;
 	float32 y = 0;
 
+	bool prevCharWasWhiteSpace = false;
+	for (ssize i = 0; i < string.length; i++) {
+		byte b = string.data[i];
+		bool whiteSpace = IsWhiteSpace(b);
+		if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+			float32 wordWidth = GetWordWidth(font, string, i);
+			if (wrapX <= x + wordWidth) {
+				y += font->height;
+				x = 0;
+			}
+		}
+		if (b == 10) {
+			y += font->height;
+			x = 0;
+		}
+		x += GetCharWidth(font, b);
+		if (x_end <= x - 2 && y_end <= y) return i;
+		prevCharWasWhiteSpace = whiteSpace;
+	}
+
+	return string.length;
+}
+
+ssize GetCharIndex(BakedFont* font, StringList list, float32 x_end, float32 y_end,
+				   float32 wrapX = -1) {
+
+	float32 x = 0;
+	float32 y = 0;
+
+	bool prevCharWasWhiteSpace = false;
 	ssize i = 0;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
 		for (ssize j = 0; j < string.length; j++) {
 			byte b = string.data[j];
+			bool whiteSpace = IsWhiteSpace(b);
+			if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+				float32 wordWidth = GetWordWidth(font, node, j);
+				if (wrapX <= x + wordWidth) {
+					y += font->height;
+					x = 0;
+				}
+			}
 			if (b == 10) {
 				y += font->height;
 				x = 0;
@@ -187,6 +227,7 @@ ssize GetCharIndex(BakedFont* font, StringList list, float32 x_end, float32 y_en
 			x += GetCharWidth(font, b);
 			if (x_end <= x - 2 && y_end <= y) return i;
 			i++;
+			prevCharWasWhiteSpace = whiteSpace;
 		}
 	}
 
