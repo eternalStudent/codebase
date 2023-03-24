@@ -1,3 +1,7 @@
+inline bool IsWhiteSpace(byte b) {
+	return (9 <= b && b <= 13 || b == 32);
+}
+
 // Null-Terminated
 //-----------------
 

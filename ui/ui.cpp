@@ -1,6 +1,8 @@
 /*
  * TODO:
- * EDITABLE TEXT!!! spinner
+ * selectable text
+ * text navigation
+ * EDITABLE TEXT!!! 
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
  * theme/palette
@@ -10,31 +12,39 @@
 #include "font.cpp"
 #include "icons.cpp"
 
-#define UI_X_MOVABLE		(1ull << 0)
-#define UI_Y_MOVABLE		(1ull << 1)
-#define UI_MOVABLE			(UI_X_MOVABLE | UI_Y_MOVABLE)
-#define UI_RESIZABLE		(1ull << 2)
-#define UI_SHUFFLABLE		(1ull << 3)
-#define UI_CLICKABLE		(1ull << 4)
-#define UI_HIDE_OVERFLOW	(1ull << 5)
-#define UI_SCROLLABLE	   ((1ull << 6) | UI_HIDE_OVERFLOW)
-#define UI_INFINITE_SCROLL ((1ull << 7) | UI_SCROLLABLE)
-#define UI_HIDDEN			(1ull << 8)
+#define UI_X_MOVABLE		 (1ull << 0)
+#define UI_Y_MOVABLE		 (1ull << 1)
+#define UI_MOVABLE			 (UI_X_MOVABLE | UI_Y_MOVABLE)
+#define UI_RESIZABLE		 (1ull << 2)
+#define UI_SHUFFLABLE		 (1ull << 3)
+#define UI_CLICKABLE		 (1ull << 4)
+#define UI_HIDE_OVERFLOW	 (1ull << 5)
+#define UI_SCROLLABLE		((1ull << 6) | UI_HIDE_OVERFLOW)
+#define UI_INFINITE_SCROLL	((1ull << 7) | UI_SCROLLABLE)
+// TODO: maybe hidden shouldn't be a flag? 
+// Same as isChecked/isSelected/isActive?
+#define UI_HIDDEN			 (1ull << 8)
 
-#define UI_CENTER			(1ull << 10)
-#define UI_MIDDLE			(1ull << 11)
-#define UI_HORIZONTAL_STACK	(1ull << 12)
-#define UI_VERTICAL_STACK	(1ull << 13)
-#define UI_FIT_CONTENT		(1ull << 14)
-#define UI_MIN_CONTENT		(1ull << 15)
-#define UI_X_THUMB			(1ull << 16)
-#define UI_Y_THUMB			(1ull << 17)
+#define UI_CENTER			 (1ull << 10)
+#define UI_MIDDLE			 (1ull << 11)
+#define UI_HORIZONTAL_STACK	 (1ull << 12)
+#define UI_VERTICAL_STACK	 (1ull << 13)
+#define UI_FIT_CONTENT		 (1ull << 14)
+#define UI_MIN_CONTENT		 (1ull << 15)
+#define UI_X_THUMB			 (1ull << 16)
+#define UI_Y_THUMB			 (1ull << 17)
 
-#define UI_GRADIENT 		(1ull << 32)
-#define UI_HOVER_STYLE		(1ull << 33)
-#define UI_ACTIVE_STYLE 	(1ull << 34)
-#define UI_CURSOR 			(1ull << 35)
-#define UI_TRANSITION		(1ull << 36)
+#define UI_GRADIENT 		 (1ull << 32)
+#define UI_HOVER_STYLE		 (1ull << 33)
+#define UI_ACTIVE_STYLE 	 (1ull << 34)
+#define UI_CURSOR 			 (1ull << 35)
+#define UI_TRANSITION		 (1ull << 36)
+
+
+#define TEXT_SELECTABLE 	 (1 << 0)
+#define TEXT_EDITABLE		((1 << 1) | TEXT_SELECTABLE)
+#define TEXT_MULTILINE		((1 << 2) | TEXT_EDITABLE)
+#define TEXT_WRAPPING		 (1 << 3)
 
 struct UIStyle {
 	Color background;
@@ -48,6 +58,8 @@ struct UIText {
 	BakedFont* font;
 	Color color;
 	String string;
+	uint32 flags;
+	StringList editable;
 };
 
 struct UIImage {
@@ -98,10 +110,9 @@ struct UIElement {
 	byte icon;
 	UIImage image;
 
+	opaque64 context;
 	void (*onClick)(UIElement*);
 	void (*onMove)(UIElement*);
-
-	opaque64 context;
 
 	UIElement* parent;
 	UIElement* first;
@@ -125,6 +136,9 @@ struct {
 	bool isGrabbing;
 	bool isResizing;
 	bool rootElementIsWindow;
+
+	ssize start;
+	ssize end;
 } ui;
 
 // Util
@@ -153,8 +167,11 @@ Box2 GetScreenHitBox(UIElement* element) {
 }
 
 // NOTE: both for drawing and for intercepting hit-box
+// TODO: probably should split
 bool HasQuad(UIElement* e) {
-	return (e->background.a) || (e->borderWidth && e->borderColor.a) || (e->flags & UI_CLICKABLE) || e->onClick;
+	return (e->background.a) || (e->borderWidth && e->borderColor.a) 
+		|| (e->flags & UI_CLICKABLE) || e->onClick 
+		|| (e->text.flags & TEXT_SELECTABLE);
 }
 
 bool HasText(UIElement* e) {
@@ -219,9 +236,10 @@ Dimensions2 GetContentDim(UIElement* e) {
 	float32 width = 0;
 	float32 height = 0;
 	if (HasText(e)) {
-		StringNode node = {e->text.string, NULL, NULL};
-		StringList list = {&node, &node, e->text.string.length};
-		TextMetrics metrics = GetTextMetrics(e->text.font, list);
+		UIText text = e->text;
+		TextMetrics metrics = text.flags & TEXT_WRAPPING
+			? GetTextMetrics(text.font, text.string, e->width)
+			: GetTextMetrics(text.font, text.string);
 		width = metrics.maxx;
 		height = metrics.endy;
 	}
@@ -234,25 +252,20 @@ Dimensions2 GetContentDim(UIElement* e) {
 }
 
 bool IsInteractable(UIElement* e) {
-	return e != ui.focused 
-		&& ((e->flags & (UI_CLICKABLE | UI_MOVABLE)) || e->onClick);
+	return (e->flags & (UI_CLICKABLE | UI_MOVABLE)) || e->onClick;
 }
 
 UIElement* GetNext(UIElement* e) {
 	if (e->first && !(e->flags & UI_HIDDEN)) 
 		return e->first;
 	if (e->next) return e->next;
-	do {
-		e = e->parent;
-	} while(e && !e->next);
+	do {e = e->parent;} while(e && !e->next);
 	return e ? e->next : NULL;
 }
 
 UIElement* FindFirstInteractable(UIElement* e) {
 	if (e->flags & UI_HIDDEN)
 		return NULL;
-	if (IsInteractable(e))
-		return e;
 	for (UIElement* current = GetNext(e); 
 			current != NULL; 
 				current = GetNext(current)) {
@@ -262,6 +275,25 @@ UIElement* FindFirstInteractable(UIElement* e) {
 			return current;
 	}
 	return NULL;
+}
+
+// Text
+//--------
+
+ssize GetTextIndex(UIElement* textElement, Point2 pos, Point2i cursorPos) {
+	UIText text = textElement->text;
+	StringList list;
+	StringNode node;
+	if (text.editable.totalLength) {
+		list = text.editable;
+	}
+	else if (text.string.length || (text.flags & TEXT_EDITABLE)) {
+		list = CreateStringList(text.string, &node);
+	}
+	else return -1;
+	float32 x_end = cursorPos.x - pos.x + textElement->scroll.x;
+	float32 y_end = cursorPos.y - (pos.y + text.font->height) + textElement->scroll.y;
+	return GetCharIndex(text.font, list, x_end, y_end);
 }
 
 // Render
@@ -372,10 +404,15 @@ void RenderElement(UIElement* element) {
 		GfxDrawQuad(pos, element->dim, style.background, style.radius, style.borderWidth, style.borderColor,
 			element->flags & UI_GRADIENT ? style.color2 : style.background);
 	}
-	if (HasText(element))
-		RenderText(pos, element->text.font, element->text.color, element->text.string);
+	if (HasText(element)) {
+		UIText text = element->text;
+		if (text.flags & TEXT_WRAPPING)
+			RenderText(pos, text.font, text.color, text.string, pos.x + element->width);
+		else
+			RenderText(pos, text.font, text.color, text.string);
+	}
 	if (element->icon) {
-		RenderGlyph(pos, &ui.iconsFont, {0, 0, 0, 1}, element->icon);
+		RenderGlyph(pos, &ui.iconsFont, COLOR_BLACK, element->icon);
 	}
 	if (HasImage(element)) {
 		GfxDrawImage(pos, element->dim, element->image.atlas, element->image.crop);
@@ -458,6 +495,18 @@ UIElement* UIAddText(UIElement* parent, UIText text, Point2 pos) {
 	return textElement;
 }
 
+UIElement* UIAddWrappingText(UIElement* parent, UIText text, float32 margin) {
+	UIElement* textElement = UICreateElement(parent);
+	textElement->x = margin;
+	textElement->y = 0;
+	textElement->width = parent->width - 2*margin;
+	textElement->height = parent->height;
+	textElement->text = text;
+	textElement->text.flags |= TEXT_WRAPPING;
+	textElement->flags = UI_FIT_CONTENT;
+	return textElement;
+}
+
 UIElement* UIAddImage(UIElement* parent, Point2 pos, Dimensions2 dim, TextureId atlas, Box2 crop) {
 	UIElement* imageElement = UICreateElement(parent, pos, dim);
 	imageElement->image = {atlas, crop};
@@ -521,6 +570,7 @@ void UIUpdate() {
 	else if (element->flags & UI_X_MOVABLE) OSSetCursorIcon(CUR_MOVESIDE);
 	else if (element->flags & UI_Y_MOVABLE) OSSetCursorIcon(CUR_MOVEUPDN);
 	else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
+	else if (element->text.flags & TEXT_SELECTABLE) OSSetCursorIcon(CUR_TEXT);
 	else OSSetCursorIcon(CUR_ARROW);
 
 	// Handle left click
@@ -579,7 +629,7 @@ void UIUpdate() {
 	int32 mouseHWheelDelta = OSGetMouseHWheelDelta();
 	if (mouseWheelDelta || mouseHWheelDelta) {
 		UIElement* scrollable = element;
-		while (scrollable && !(scrollable->flags & UI_SCROLLABLE))
+		while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
 			scrollable = scrollable->parent;
 		if (scrollable) {
 			Dimensions2 contentDim = GetContentDim(scrollable);
@@ -603,13 +653,18 @@ void UIUpdate() {
 			}
 
 			// update scrollbar
+			// NOTE: hmm... problematic...
 			UIElement* yscrollBar = scrollable->next;
-			UIElement* ythumb = yscrollBar->first;
-			ythumb->y = ((yscrollBar->height - ythumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
+			if (yscrollBar) {
+				UIElement* ythumb = yscrollBar->first;
+				ythumb->y = ((yscrollBar->height - ythumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
 
-			UIElement* xscrollBar = yscrollBar->next;
-			UIElement* xthumb = xscrollBar->first;
-			xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
+				UIElement* xscrollBar = yscrollBar->next;
+				if (xscrollBar) {
+					UIElement* xthumb = xscrollBar->first;
+					xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
+				}
+			}
 		}
 	}
 
@@ -633,25 +688,25 @@ void UIUpdate() {
 	// Handle Arrow Keys
 	if (OSIsKeyDown(KEY_UP) && ui.focused) {
 		if (ui.focused->flags & UI_Y_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x, ui.focused->y - 6);
+			SetPosition(ui.focused, ui.focused->x, ui.focused->y - 1);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
 	}
 	if (OSIsKeyDown(KEY_DOWN) && ui.focused) {
 		if (ui.focused->flags & UI_Y_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x, ui.focused->y + 6);
+			SetPosition(ui.focused, ui.focused->x, ui.focused->y + 1);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
 	}
 	if (OSIsKeyDown(KEY_LEFT) && ui.focused) {
 		if (ui.focused->flags & UI_X_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x - 6, ui.focused->y);
+			SetPosition(ui.focused, ui.focused->x - 1, ui.focused->y);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
 	}
 	if (OSIsKeyDown(KEY_RIGHT) && ui.focused) {
 		if (ui.focused->flags & UI_X_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x + 6, ui.focused->y);
+			SetPosition(ui.focused, ui.focused->x + 1, ui.focused->y);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
 	}
@@ -670,12 +725,7 @@ void UIRender() {
 UIElement* UICreateButton(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style) {
 	UIElement* button = UICreateElement(parent, pos, dim, style, UI_CLICKABLE);
 	UIStyle hover = style;
-	hover.background = {
-		0.5f*style.background.r,
-		0.5f*style.background.g,
-		0.5f*style.background.b,
-		style.background.a
-	};
+	hover.background = {0.5f*style.background.rgb, style.background.a};
 	UIEnableHoverStyle(button, hover);
 
 	button->name = STR("button");
@@ -756,21 +806,16 @@ void __activate_tab(UIElement* e) {
 
 UIElement* UICreateTab(UIElement* tabControl, Dimensions2 headerDim, UIStyle active, UIText header) {
 	Color bg = active.background;
-	UIStyle nonactive = {{
-		0.5f*bg.r + 0.5f,
-		0.5f*bg.g + 0.5f,
-		0.5f*bg.b + 0.5f,
-		bg.a,
-	}, active.radius, active.borderWidth, active.borderColor};
-	UIStyle hover = {{
-		0.75f*bg.r + 0.25f,
-		0.75f*bg.g + 0.25f,
-		0.75f*bg.b + 0.25f,
-		bg.a,
-	}, active.radius, active.borderWidth, active.borderColor};
+	UIStyle nonactive = {{0.5f*bg.rgb + 0.5f, bg.a},
+		active.radius, active.borderWidth, active.borderColor};
+	UIStyle hover = {{0.75f*bg.rgb + 0.25f, bg.a}, 
+		active.radius, active.borderWidth, active.borderColor};
 
-	UIElement* lastTab = tabControl->last;
-	float32 x = lastTab ? lastTab->x + lastTab->width : 0;
+	float32 x = 0;
+	LINKEDLIST_FOREACH(tabControl, UIElement, sibling) {
+		if (x < sibling->x + sibling->width) x = sibling->x + sibling->width;
+	}
+
 	UIElement* tab = UICreateElement(tabControl, {x, 2}, {headerDim.width, headerDim.height + active.radius}, nonactive, 
 		UI_CLICKABLE | UI_SHUFFLABLE);
 	UIAddText(tab, header);
@@ -784,6 +829,12 @@ UIElement* UICreateTab(UIElement* tabControl, Dimensions2 headerDim, UIStyle act
 	tab->name = STR("tab");
 	tabBody->name = STR("tab body");
 	return tabBody;
+}
+
+void UIActivateTab(UIElement* tabBody) {
+	UIElement* tab = tabBody->parent;
+	__activate_tab(tab);
+	LINKEDLIST_MOVE_TO_LAST(tab->parent, tab);
 }
 
 void __scroll_x(UIElement* e) {
@@ -834,7 +885,7 @@ void __move_vsplitter(UIElement* e) {
 }
 
 UIElement* UICreateVSplitter(UIElement* parent, float32 x, float32 width) {
-	UIElement* splitter = UICreateElement(parent, {x - width/2, 0}, {width, parent->height}, {{0.5f, 0.5f, 0.5f, 1}, 0, 1, {0, 0, 0, 1}}, UI_X_MOVABLE);
+	UIElement* splitter = UICreateElement(parent, {x - width/2, 0}, {width, parent->height}, {{0.5f, 0.5f, 0.5f, 1}, 0, 1, COLOR_BLACK}, UI_X_MOVABLE);
 	splitter->onMove = __move_vsplitter;
 	__move_vsplitter(splitter);
 	return splitter;
@@ -853,7 +904,7 @@ void __move_hsplitter(UIElement* e) {
 }
 
 UIElement* UICreateHSplitter(UIElement* parent, float32 y, float32 height) {
-	UIElement* splitter = UICreateElement(parent, {0, y - height/2}, {parent->width, height}, {{0.5f, 0.5f, 0.5f, 1}, 0, 1, {0, 0, 0, 1}}, UI_Y_MOVABLE);
+	UIElement* splitter = UICreateElement(parent, {0, y - height/2}, {parent->width, height}, {{0.5f, 0.5f, 0.5f, 1}, 0, 1, COLOR_BLACK}, UI_Y_MOVABLE);
 	splitter->onMove = __move_hsplitter;
 	__move_hsplitter(splitter);
 	return splitter;
@@ -888,7 +939,7 @@ UIElement* UICreateTreeItem(UIElement* parent) {
 		UI_FIT_CONTENT | UI_VERTICAL_STACK);
 	UIEnableTransition(item);
 	parent->icon = Icon_down_dir;
-	item->onClick = __expand_or_collapse;
+	parent->onClick = __expand_or_collapse;
 
 	UICreateElement(item, parent->first->pos, {}, {}, UI_FIT_CONTENT); // children container
 
