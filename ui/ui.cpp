@@ -718,11 +718,34 @@ void UIUpdate() {
 					}
 				}
 
+				// up
 				if (cursorPos.y < selectedPos.y) {
-					
+					ssize end = GetCharIndex(text.font, text.string, 
+											 metrics.endx, metrics.endy - 2*text.font->height,
+											 shouldWrap, ui.selected->width);
+					if (end != -1) {
+						ui.end = end;
+
+						metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+						if (metrics.endy <= scrollable->scroll.y) {
+							scrollable->scroll.y = metrics.endy - text.font->height; 
+						}
+					}
 				}
+
+				// down
 				if (selectedPos.y + scrollable->height < cursorPos.y) {
-					
+					ssize end = GetCharIndex(text.font, text.string, 
+											 metrics.endx, metrics.endy + text.font->height,
+											 shouldWrap, ui.selected->width);
+					if (end != -1) {
+						ui.end = end;
+
+						metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+						if (scrollable->scroll.y + scrollable->height < metrics.endy) {
+							scrollable->scroll.y = metrics.endy - scrollable->height + 0.5f*text.font->height; 
+						}
+					}
 				}
 			}
 			else selectionCount--;
