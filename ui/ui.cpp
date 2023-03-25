@@ -241,9 +241,8 @@ Dimensions2 GetContentDim(UIElement* e) {
 	float32 height = 0;
 	if (HasText(e)) {
 		UIText text = e->text;
-		TextMetrics metrics = text.flags & TEXT_WRAPPING
-			? GetTextMetrics(text.font, text.string, e->width)
-			: GetTextMetrics(text.font, text.string);
+		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+		TextMetrics metrics = GetTextMetrics(text.font, text.string, shouldWrap, e->width);
 		width = metrics.maxx;
 		height = metrics.endy + 0.5f*text.font->height;
 	}
@@ -281,6 +280,13 @@ UIElement* FindFirstInteractable(UIElement* e) {
 	return NULL;
 }
 
+UIElement* GetScrollableAncestor(UIElement* element) {
+	UIElement* scrollable = element;
+	while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
+		scrollable = scrollable->parent;
+	return scrollable;
+}
+
 // Text
 //--------
 
@@ -290,9 +296,8 @@ ssize GetTextIndex(UIElement* textElement, Point2 pos, Point2i cursorPos) {
 	UIText text = textElement->text;
 	float32 x_end = cursorPos.x - pos.x + textElement->scroll.x;
 	float32 y_end = cursorPos.y - (pos.y + text.font->height) + textElement->scroll.y;
-	return text.flags & TEXT_WRAPPING
-		? GetCharIndex(text.font, text.string, x_end, y_end, textElement->width) 
-		: GetCharIndex(text.font, text.string, x_end, y_end);
+	bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+	return GetCharIndex(text.font, text.string, x_end, y_end, shouldWrap, textElement->width);
 }
 
 // Render
@@ -326,9 +331,9 @@ Point2 GetScreenPosition(UIElement* element) {
 	Point2 pos = element->flags & UI_TRANSITION
 		? GetInterpolatedPos(element)
 		: element->pos;
-	Point2 scrollPos = parent->scroll;
+	Point2 scroll = parent->scroll;
 
-	return {parentPos.x + pos.x - scrollPos.x, parentPos.y + pos.y - scrollPos.y};
+	return {parentPos.x + pos.x - scroll.x, parentPos.y + pos.y - scroll.y};
 }
 
 void RenderElement(UIElement* element) {
@@ -405,27 +410,18 @@ void RenderElement(UIElement* element) {
 	}
 	if (HasText(element)) {
 		UIText text = element->text;
-		if (text.flags & TEXT_WRAPPING)
-			RenderText(pos, text.font, text.color, text.string, pos.x + element->width);
-		else
-			RenderText(pos, text.font, text.color, text.string);
+		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+		RenderText(pos, text.font, text.color, text.string, shouldWrap, pos.x + element->width);
+		
 		if (ui.selected == element) {
 			if (ui.start != ui.end) {
 				ssize start = MIN(ui.start, ui.end);
 				ssize end = MAX(ui.start, ui.end);
-				if (text.flags & TEXT_WRAPPING) {
-					RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.string,
-						 start, end, element->width);
-				}
-				else {
-					RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.string,
-						 start, end);
-				}
+				RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.string,
+						 			start, end, shouldWrap, element->width);
 			}
 
-			TextMetrics metrics = (text.flags & TEXT_WRAPPING)
-				? GetTextMetrics(text.font, text.string, ui.end, element->width)
-				: GetTextMetrics(text.font, text.string, ui.end);
+			TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, element->width);
 			float32 caretx = round(pos.x + metrics.endx);
 			float32 carety = round(pos.y + metrics.endy - text.font->height + 2);
 			GfxDrawQuad({caretx, carety}, {1, text.font->height + 2}, COLOR_BLACK, 0, 0, {}, COLOR_BLACK);
@@ -692,28 +688,44 @@ void UIUpdate() {
 			ui.end = textIndex;
 		}
 		else {
-			/*
 			if (selectionCount == 0) {
 				selectionCount = 6;
-				Point2 selectedPos = GetScreenPosition(ui.selected);
-				if (cursorPos.x < selectedPos.x + ui.selected->width) {
-					ui.end = MAX(ui.end - 1, 0);
-					// TODO:
-					// UpdateTextScrollPos();
-				}
-				if (selectedPos.x + ui.selected->width < cursorPos.x) {
-					ssize length = ui.selected->text.string.length;
-					byte nextChar = ui.selected->text.string.data[ui.end + 1];
-					if (ui.end < length && nextChar != 10) {
-						ui.end++;
-						// TODO:
-						// UpdateTextScrollPos();
+				// TODO: is it necessarilly the parent?
+				UIElement* scrollable = ui.selected->parent;
+				Point2 selectedPos = GetScreenPosition(scrollable);
+				UIText text = ui.selected->text;
+				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+				TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+
+				// left
+				if (cursorPos.x < selectedPos.x && 0 < ui.end) {
+					TextMetrics prev = GetTextMetrics(text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
+					ui.end--;
+					if (prev.endy != metrics.endy)
+						scrollable->scroll.x = 0;
+					else if (prev.endx < scrollable->scroll.x) {
+						scrollable->scroll.x = prev.endx; 
 					}
 				}
-				// TODO: handle ups and downs
+
+				// right
+				if (selectedPos.x + scrollable->width < cursorPos.x && ui.end + 1 < text.string.length) {
+					TextMetrics next = GetTextMetrics(text.font, text.string, ui.end + 1, shouldWrap, ui.selected->width);
+					if (next.endy == metrics.endy)
+						ui.end++;
+					if (scrollable->scroll.x + scrollable->width < next.endx) {
+						scrollable->scroll.x = next.endx - scrollable->width; 
+					}
+				}
+
+				if (cursorPos.y < selectedPos.y) {
+					
+				}
+				if (selectedPos.y + scrollable->height < cursorPos.y) {
+					
+				}
 			}
 			else selectionCount--;
-			*/
 		}
 	}
 

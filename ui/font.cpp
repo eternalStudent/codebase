@@ -97,14 +97,14 @@ float32 GetWordWidth(BakedFont* font, String string, ssize i) {
 }
 
 void RenderText(Point2 pos, BakedFont* font, Color color, String string,
-				float32 wrapX = -1) {
+				bool shouldWrap, float32 wrapX) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 initialX = pos.x;
 	for (ssize i = 0; i < string.length; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
-		if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= pos.x + wordWidth) {
 				pos.y += font->height;
@@ -126,7 +126,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, String string,
 }
 
 ssize GetCharIndex(BakedFont* font, String string, float32 x_end, float32 y_end,
-				   float32 wrapX = -1) {
+				   bool shouldWrap, float32 wrapX) {
 
 	float32 x = 0;
 	float32 y = 0;
@@ -135,7 +135,7 @@ ssize GetCharIndex(BakedFont* font, String string, float32 x_end, float32 y_end,
 	for (ssize i = 0; i < string.length; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
-		if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
 				y += font->height;
@@ -160,8 +160,8 @@ struct TextMetrics {
 	float32 endy;
 };
 
-TextMetrics GetTextMetrics(BakedFont* font, String string, 
-						   ssize end, float32 wrapX = -1) {
+TextMetrics GetTextMetrics(BakedFont* font, String string, ssize end, 
+						   bool shouldWrap, float32 wrapX) {
 	
 	if (string.length == 0) return {};
 	
@@ -172,7 +172,7 @@ TextMetrics GetTextMetrics(BakedFont* font, String string,
 	for (ssize i = 0; i < end; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
-		if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
 				maxx = MAX(maxx, x);
@@ -194,13 +194,14 @@ TextMetrics GetTextMetrics(BakedFont* font, String string,
 }
 
 TextMetrics GetTextMetrics(BakedFont* font, String string, 
-						   float32 wrapX = -1) {
+						   bool shouldWrap, float32 wrapX) {
 
-	return GetTextMetrics(font, string, string.length, wrapX);
+	return GetTextMetrics(font, string, string.length, shouldWrap, wrapX);
 }
 
 void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string,
-						 ssize start, ssize end, float32 wrapX = -1) {
+						 ssize start, ssize end, 
+						 bool shouldWrap, float32 wrapX) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 x = 0;
@@ -211,7 +212,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 	for (; i < start; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
-		if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
 				x = 0;
