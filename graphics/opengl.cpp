@@ -198,10 +198,11 @@ GLuint OpenGLGenerateTexture(Image image, GLint filter) {
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	static GLenum formats[] = {GL_RED, GL_RG, GL_RGB, GL_RGBA};
+	static GLenum internalFormats[] = {GL_RED, GL_RG, GL_SRGB, GL_SRGB_ALPHA};
 	glTexImage2D(
 		GL_TEXTURE_2D, 
 		0, 
-		formats[image.channels - 1], 
+		internalFormats[image.channels - 1], 
 		image.width, 
 		image.height, 
 		0, 

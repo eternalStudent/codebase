@@ -254,6 +254,11 @@ BOOL Win32OpenGLSwapBuffers() {
 #define GL_TEXTURE6 					0x84C6
 #define GL_TEXTURE7 					0x84C7
 
+#define GL_SRGB 						0x8C40
+#define GL_SRGB8						0x8C41
+#define GL_SRGB_ALPHA					0x8C42
+#define GL_SRGB8_ALPHA8					0x8C43
+
 #define GL_ARRAY_BUFFER 				0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 		0x8893
 #define GL_STREAM_DRAW					0x88E0
