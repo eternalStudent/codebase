@@ -129,12 +129,14 @@ struct {
 
 	UIElement* hovered;
 	UIElement* focused;
+	UIElement* selected;
 
 	Point2 originalPos;
 	Point2 grabPos;
 
 	bool isGrabbing;
 	bool isResizing;
+	bool isSelecting;
 	bool rootElementIsWindow;
 
 	ssize start;
@@ -195,7 +197,9 @@ UIElement* GetElementByPosition(Point2i cursorPos) {
 	while (element->last) element = element->last;
 
 	while (element) {
-		if (HasQuad(element) || HasImage(element) && !IsAncestorHidden(element)) {
+		if ((HasQuad(element) || HasImage(element)) 
+				&& !IsAncestorHidden(element)) {
+
 			Box2 box = GetScreenHitBox(element);
 			if (box.x0 <= cursorPos.x && cursorPos.x <= box.x1 && box.y0 <= cursorPos.y && cursorPos.y <= box.y1)
 				break;
@@ -241,7 +245,7 @@ Dimensions2 GetContentDim(UIElement* e) {
 			? GetTextMetrics(text.font, text.string, e->width)
 			: GetTextMetrics(text.font, text.string);
 		width = metrics.maxx;
-		height = metrics.endy;
+		height = metrics.endy + 0.5f*text.font->height;
 	}
 	LINKEDLIST_FOREACH(e, UIElement, child) {
 		if (child->flags & UI_HIDDEN) continue;
@@ -304,7 +308,7 @@ UIStyle GetCurrentStyle(UIElement* element) {
 
 	if (element == ui.focused) {
 		style.borderWidth++;
-		style.borderColor = {1, 0, 0, 1};
+		style.borderColor = COLOR_RED;
 	}
 
 	return style;
@@ -405,6 +409,27 @@ void RenderElement(UIElement* element) {
 			RenderText(pos, text.font, text.color, text.string, pos.x + element->width);
 		else
 			RenderText(pos, text.font, text.color, text.string);
+		if (ui.selected == element) {
+			if (ui.start != ui.end) {
+				ssize start = MIN(ui.start, ui.end);
+				ssize end = MAX(ui.start, ui.end);
+				if (text.flags & TEXT_WRAPPING) {
+					RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.string,
+						 start, end, element->width);
+				}
+				else {
+					RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.string,
+						 start, end);
+				}
+			}
+
+			TextMetrics metrics = (text.flags & TEXT_WRAPPING)
+				? GetTextMetrics(text.font, text.string, ui.end, element->width)
+				: GetTextMetrics(text.font, text.string, ui.end);
+			float32 caretx = round(pos.x + metrics.endx);
+			float32 carety = round(pos.y + metrics.endy - text.font->height + 2);
+			GfxDrawQuad({caretx, carety}, {1, text.font->height + 2}, COLOR_BLACK, 0, 0, {}, COLOR_BLACK);
+		}
 	}
 	if (element->icon) {
 		RenderGlyph(pos, &ui.iconsFont, COLOR_BLACK, element->icon);
@@ -544,6 +569,7 @@ void UIUpdate() {
 	Point2 absPos = GetScreenPosition(element);
 	Point2 p1 = {absPos.x + element->width, absPos.y + element->height};
 	bool isInBottomRight = p1.x - MIN(4, element->radius) <= cursorPos.x && p1.y - MIN(4, element->radius) <= cursorPos.y;
+	ssize textIndex = GetTextIndex(element, absPos, cursorPos);
 
 	// Handle mouse hover
 	if (element->flags & UI_CURSOR) OSSetCursorIcon(element->cursor);
@@ -565,7 +591,13 @@ void UIUpdate() {
 			element->onClick(element);
 		}
 
-		if (isInBottomRight && (element->flags & UI_RESIZABLE)) {
+		if (textIndex != -1) {
+			ui.end = textIndex;
+			ui.start = ui.end;
+			ui.selected = element;
+			ui.isSelecting = true;
+		}
+		else if (isInBottomRight && (element->flags & UI_RESIZABLE)) {
 			ui.isResizing = true;
 			ui.originalPos = element->pos;
 		}
@@ -574,13 +606,14 @@ void UIUpdate() {
 			ui.grabPos = {(float32)cursorPos.x, (float32)cursorPos.y};
 			ui.originalPos = element->pos;
 		}
-		//ui.focused = NULL;
+		ui.focused = NULL;
 	}
 
 	// Handle mouse released
 	if (!OSIsMouseLeftButtonDown()) {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
+		ui.isSelecting = false;
 	}
 
 	// Handle grabbing
@@ -647,6 +680,40 @@ void UIUpdate() {
 					xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
 				}
 			}
+		}
+	}
+
+	// Handle text selection
+	if (ui.isSelecting) {
+		static int32 selectionCount = 0;
+		if (element->text.string.length) {
+			selectionCount = 0;
+			ASSERT(element == ui.selected && textIndex != -1);
+			ui.end = textIndex;
+		}
+		else {
+			/*
+			if (selectionCount == 0) {
+				selectionCount = 6;
+				Point2 selectedPos = GetScreenPosition(ui.selected);
+				if (cursorPos.x < selectedPos.x + ui.selected->width) {
+					ui.end = MAX(ui.end - 1, 0);
+					// TODO:
+					// UpdateTextScrollPos();
+				}
+				if (selectedPos.x + ui.selected->width < cursorPos.x) {
+					ssize length = ui.selected->text.string.length;
+					byte nextChar = ui.selected->text.string.data[ui.end + 1];
+					if (ui.end < length && nextChar != 10) {
+						ui.end++;
+						// TODO:
+						// UpdateTextScrollPos();
+					}
+				}
+				// TODO: handle ups and downs
+			}
+			else selectionCount--;
+			*/
 		}
 	}
 
