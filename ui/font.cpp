@@ -82,6 +82,7 @@ float32 GetCharWidth(BakedFont* font, byte b) {
 		BakedChar bakedchar = font->chardata[b - font->firstChar];
 		return bakedchar.xadvance;
 	}
+	if (b == 10) return font->chardata[32 - font->firstChar].xadvance;
 	if (b == 9) return 4*font->chardata[32 - font->firstChar].xadvance;
 	return 0;
 }
@@ -142,11 +143,11 @@ ssize GetCharIndex(BakedFont* font, String string, float32 x_end, float32 y_end,
 				x = 0;
 			}
 		}
+		x += GetCharWidth(font, b);
 		if (b == 10) {
 			y += font->height;
 			x = 0;
 		}
-		x += GetCharWidth(font, b);
 		if (x_end <= x - 2 && y_end <= y) return i;
 		prevCharWasWhiteSpace = whiteSpace;
 	}
@@ -180,12 +181,17 @@ TextMetrics GetTextMetrics(BakedFont* font, String string, ssize end,
 				y += font->height;
 			}
 		}
+		x += GetCharWidth(font, b);
 		if (b == 10) {
 			maxx = MAX(maxx, x);
-			x = 0;
-			y += font->height;
+			if (i == end -1) {
+				// do nothing
+			}
+			else {
+				x = 0;
+				y += font->height;
+			}
 		}
-		x += GetCharWidth(font, b);
 		prevCharWasWhiteSpace = whiteSpace;
 	}
 
@@ -219,11 +225,11 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 				y += font->height;
 			}
 		}
+		x += GetCharWidth(font, b);
 		if (b == 10) {
 			x = 0;
 			y += font->height;
 		}
-		x += GetCharWidth(font, b);
 		prevCharWasWhiteSpace = whiteSpace;
 	}
 
@@ -248,6 +254,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 				break;
 			}
 		}
+		x += GetCharWidth(font, b);
 		if (b == 10) {
 
 			selection.x = round(pos.x + startx);
@@ -260,7 +267,6 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 			i++;
 			break;
 		}
-		x += GetCharWidth(font, b);
 		prevCharWasWhiteSpace = whiteSpace;
 	}
 	
@@ -280,6 +286,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 				y += font->height;
 			}
 		}
+		x += GetCharWidth(font, b);
 		if (b == 10) {
 
 			selection.x = round(pos.x);
@@ -289,7 +296,6 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 			x = 0;
 			y += font->height;
 		}
-		x += GetCharWidth(font, b);
 		prevCharWasWhiteSpace = whiteSpace;
 	}
 

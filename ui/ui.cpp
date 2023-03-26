@@ -1,6 +1,5 @@
 /*
  * TODO:
- * selectable text (non-wrapping)
  * text navigation
  * EDITABLE TEXT!!! 
  * drop-down, menu-bar, list-box, combo-box
@@ -607,6 +606,8 @@ void UIUpdate() {
 			ui.originalPos = element->pos;
 		}
 		ui.focused = NULL;
+
+		if (textIndex == -1) ui.selected = NULL;
 	}
 
 	// Handle mouse released
@@ -702,6 +703,7 @@ void UIUpdate() {
 				// left
 				if (cursorPos.x < selectedPos.x && 0 < ui.end) {
 					TextMetrics prev = GetTextMetrics(text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
+					// TODO: This is a not-so-great hack
 					ui.end--;
 					if (prev.endy != metrics.endy)
 						scrollable->scroll.x = 0;
@@ -738,7 +740,7 @@ void UIUpdate() {
 				// down
 				if (selectedPos.y + scrollable->height < cursorPos.y) {
 					ssize end = GetCharIndex(text.font, text.string, 
-											 metrics.endx, metrics.endy + text.font->height,
+											 metrics.endx, metrics.endy,
 											 shouldWrap, ui.selected->width);
 					if (end != -1) {
 						ui.end = end;
