@@ -136,6 +136,73 @@ ssize StringSplit(String text, String separator, String* buffer) {
 	return j+1;
 }
 
+ssize StringGetFirstIndexOf(String string, byte b) {
+	byte* ptr = string.data;
+	byte* end = ptr + string.length;
+
+	__m128i mask = _mm_set1_epi8(b);	
+	while (ptr < end - 15) {
+		__m128i cmp = _mm_cmpeq_epi8(_mm_loadu_si128((__m128i*)ptr), mask);
+		uint32 res = _mm_movemask_epi8(cmp);
+		if (res) {
+			return ptr - string.data + LowBit(res);
+		}
+		ptr += 16;
+	}
+
+	while (ptr < end) {
+		if (*ptr == b) {
+			return ptr - string.data;
+		}
+		ptr++;
+	}
+	return string.length;
+}
+
+ssize StringGetLastIndexOf(String string, byte b) {
+	byte* ptr = string.data + string.length - 1;
+
+	__m128i mask = _mm_set1_epi8(b);
+	while (ptr >= string.data + 15) {
+		__m128i cmp = _mm_cmpeq_epi8(_mm_loadu_si128((__m128i*)ptr - 1), mask);
+		uint32 res = _mm_movemask_epi8(cmp);
+		if (res) {
+			return ptr - string.data - 16 + HighBit(res, 0);
+		}
+		ptr -= 16;
+	}
+
+	while (ptr >= string.data) {
+		if (*ptr == b) {
+			return ptr - string.data;
+		}
+		ptr--;
+	}
+	return -1;
+}
+
+void StringFindWord(String string, ssize index, ssize* start, ssize* end) {
+	*start = 0;
+
+	for (ssize i = 0; i < string.length; i++) {
+		byte b = string.data[i];
+		bool alphaNumeric = 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || b == '_';
+		if (i == index && !alphaNumeric) {
+			*start = i;
+			*end = i + 1;
+			return;
+		}
+		if (i < index && !alphaNumeric) {
+			*start = i + 1;
+		}
+		if (index < i && !alphaNumeric) {
+			*end = i;
+			return;
+		}
+	}
+	*end = string.length;
+}
+
 int64 ParseInt64(String str) {
 	int64 result = 0;
 	ssize start = str.data[0] == '-' ? 1 : 0;

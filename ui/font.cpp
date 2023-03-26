@@ -233,7 +233,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 	for (; i < end; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
-		if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
 
@@ -244,18 +244,20 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 
 				x = 0;
 				y += font->height;
+				i++;
 				break;
 			}
 		}
 		if (b == 10) {
 
-			selection.x = round(pos.x + x);
+			selection.x = round(pos.x + startx);
 			selection.y = round(pos.y + y + 2);
 			GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
 			startx = 0;
 			
 			x = 0;
 			y += font->height;
+			i++;
 			break;
 		}
 		x += GetCharWidth(font, b);
@@ -266,7 +268,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 	for (; i < end; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
-		if (wrapX != -1 && prevCharWasWhiteSpace && !whiteSpace) {
+		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
 

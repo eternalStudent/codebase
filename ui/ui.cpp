@@ -1,11 +1,11 @@
 /*
  * TODO:
- * selectable text
+ * selectable text (non-wrapping)
  * text navigation
  * EDITABLE TEXT!!! 
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
- * theme/palette
+ * theme
  */
 
 #include "uigraphics.cpp"
@@ -21,9 +21,6 @@
 #define UI_HIDE_OVERFLOW	 (1ull << 5)
 #define UI_SCROLLABLE		((1ull << 6) | UI_HIDE_OVERFLOW)
 #define UI_INFINITE_SCROLL	((1ull << 7) | UI_SCROLLABLE)
-// TODO: maybe hidden shouldn't be a flag? 
-// Same as isChecked/isSelected/isActive?
-#define UI_HIDDEN			 (1ull << 8)
 
 #define UI_CENTER			 (1ull << 10)
 #define UI_MIDDLE			 (1ull << 11)
@@ -33,6 +30,10 @@
 #define UI_MIN_CONTENT		 (1ull << 15)
 #define UI_X_THUMB			 (1ull << 16)
 #define UI_Y_THUMB			 (1ull << 17)
+
+// TODO: maybe hidden shouldn't be a flag? 
+// Same as isChecked/isSelected/isActive?
+#define UI_HIDDEN			 (1ull << 20)
 
 #define UI_GRADIENT 		 (1ull << 32)
 #define UI_HOVER_STYLE		 (1ull << 33)
@@ -113,6 +114,9 @@ struct UIElement {
 	opaque64 context;
 	void (*onClick)(UIElement*);
 	void (*onMove)(UIElement*);
+
+	UIElement* xscrollBar;
+	UIElement* yscrollBar;
 
 	UIElement* parent;
 	UIElement* first;
@@ -663,18 +667,16 @@ void UIUpdate() {
 				}
 			}
 
-			// update scrollbar
-			// NOTE: hmm... problematic...
-			UIElement* yscrollBar = scrollable->next;
+			UIElement* yscrollBar = scrollable->yscrollBar;
 			if (yscrollBar) {
 				UIElement* ythumb = yscrollBar->first;
 				ythumb->y = ((yscrollBar->height - ythumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
+			}
 
-				UIElement* xscrollBar = yscrollBar->next;
-				if (xscrollBar) {
-					UIElement* xthumb = xscrollBar->first;
-					xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
-				}
+			UIElement* xscrollBar = scrollable->xscrollBar;
+			if (xscrollBar) {
+				UIElement* xthumb = xscrollBar->first;
+				xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
 			}
 		}
 	}
@@ -682,9 +684,9 @@ void UIUpdate() {
 	// Handle text selection
 	if (ui.isSelecting) {
 		static int32 selectionCount = 0;
-		if (element->text.string.length) {
-			selectionCount = 0;
+		if (HasText(element)) {
 			ASSERT(element == ui.selected && textIndex != -1);
+			selectionCount = 0;
 			ui.end = textIndex;
 		}
 		else {
@@ -752,6 +754,21 @@ void UIUpdate() {
 		}
 	}
 
+	// Handle double click
+	if (OSIsMouseDoubleClicked() && textIndex != -1) {
+		ui.selected = element;
+		UIText text = ui.selected->text;
+		StringFindWord(text.string, textIndex, &ui.start, &ui.end);
+	}
+
+	// Handle triple click
+	if (OSIsMouseTripleClicked() && textIndex != -1) {
+		ui.selected = element;
+		String string = ui.selected->text.string;
+		ui.start = 1 + StringGetLastIndexOf({string.data, textIndex}, 10);
+		ui.end = textIndex + StringGetFirstIndexOf({string.data + textIndex, string.length - textIndex}, 10);
+	}
+
 	// Handle tab
 	if (OSIsKeyPressed(KEY_TAB)) {
 		if (ui.focused) {
@@ -793,6 +810,15 @@ void UIUpdate() {
 			SetPosition(ui.focused, ui.focused->x + 1, ui.focused->y);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
+	}
+
+	// Handle copy
+	if (ui.selected && OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C)) {
+		ssize start = MIN(ui.start, ui.end);
+		ssize end = MAX(ui.start, ui.end);
+		String string = ui.selected->text.string;
+		String sub = {string.data + start, end - start};
+		OSCopyToClipboard(sub);
 	}
 }
 
@@ -946,12 +972,14 @@ UIElement* UICreateScrollPane(UIElement* parent, Point2 pos, Dimensions2 dim, UI
 	UIEnableHoverStyle(ythumb, {{1, 1, 1, 0.5f}, 3});
 	UISetCursor(ythumb, CUR_ARROW);
 	ythumb->onMove = __scroll_y;
+	scrollPane->yscrollBar = yscrollBar;
 
 	UIElement* xscrollBar = UICreateElement(container, {6, dim.height + 4}, {dim.width - 12, 7}, {{0, 0, 0, 0.25f}, 3});
 	UIElement* xthumb = UICreateElement(xscrollBar, {}, {14, 7}, {{1, 1, 1, 0.33f}, 3}, UI_X_MOVABLE | UI_X_THUMB);
 	UIEnableHoverStyle(xthumb, {{1, 1, 1, 0.5f}, 3});
 	UISetCursor(xthumb, CUR_ARROW);
 	xthumb->onMove = __scroll_x;
+	scrollPane->xscrollBar = xscrollBar;
 
 	return scrollPane;
 }
