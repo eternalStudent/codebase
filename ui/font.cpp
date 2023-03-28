@@ -130,7 +130,7 @@ ssize GetCharIndex(BakedFont* font, String string,
 				   float32 cursorx, float32 cursory,
 				   bool shouldWrap, float32 wrapX) {
 
-	if (cursorx < 2 && cursory == 0) return 0;
+	if (cursorx <= 2 && cursory <= 0) return 0;
 
 	float32 x = 0;
 	float32 y = 0;
