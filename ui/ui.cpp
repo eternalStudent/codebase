@@ -247,7 +247,7 @@ Dimensions2 GetContentDim(UIElement* e) {
 		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
 		TextMetrics metrics = GetTextMetrics(text.font, text.string, shouldWrap, e->width);
 		width = metrics.maxx;
-		height = metrics.endy + 0.5f*text.font->height;
+		height = metrics.y + 0.5f*text.font->height;
 	}
 	LINKEDLIST_FOREACH(e, UIElement, child) {
 		if (child->flags & UI_HIDDEN) continue;
@@ -288,19 +288,6 @@ UIElement* GetScrollableAncestor(UIElement* element) {
 	while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
 		scrollable = scrollable->parent;
 	return scrollable;
-}
-
-// Text
-//--------
-
-ssize GetTextIndex(UIElement* textElement, Point2 pos, Point2i cursorPos) {
-	if (!HasText(textElement)) return -1;
-
-	UIText text = textElement->text;
-	float32 x_end = cursorPos.x - pos.x + textElement->scroll.x;
-	float32 y_end = cursorPos.y - (pos.y + text.font->height) + textElement->scroll.y;
-	bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-	return GetCharIndex(text.font, text.string, x_end, y_end, shouldWrap, textElement->width);
 }
 
 // Render
@@ -425,8 +412,12 @@ void RenderElement(UIElement* element) {
 			}
 
 			TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, element->width);
-			float32 caretx = round(pos.x + metrics.endx);
-			float32 carety = round(pos.y + metrics.endy - text.font->height + 2);
+			float32 caretx = round(pos.x + metrics.x);
+			float32 carety = round(pos.y + metrics.y - text.font->height + 2);
+			if (metrics.lastCharIsNewLine) {
+				caretx = round(pos.x);
+				carety = round(pos.y + metrics.y + 2);
+			}
 			GfxDrawQuad({caretx, carety}, {1, text.font->height + 2}, COLOR_BLACK, 0, 0, {}, COLOR_BLACK);
 		}
 	}
@@ -565,10 +556,17 @@ void UIUpdate() {
 		return;
 	}
 
-	Point2 absPos = GetScreenPosition(element);
-	Point2 p1 = {absPos.x + element->width, absPos.y + element->height};
+	Point2 screenPos = GetScreenPosition(element);
+	Point2 p1 = {screenPos.x + element->width, screenPos.y + element->height};
 	bool isInBottomRight = p1.x - MIN(4, element->radius) <= cursorPos.x && p1.y - MIN(4, element->radius) <= cursorPos.y;
-	ssize textIndex = GetTextIndex(element, absPos, cursorPos);
+	ssize textIndex = -1;
+	if (HasText(element)) {
+		UIText text = element->text;
+		float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
+		float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
+		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+		textIndex = GetCharIndex(text.font, text.string, relx, rely, shouldWrap, element->width);
+	}
 
 	// Handle mouse hover
 	if (element->flags & UI_CURSOR) OSSetCursorIcon(element->cursor);
@@ -682,80 +680,6 @@ void UIUpdate() {
 		}
 	}
 
-	// Handle text selection
-	if (ui.isSelecting) {
-		static int32 selectionCount = 0;
-		if (HasText(element)) {
-			ASSERT(element == ui.selected && textIndex != -1);
-			selectionCount = 0;
-			ui.end = textIndex;
-		}
-		else {
-			if (selectionCount == 0) {
-				selectionCount = 6;
-				// TODO: is it necessarilly the parent?
-				UIElement* scrollable = ui.selected->parent;
-				Point2 selectedPos = GetScreenPosition(scrollable);
-				UIText text = ui.selected->text;
-				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-				TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-
-				// left
-				if (cursorPos.x < selectedPos.x && 0 < ui.end) {
-					TextMetrics prev = GetTextMetrics(text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
-					// TODO: This is a not-so-great hack
-					ui.end--;
-					if (prev.endy != metrics.endy)
-						scrollable->scroll.x = 0;
-					else if (prev.endx < scrollable->scroll.x) {
-						scrollable->scroll.x = prev.endx; 
-					}
-				}
-
-				// right
-				if (selectedPos.x + scrollable->width < cursorPos.x && ui.end + 1 < text.string.length) {
-					TextMetrics next = GetTextMetrics(text.font, text.string, ui.end + 1, shouldWrap, ui.selected->width);
-					if (next.endy == metrics.endy)
-						ui.end++;
-					if (scrollable->scroll.x + scrollable->width < next.endx) {
-						scrollable->scroll.x = next.endx - scrollable->width; 
-					}
-				}
-
-				// up
-				if (cursorPos.y < selectedPos.y) {
-					ssize end = GetCharIndex(text.font, text.string, 
-											 metrics.endx, metrics.endy - 2*text.font->height,
-											 shouldWrap, ui.selected->width);
-					if (end != -1) {
-						ui.end = end;
-
-						metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-						if (metrics.endy <= scrollable->scroll.y) {
-							scrollable->scroll.y = metrics.endy - text.font->height; 
-						}
-					}
-				}
-
-				// down
-				if (selectedPos.y + scrollable->height < cursorPos.y) {
-					ssize end = GetCharIndex(text.font, text.string, 
-											 metrics.endx, metrics.endy,
-											 shouldWrap, ui.selected->width);
-					if (end != -1) {
-						ui.end = end;
-
-						metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-						if (scrollable->scroll.y + scrollable->height < metrics.endy) {
-							scrollable->scroll.y = metrics.endy - scrollable->height + 0.5f*text.font->height; 
-						}
-					}
-				}
-			}
-			else selectionCount--;
-		}
-	}
-
 	// Handle double click
 	if (OSIsMouseDoubleClicked() && textIndex != -1) {
 		ui.selected = element;
@@ -769,6 +693,197 @@ void UIUpdate() {
 		String string = ui.selected->text.string;
 		ui.start = 1 + StringGetLastIndexOf({string.data, textIndex}, 10);
 		ui.end = textIndex + StringGetFirstIndexOf({string.data + textIndex, string.length - textIndex}, 10);
+	}
+
+	// Handle text selection
+	static int32 selectionCount = 0;
+	static int32 keyCount = 0;
+
+	if (ui.selected) {
+		bool updateScrollPos = false;
+		UIText text = ui.selected->text;
+		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+
+		TextMetrics prev = ui.end == 0
+			? TextMetrics{}
+			: GetTextMetrics(text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
+		TextMetrics metrics = NextTextMetrics(prev, text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
+		TextMetrics next = ui.end == text.string.length
+			? metrics
+			: NextTextMetrics(metrics, text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+
+		bool isStartOfLine = IsStartOfLine(metrics, text.font, text.string,
+										   ui.end, shouldWrap, ui.selected->width);
+
+		// TODO: is it necessarilly the parent?
+		UIElement* scrollable = ui.selected->parent;
+
+		if (ui.isSelecting && textIndex != -1) {
+			selectionCount = 0;
+			ui.end = textIndex;
+		}
+		if (ui.isSelecting && textIndex == -1) {
+			if (selectionCount) {
+				selectionCount--;
+			}
+			else {
+				selectionCount = 6;
+				Point2 selectedPos = GetScreenPosition(scrollable);
+													   
+
+				// left
+				if (cursorPos.x < selectedPos.x && 0 < ui.end) {
+					bool prevIsStartOfLine = IsStartOfLine(prev, text.font, text.string,
+														   ui.end - 1, shouldWrap, ui.selected->width);
+
+					if ( (prev.y == metrics.y && !isStartOfLine) ||
+						 (prevIsStartOfLine) )
+
+						ui.end--;
+				}
+
+				// right
+				if (selectedPos.x + scrollable->width <= cursorPos.x && ui.end + 1 < text.string.length) {
+					if (next.y == metrics.y) 
+						ui.end++;
+
+					isStartOfLine = false;
+				}
+
+				// up
+				if (cursorPos.y < selectedPos.y) {
+					ui.end = GetCharIndex(text.font, text.string, 
+										  metrics.x, metrics.y - 2*text.font->height,
+										  shouldWrap, ui.selected->width);					
+				}
+
+				// down
+				if (selectedPos.y + scrollable->height < cursorPos.y) {
+					ui.end = GetCharIndex(text.font, text.string, 
+										  metrics.x, metrics.y,
+										  shouldWrap, ui.selected->width);
+				}
+
+				updateScrollPos = true;
+			}
+		}
+
+		if (OSIsKeyDown(KEY_LEFT) && ui.end > 0) {
+			if (keyCount) {
+				keyCount--;
+			}
+			else {
+				keyCount = 6;
+				ui.end--;
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				updateScrollPos = true;
+			}
+		}
+
+		if (OSIsKeyDown(KEY_RIGHT) && ui.end < text.string.length - 1) {
+			if (keyCount) {
+				keyCount--;
+			}
+			else {
+				keyCount = 6;
+				ui.end++;
+				isStartOfLine = IsStartOfLine(next, text.font, text.string,
+													   ui.end, shouldWrap, ui.selected->width);
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				updateScrollPos = true;
+			}
+		}
+
+		if (OSIsKeyDown(KEY_UP) && ui.end > 0) {
+			if (keyCount) {
+				keyCount--;
+			}
+			else {
+				keyCount = 6;
+
+				ui.end = GetCharIndex(text.font, text.string, 
+									  metrics.x, metrics.y - 2*text.font->height,
+									  shouldWrap, ui.selected->width);
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				updateScrollPos = true;
+			}
+		}
+
+		if (OSIsKeyDown(KEY_DOWN) && ui.end < text.string.length - 1) {
+			if (keyCount) {
+				keyCount--;
+			}
+			else {
+				keyCount = 6;
+
+				ui.end = GetCharIndex(text.font, text.string, 
+									  metrics.x, metrics.y,
+									  shouldWrap, ui.selected->width);
+
+				if (!OSIsKeyDown(KEY_SHIFT))
+					ui.start = ui.end;
+				updateScrollPos = true;
+			}
+		}
+
+		if (OSIsKeyPressed(KEY_HOME)) {
+			ui.end = OSIsKeyDown(KEY_CTRL)
+				? text.string.length
+				: 1 + StringGetLastIndexOf({text.string.data, ui.end}, 10);
+			isStartOfLine = true;
+
+			if (!OSIsKeyDown(KEY_SHIFT))
+				ui.start = ui.end;
+			updateScrollPos = true;
+		}
+
+		if (OSIsKeyPressed(KEY_END)) {
+			ui.end = OSIsKeyDown(KEY_CTRL)
+				? 0
+				: ui.end + StringGetFirstIndexOf({text.string.data + ui.end, text.string.length - ui.end}, 10);
+			isStartOfLine = false;
+
+			if (!OSIsKeyDown(KEY_SHIFT))
+				ui.start = ui.end;
+
+			updateScrollPos = true;
+		}
+
+		metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+		float32 margin = text.font->height;
+		Box2 box = {metrics.x - margin, metrics.y - margin, 
+					metrics.x + margin, metrics.y};
+
+		// update scroll position
+		if (updateScrollPos && scrollable) {
+			Point2 pos = ui.selected->pos;
+
+			if (isStartOfLine) {
+				scrollable->scroll.x = 0;
+			}
+			else if (pos.x + box.x0 < scrollable->scroll.x) {
+				scrollable->scroll.x = MAX(pos.x + box.x0, 0); 
+			}
+			else if (scrollable->scroll.x + scrollable->width < pos.x + box.x1) {
+				scrollable->scroll.x = pos.x + box.x1 - scrollable->width; 
+			}
+
+			// up
+			if (box.y0 <= scrollable->scroll.y) {
+				scrollable->scroll.y = MAX(pos.y + box.y0 - text.font->height, 0); 
+			}
+
+			// down
+			if (scrollable->scroll.y + scrollable->height < box.y1) {
+				scrollable->scroll.y = pos.y + box.y1 - scrollable->height + 0.5f*text.font->height; 
+			}
+		}
 	}
 
 	// Handle tab
@@ -789,26 +904,26 @@ void UIUpdate() {
 	}
 
 	// Handle Arrow Keys
-	if (OSIsKeyDown(KEY_UP) && ui.focused) {
-		if (ui.focused->flags & UI_Y_MOVABLE) {
+	if (OSIsKeyDown(KEY_UP)) {
+		if (ui.focused && ui.focused->flags & UI_Y_MOVABLE) {
 			SetPosition(ui.focused, ui.focused->x, ui.focused->y - 1);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
 	}
-	if (OSIsKeyDown(KEY_DOWN) && ui.focused) {
-		if (ui.focused->flags & UI_Y_MOVABLE) {
+	if (OSIsKeyDown(KEY_DOWN)) {
+		if (ui.focused && ui.focused->flags & UI_Y_MOVABLE) {
 			SetPosition(ui.focused, ui.focused->x, ui.focused->y + 1);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
 	}
-	if (OSIsKeyDown(KEY_LEFT) && ui.focused) {
-		if (ui.focused->flags & UI_X_MOVABLE) {
+	if (OSIsKeyDown(KEY_LEFT)) {
+		if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
 			SetPosition(ui.focused, ui.focused->x - 1, ui.focused->y);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}
 	}
-	if (OSIsKeyDown(KEY_RIGHT) && ui.focused) {
-		if (ui.focused->flags & UI_X_MOVABLE) {
+	if (OSIsKeyDown(KEY_RIGHT)) {
+		if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
 			SetPosition(ui.focused, ui.focused->x + 1, ui.focused->y);
 			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 		}

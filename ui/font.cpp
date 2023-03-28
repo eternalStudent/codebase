@@ -126,8 +126,11 @@ void RenderText(Point2 pos, BakedFont* font, Color color, String string,
 	}
 }
 
-ssize GetCharIndex(BakedFont* font, String string, float32 x_end, float32 y_end,
+ssize GetCharIndex(BakedFont* font, String string, 
+				   float32 cursorx, float32 cursory,
 				   bool shouldWrap, float32 wrapX) {
+
+	if (cursorx < 2 && cursory == 0) return 0;
 
 	float32 x = 0;
 	float32 y = 0;
@@ -139,16 +142,21 @@ ssize GetCharIndex(BakedFont* font, String string, float32 x_end, float32 y_end,
 		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
+				if (cursory <= y) return i;
 				y += font->height;
 				x = 0;
+				if (cursorx <= x && cursory <= y) return i + 1;
 			}
 		}
 		x += GetCharWidth(font, b);
+
 		if (b == 10) {
+			if (cursory <= y) return i + 1;
 			y += font->height;
 			x = 0;
 		}
-		if (x_end <= x - 2 && y_end <= y) return i;
+		if (cursorx <= x && cursory <= y) return i + 1;
+		
 		prevCharWasWhiteSpace = whiteSpace;
 	}
 
@@ -156,47 +164,65 @@ ssize GetCharIndex(BakedFont* font, String string, float32 x_end, float32 y_end,
 }
 
 struct TextMetrics {
+	union {
+		struct {float32 x, y;};
+		Point2 pos;
+	};
+
 	float32 maxx;
-	float32 endx;
-	float32 endy;
+	bool lastCharIsWhiteSpace;
+	bool lastCharIsNewLine;
 };
+
+bool IsStartOfLine(TextMetrics metrics, BakedFont* font, String string,
+				ssize i, bool shouldWrap, float32 wrapX) {
+
+	if (metrics.lastCharIsNewLine)
+		return true;
+	if (!shouldWrap || !metrics.lastCharIsWhiteSpace) 
+		return false;
+	byte b = string.data[i];
+	if (IsWhiteSpace(b)) 
+		return false;
+	float32 wordWidth = GetWordWidth(font, string, i);
+	return wrapX <= metrics.x + wordWidth;
+}
+
+TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, String string,
+							ssize i, bool shouldWrap, float32 wrapX) {
+
+	if (metrics.lastCharIsNewLine) {
+		metrics.x = 0;
+		metrics.y += font->height;
+	}
+	byte b = string.data[i];
+	bool whiteSpace = IsWhiteSpace(b);
+	if (shouldWrap && metrics.lastCharIsWhiteSpace && !whiteSpace) {
+		float32 wordWidth = GetWordWidth(font, string, i);
+		if (wrapX <= metrics.x + wordWidth) {
+			metrics.maxx = MAX(metrics.maxx, metrics.x);
+			metrics.x = 0;
+			metrics.y += font->height;
+		}
+	}
+	metrics.x += GetCharWidth(font, b);
+	metrics.maxx = MAX(metrics.x, metrics.maxx);
+	metrics.lastCharIsNewLine = b == 10;
+	metrics.lastCharIsWhiteSpace = whiteSpace;
+	return metrics;
+}
 
 TextMetrics GetTextMetrics(BakedFont* font, String string, ssize end, 
 						   bool shouldWrap, float32 wrapX) {
 	
-	if (string.length == 0) return {};
-	
-	bool prevCharWasWhiteSpace = false;
-	float32 maxx = 0;
-	float32 x = 0;
-	float32 y = font->height;
-	for (ssize i = 0; i < end; i++) {
-		byte b = string.data[i];
-		bool whiteSpace = IsWhiteSpace(b);
-		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
-			float32 wordWidth = GetWordWidth(font, string, i);
-			if (wrapX <= x + wordWidth) {
-				maxx = MAX(maxx, x);
-				x = 0;
-				y += font->height;
-			}
-		}
-		x += GetCharWidth(font, b);
-		if (b == 10) {
-			maxx = MAX(maxx, x);
-			if (i == end -1) {
-				// do nothing
-			}
-			else {
-				x = 0;
-				y += font->height;
-			}
-		}
-		prevCharWasWhiteSpace = whiteSpace;
-	}
+	TextMetrics metrics = {};
+	if (string.length == 0) return metrics;
 
-	maxx = MAX(x, maxx);
-	return {maxx, x, y};
+	metrics.y = font->height;
+	for (ssize i = 0; i < end; i++)
+		metrics = NextTextMetrics(metrics, font, string, i, shouldWrap, wrapX);
+
+	return metrics;
 }
 
 TextMetrics GetTextMetrics(BakedFont* font, String string, 
@@ -215,7 +241,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 	ssize i = 0;
 
 	// start by finding position of start.
-	for (; i < start; i++) {
+	for (; i < start + 1; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
 		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
@@ -225,6 +251,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 				y += font->height;
 			}
 		}
+		if (i == start) break;
 		x += GetCharWidth(font, b);
 		if (b == 10) {
 			x = 0;
