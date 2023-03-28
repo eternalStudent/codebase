@@ -834,7 +834,7 @@ void UIUpdate() {
 
 		if (OSIsKeyPressed(KEY_HOME)) {
 			ui.end = OSIsKeyDown(KEY_CTRL)
-				? text.string.length
+				? 0
 				: 1 + StringGetLastIndexOf({text.string.data, ui.end}, 10);
 			isStartOfLine = true;
 
@@ -845,7 +845,7 @@ void UIUpdate() {
 
 		if (OSIsKeyPressed(KEY_END)) {
 			ui.end = OSIsKeyDown(KEY_CTRL)
-				? 0
+				? text.string.length
 				: ui.end + StringGetFirstIndexOf({text.string.data + ui.end, text.string.length - ui.end}, 10);
 			isStartOfLine = false;
 
