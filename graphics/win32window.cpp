@@ -2,32 +2,37 @@
 #define WM_MOUSEHWHEEL 0x020e
 #endif
 
+#define EVENT_QUEUE_CAP			8
+#define EVENT_QUEUE_MASK		(EVENT_QUEUE_CAP - 1)
+
+struct EventQueue {
+	OSEvent table[EVENT_QUEUE_CAP];
+	volatile uint32 writeIndex;
+	volatile uint32 readIndex;
+};
+
 struct {
 	HWND handle;
 
 	Dimensions2i dim;
 	BOOL destroyed;
 
-	BYTE keyIsDown[256];
-	BYTE keyWasDown[256];
 	CHAR typed[4];
 	int32 strlength;
 
 	BYTE mouseLeftButtonIsDown;
 	BYTE mouseRightButtonIsDown;
-	BYTE mouseLeftButtonWasDown;
-	BYTE mouseRightButtonWasDown;
 	int32 clickCount;
 	int32 prevClickCount;
 	RECT clickRect;
-	DWORD timeLastClicked;
-	DWORD mouseWheelDelta;
-	DWORD mouseHWheelDelta;
+	LONG timeLastClicked;
 
 	BOOL iconSet;
 	int32 icon;
 
-	HCURSOR cursors[8];
+	HCURSOR cursors[CUR_COUNT];
+
+	EventQueue queue;
 } window;
 
 HWND Win32GetWindowHandle() {
@@ -38,52 +43,8 @@ Dimensions2i Win32GetWindowDimensions() {
 	return window.dim;
 }
 
-BOOL Win32IsKeyDown(DWORD key) {
-	return window.keyIsDown[key] == 1;
-}
-
-BOOL Win32IsKeyPressed(DWORD key) {
-	return window.keyIsDown[key] == 1 && window.keyWasDown[key] == 0;
-}
-
 BOOL Win32IsMouseLeftButtonDown() {
-	return window.mouseLeftButtonIsDown == 1 && window.clickCount == 1;
-}
-
-BOOL Win32IsMouseLeftButtonUp() {
-	return window.mouseLeftButtonIsDown == 0;
-}
-
-BOOL Win32IsMouseLeftReleased() {
-	return window.mouseLeftButtonIsDown == 0 && window.mouseLeftButtonWasDown == 1;
-}
-
-BOOL Win32IsMouseLeftClicked() {
-	return window.clickCount == 1 && window.mouseLeftButtonIsDown == 1 && window.mouseLeftButtonWasDown == 0;
-}
-
-BOOL Win32IsMouseRightClicked() {
-	return window.mouseRightButtonIsDown == 1 && window.mouseRightButtonWasDown == 0;
-}
-
-BOOL Win32IsMouseDoubleClicked() {
-	return window.clickCount == 2 && window.prevClickCount == 1;
-}
-
-BOOL Win32IsMouseTripleClicked() {
-	return window.clickCount == 3 && window.prevClickCount == 2;
-}
-
-DWORD Win32GetMouseWheelDelta() {
-	return window.mouseWheelDelta;
-}
-
-DWORD Win32GetMouseHWheelDelta() {
-	return window.mouseHWheelDelta;
-}
-
-void Win32ResetMouse() {
-	window.mouseLeftButtonIsDown = 0;
+	return window.mouseLeftButtonIsDown == 1;
 }
 
 String Win32GetTypedText() {
@@ -94,11 +55,14 @@ void Win32ResetTypedText() {
 	window.strlength = 0;
 }
 
+BOOL Win32IsKeyDown(int vkCode) {
+	return (GetKeyState(vkCode) & 0x8000) != 0;
+}
+
 void Win32ExitFullScreen() {
 	DWORD dwStyle = GetWindowLong(window.handle, GWL_STYLE);
 	SetWindowLong(window.handle, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
 	SetWindowPos(window.handle, NULL, 0, 0, 920, 540, SWP_FRAMECHANGED);
-	memset(window.keyIsDown, 0, 256);
 }
 
 void Win32SetWindowToNoneResizable() {
@@ -131,6 +95,20 @@ BOOL Win32EnterFullScreen() {
 	return TRUE;
 }
 
+void Win32EnqueueEvent(OSEvent event) {
+	window.queue.table[window.queue.writeIndex & EVENT_QUEUE_MASK] = event;
+	_WriteBarrier();
+	window.queue.writeIndex++;
+}
+
+BOOL Win32PollEvent(OSEvent* event) {
+	if (window.queue.readIndex == window.queue.writeIndex) return FALSE;
+	*event = window.queue.table[window.queue.readIndex & EVENT_QUEUE_MASK];
+	_ReadWriteBarrier();
+	window.queue.readIndex++;
+	return TRUE;
+}
+
 LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch (message) {
 		case WM_DESTROY: {
@@ -141,33 +119,100 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			UINT width = LOWORD(lParam);
 			UINT height = HIWORD(lParam);
 			window.dim = {(int32)width, (int32)height};
+
+			OSEvent event;
+			event.type = Event_WindowResize;
+			event.time = GetMessageTime();
+			event.window.dim = window.dim;
+			Win32EnqueueEvent(event);
 		} break;
+		case WM_ACTIVATE: {
+			window.clickCount = 0;
+			// TODO: probably more stuff should be reset here
+		} break;
+
 		case WM_KEYDOWN: {
-			UINT vkcode = (UINT)wParam;
-			window.keyIsDown[vkcode] = 1;
+			WORD vkCode = LOWORD(wParam);
+			WORD keyFlags = HIWORD(lParam);
+    		WORD scanCode = LOBYTE(keyFlags);
+    		BOOL isExtendedKey = (keyFlags & KF_EXTENDED) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
+    		if (isExtendedKey)
+        		scanCode = MAKEWORD(scanCode, 0xE0);
+
+			OSEvent event;
+			event.type = Event_KeyboardPress;
+			event.time = GetMessageTime();
+			event.keyboard.vkCode = vkCode;
+			event.keyboard.scanCode = scanCode;
+			event.keyboard.ctrlIsDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+			event.keyboard.shiftIsDown = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+			Win32EnqueueEvent(event);
 		} break;
 		case WM_KEYUP: {
-			UINT vkcode = (UINT)wParam;
-			window.keyIsDown[vkcode] = 0;
+
+		} break;
+		case WM_CHAR: {
+			if (wParam == 13) wParam = 10;
+			if (32 <= wParam && wParam <= 127 || 9 <= wParam && wParam <= 10) {
+				window.typed[window.strlength] = (CHAR)wParam;
+				window.strlength++;
+			}
+		} break;
+
+		case WM_MOUSEMOVE: {
+			if (window.iconSet) SetCursor(window.cursors[window.icon]);
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+
+			OSEvent event;
+			event.type = Event_MouseMove;
+			event.time = GetMessageTime();
+			event.mouse.cursorPos = {x, y};
+			Win32EnqueueEvent(event);
 		} break;
 		case WM_LBUTTONDOWN : {
 			window.mouseLeftButtonIsDown = 1;
-
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
-			DWORD time = GetMessageTime();
+			LONG time = GetMessageTime();
 
-			if (!PtInRect(&window.clickRect, {x, y}) || time - window.timeLastClicked > GetDoubleClickTime()) {
+			OSEvent event;
+			event.type = Event_MouseLeftButtonDown;
+			event.time = time;
+			event.mouse.cursorPos = {x, y};
+			Win32EnqueueEvent(event);
+			
+			if (!PtInRect(&window.clickRect, {x, y}) || (UINT)(time - window.timeLastClicked) > GetDoubleClickTime()) {
 				window.clickCount = 0;
 			}
 			window.clickCount++;
-
 			window.timeLastClicked = time;
 			SetRect(&window.clickRect, x, y, x, y);
 			InflateRect(&window.clickRect, GetSystemMetrics(SM_CXDOUBLECLK) / 2, GetSystemMetrics(SM_CYDOUBLECLK) / 2);
+
+			if (window.clickCount == 2) {
+				event.type = Event_MouseDoubleClick;
+				Win32EnqueueEvent(event);
+			}
+
+			if (window.clickCount == 3) {
+				event.type = Event_MouseTripleClick;
+				Win32EnqueueEvent(event);
+			}
+			
 		} break;
 		case WM_LBUTTONUP : {
 			window.mouseLeftButtonIsDown = 0;
+
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+			LONG time = GetMessageTime();
+
+			OSEvent event;
+			event.type = Event_MouseLeftButtonUp;
+			event.time = time;
+			event.mouse.cursorPos = {x, y};
+			Win32EnqueueEvent(event);
 		} break;
 		case WM_RBUTTONDOWN : {
 			window.mouseRightButtonIsDown = 1;
@@ -177,24 +222,26 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			window.mouseRightButtonIsDown = 0;
 		} break;
 		case WM_MOUSEWHEEL: {
-			window.mouseWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+
+			OSEvent event;
+			event.type = Event_MouseVerticalWheel;
+			event.time = GetMessageTime();
+			event.mouse.cursorPos = {x, y};
+			event.mouse.wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+			Win32EnqueueEvent(event);
 		} break;
 		case WM_MOUSEHWHEEL: {
-			window.mouseHWheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
-		} break;
-		case WM_ACTIVATE: {
-			window.clickCount = 0;
-			// TODO: probably more stuff should be reset here
-		} break;
-		case WM_CHAR: {
-			if (wParam == 13) wParam = 10;
-			if (32 <= wParam && wParam <= 127 || 9 <= wParam && wParam <= 10) {
-				window.typed[window.strlength] = (CHAR)wParam;
-				window.strlength++;
-			}
-		} break;
-		case WM_MOUSEMOVE: {
-			if (window.iconSet) SetCursor(window.cursors[window.icon]);
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+
+			OSEvent event;
+			event.type = Event_MouseHorizontalWheel;
+			event.time = GetMessageTime();
+			event.mouse.cursorPos = {x, y};
+			event.mouse.wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+			Win32EnqueueEvent(event);
 		} break;
 	}
 
@@ -370,13 +417,7 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 }
 
 void Win32ProcessWindowEvents() {
-	for (int32 i = 0; i < 256; i++) window.keyWasDown[i] = window.keyIsDown[i];
-	window.mouseLeftButtonWasDown = window.mouseLeftButtonIsDown;
-	window.mouseRightButtonWasDown = window.mouseRightButtonIsDown;
-	window.prevClickCount = window.clickCount;
 	window.strlength = 0;
-	window.mouseWheelDelta = 0;
-	window.mouseHWheelDelta = 0;
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 	{

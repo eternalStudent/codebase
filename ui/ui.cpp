@@ -1,6 +1,6 @@
 /*
  * TODO:
- * text navigation
+ * StringList
  * EDITABLE TEXT!!! 
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
@@ -142,6 +142,9 @@ struct {
 	bool isSelecting;
 	bool rootElementIsWindow;
 
+	int32 selectionCount;
+	int32 keyCount;
+
 	ssize start;
 	ssize end;
 } ui;
@@ -193,6 +196,11 @@ bool IsAncestorHidden(UIElement* e) {
 		e = e->parent;
 	}
 	return false;
+}
+
+bool IsInBottomRight(UIElement* element, Point2 screenPos, Point2i cursorPos) {
+	Point2 p1 = {screenPos.x + element->width, screenPos.y + element->height};
+	return p1.x - MIN(4, element->radius) <= cursorPos.x && p1.y - MIN(4, element->radius) <= cursorPos.y;
 }
 
 UIElement* GetElementByPosition(Point2i cursorPos) {
@@ -288,6 +296,41 @@ UIElement* GetScrollableAncestor(UIElement* element) {
 	while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
 		scrollable = scrollable->parent;
 	return scrollable;
+}
+
+void UpdateSelectedElementScrollPosition() {
+	// TODO: is it necessarilly the parent?
+	UIElement* scrollable = ui.selected->parent;
+	if ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE) return;
+	Point2 pos = ui.selected->pos;
+	UIText text = ui.selected->text;
+	bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+	TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+	bool isStartOfLine = IsStartOfLine(metrics, text.font, text.string,
+									   ui.end, shouldWrap, ui.selected->width);
+	float32 margin = text.font->height;
+	Box2 box = {metrics.x - margin, metrics.y - margin, 
+				metrics.x + margin, metrics.y};
+
+	if (isStartOfLine) {
+		scrollable->scroll.x = 0;
+	}
+	else if (pos.x + box.x0 < scrollable->scroll.x) {
+		scrollable->scroll.x = MAX(pos.x + box.x0, 0); 
+	}
+	else if (scrollable->scroll.x + scrollable->width < pos.x + box.x1) {
+		scrollable->scroll.x = pos.x + box.x1 - scrollable->width; 
+	}
+
+	// up
+	if (box.y0 <= scrollable->scroll.y) {
+		scrollable->scroll.y = MAX(pos.y + box.y0 - text.font->height, 0); 
+	}
+
+	// down
+	if (scrollable->scroll.y + scrollable->height < box.y1) {
+		scrollable->scroll.y = pos.y + box.y1 - scrollable->height + 0.5f*text.font->height; 
+	}
 }
 
 // Render
@@ -537,49 +580,76 @@ void UIEnableTransition(UIElement* element) {
 	element->prevPos = element->pos;
 }
 
-void UIUpdate() {
-	Point2i cursorPos = OSGetCursorPosition();
-	if (ui.rootElementIsWindow) {
-		Dimensions2i dim = OSGetWindowDimensions();
-		ui.rootElement->dim = {(float32)dim.width, (float32)dim.height};
-	}
-	
-	if (!ui.isResizing && !ui.isGrabbing) {
+void UIProcessEvent(OSEvent event) {
+	switch (event.type) {
+	case Event_WindowResize: {
+		if (ui.rootElementIsWindow) {
+			Dimensions2i dim = event.window.dim;
+			ui.rootElement->dim = {(float32)dim.width, (float32)dim.height};
+		}
+	} break;
+	case Event_MouseMove: {
+		Point2i cursorPos = event.mouse.cursorPos;
+		UIElement* element = ui.hovered;
+
+		if (ui.isResizing) {
+			Point2 relativeCursorPos = {cursorPos.x - element->parent->x, cursorPos.y - element->parent->y};
+			float32 x0 = MIN(ui.originalPos.x, relativeCursorPos.x);
+			float32 y0 = MIN(ui.originalPos.y, relativeCursorPos.y);
+			float32 x1 = MAX(ui.originalPos.x, relativeCursorPos.x);
+			float32 y1 = MAX(ui.originalPos.y, relativeCursorPos.y);
+
+			element->x = MAX(x0, 0);
+			element->y = MAX(y0, 0);
+			element->width = MIN(x1 - element->x, element->parent->width - element->x);
+			element->height = MIN(y1 - element->y, element->parent->height - element->y);
+			return;
+		}
+
+		if (ui.isGrabbing) {
+			if (cursorPos.x != ui.grabPos.x || cursorPos.y != ui.grabPos.y) {
+				float32 newx= ui.originalPos.x + cursorPos.x - ui.grabPos.x;
+				float32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
+				SetPosition(element, newx, newy);
+				if (element->onMove) element->onMove(element);
+			}
+			return;
+		}
+
 		ui.hovered = GetElementByPosition(cursorPos);
-	}
-	UIElement* element = ui.hovered;
+		element = ui.hovered;
+		Point2 screenPos = GetScreenPosition(element);
 
-	if (!element) {
-		if (1 < cursorPos.x && cursorPos.x < ui.rootElement->width-1 && 1 < cursorPos.y && cursorPos.y < ui.rootElement->height-1)
-			OSSetCursorIcon(CUR_ARROW);
+		if (ui.isSelecting) {
+			if (element == ui.selected) {
+				ui.selectionCount = 0;
 
-		return;
-	}
+				UIText text = ui.selected->text;
+				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+				float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
+				float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
+				
+				ui.end = GetCharIndex(text.font, text.string, relx, rely, shouldWrap, element->width);
+			}
+			
+			return;
+		}
 
-	Point2 screenPos = GetScreenPosition(element);
-	Point2 p1 = {screenPos.x + element->width, screenPos.y + element->height};
-	bool isInBottomRight = p1.x - MIN(4, element->radius) <= cursorPos.x && p1.y - MIN(4, element->radius) <= cursorPos.y;
-	ssize textIndex = -1;
-	if (HasText(element)) {
-		UIText text = element->text;
-		float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
-		float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
-		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-		textIndex = GetCharIndex(text.font, text.string, relx, rely, shouldWrap, element->width);
-	}
+		if (element->flags & UI_CURSOR) OSSetCursorIcon(element->cursor);
+		else if (IsInBottomRight(element, screenPos, cursorPos) && (element->flags & UI_RESIZABLE)) OSSetCursorIcon(CUR_RESIZE);
+		else if ((element->flags & UI_MOVABLE) == UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
+		else if (element->flags & UI_X_MOVABLE) OSSetCursorIcon(CUR_MOVESIDE);
+		else if (element->flags & UI_Y_MOVABLE) OSSetCursorIcon(CUR_MOVEUPDN);
+		else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
+		else if (element->text.flags & TEXT_SELECTABLE) OSSetCursorIcon(CUR_TEXT);
+		else OSSetCursorIcon(CUR_ARROW);
+	} break;
 
-	// Handle mouse hover
-	if (element->flags & UI_CURSOR) OSSetCursorIcon(element->cursor);
-	else if (isInBottomRight && (element->flags & UI_RESIZABLE)) OSSetCursorIcon(CUR_RESIZE);
-	else if ((element->flags & UI_MOVABLE) == UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
-	else if (element->flags & UI_X_MOVABLE) OSSetCursorIcon(CUR_MOVESIDE);
-	else if (element->flags & UI_Y_MOVABLE) OSSetCursorIcon(CUR_MOVEUPDN);
-	else if (element->flags & UI_CLICKABLE) OSSetCursorIcon(CUR_HAND);
-	else if (element->text.flags & TEXT_SELECTABLE) OSSetCursorIcon(CUR_TEXT);
-	else OSSetCursorIcon(CUR_ARROW);
+	case Event_MouseLeftButtonDown: {
+		Point2i cursorPos = event.mouse.cursorPos;
+		UIElement* element = ui.hovered;
+		Point2 screenPos = GetScreenPosition(element);
 
-	// Handle left click
-	if (OSIsMouseLeftClicked()) {
 		if (element->flags & UI_SHUFFLABLE) {
 			LINKEDLIST_MOVE_TO_LAST(element->parent, element);
 		}
@@ -588,354 +658,287 @@ void UIUpdate() {
 			element->onClick(element);
 		}
 
-		if (textIndex != -1) {
-			ui.end = textIndex;
+		if (HasText(element)) {
+			UIText text = element->text;
+			float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
+			float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
+			bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+			ui.end = GetCharIndex(text.font, text.string, relx, rely, shouldWrap, element->width);
 			ui.start = ui.end;
 			ui.selected = element;
 			ui.isSelecting = true;
 		}
-		else if (isInBottomRight && (element->flags & UI_RESIZABLE)) {
-			ui.isResizing = true;
-			ui.originalPos = element->pos;
+		else {
+			ui.selected = NULL;
+			if (IsInBottomRight(element, screenPos, cursorPos) 
+				&& (element->flags & UI_RESIZABLE)) {
+
+				ui.isResizing = true;
+				ui.originalPos = element->pos;
+			}
+			else if (element->flags & UI_MOVABLE) {
+				ui.isGrabbing = true;
+				ui.grabPos = {(float32)cursorPos.x, (float32)cursorPos.y};
+				ui.originalPos = element->pos;
+			}
 		}
-		else if (element->flags & UI_MOVABLE) {
-			ui.isGrabbing = true;
-			ui.grabPos = {(float32)cursorPos.x, (float32)cursorPos.y};
-			ui.originalPos = element->pos;
-		}
+
 		ui.focused = NULL;
+	} break;
 
-		if (textIndex == -1) ui.selected = NULL;
-	}
-
-	// Handle mouse released
-	if (!OSIsMouseLeftButtonDown()) {
+	case Event_MouseLeftButtonUp: {
 		ui.isGrabbing = false;
 		ui.isResizing = false;
 		ui.isSelecting = false;
-	}
+	} break;
 
-	// Handle grabbing
-	if (ui.isGrabbing && 
-			(cursorPos.x != ui.grabPos.x || cursorPos.y != ui.grabPos.y)) {
-		float32 newx  = ui.originalPos.x + cursorPos.x - ui.grabPos.x;
-		float32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
-		SetPosition(element, newx, newy);
-		if (element->onMove) element->onMove(element);
-	}
-
-	// Handle resizing
-	if (ui.isResizing) {
-		Point2 relativeCursorPos = {cursorPos.x - element->parent->x, cursorPos.y - element->parent->y};
-		float32 x0 = MIN(ui.originalPos.x, relativeCursorPos.x);
-		float32 y0 = MIN(ui.originalPos.y, relativeCursorPos.y);
-		float32 x1 = MAX(ui.originalPos.x, relativeCursorPos.x);
-		float32 y1 = MAX(ui.originalPos.y, relativeCursorPos.y);
-
-		element->x = MAX(x0, 0);
-		element->y = MAX(y0, 0);
-		element->width = MIN(x1 - element->x, element->parent->width - element->x);
-		element->height = MIN(y1 - element->y, element->parent->height - element->y);
-	}
-
-	// Handle scrolling
-	int32 mouseWheelDelta = OSGetMouseWheelDelta();
-	int32 mouseHWheelDelta = OSGetMouseHWheelDelta();
-	if (mouseWheelDelta || mouseHWheelDelta) {
-		UIElement* scrollable = element;
+	case Event_MouseVerticalWheel: {
+		UIElement* scrollable = ui.hovered;
 		while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
 			scrollable = scrollable->parent;
 		if (scrollable) {
 			Dimensions2 contentDim = GetContentDim(scrollable);
-
-			if (mouseWheelDelta) {
-				scrollable->scroll.y -= mouseWheelDelta;
-				if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
-					if (scrollable->scroll.y < 0) scrollable->scroll.y = 0;
-					if (scrollable->scroll.y > contentDim.height - scrollable->height)
-						scrollable->scroll.y = MAX(contentDim.height - scrollable->height, 0);
-				}
+			scrollable->scroll.y -= event.mouse.wheelDelta;
+			if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
+				if (scrollable->scroll.y < 0) scrollable->scroll.y = 0;
+				if (scrollable->scroll.y > contentDim.height - scrollable->height)
+					scrollable->scroll.y = MAX(contentDim.height - scrollable->height, 0);
 			}
-
-			if (mouseHWheelDelta) {
-				scrollable->scroll.x += mouseHWheelDelta;
-				if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
-					if (scrollable->scroll.x < 0) scrollable->scroll.x = 0;
-					if (scrollable->scroll.x > contentDim.width - scrollable->width)
-						scrollable->scroll.x = MAX(contentDim.width - scrollable->width, 0);
-				}
-			}
-
 			UIElement* yscrollBar = scrollable->yscrollBar;
 			if (yscrollBar) {
 				UIElement* ythumb = yscrollBar->first;
 				ythumb->y = ((yscrollBar->height - ythumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
 			}
+		}
+	} break;
 
+	case Event_MouseHorizontalWheel: {
+		UIElement* scrollable = ui.hovered;
+		while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
+			scrollable = scrollable->parent;
+		if (scrollable) {
+			Dimensions2 contentDim = GetContentDim(scrollable);
+			scrollable->scroll.x += event.mouse.wheelDelta;
+			if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
+				if (scrollable->scroll.x < 0) scrollable->scroll.x = 0;
+				if (scrollable->scroll.x > contentDim.width - scrollable->width)
+					scrollable->scroll.x = MAX(contentDim.width - scrollable->width, 0);
+			}
 			UIElement* xscrollBar = scrollable->xscrollBar;
 			if (xscrollBar) {
 				UIElement* xthumb = xscrollBar->first;
 				xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
 			}
 		}
-	}
+	} break;
 
-	// Handle double click
-	if (OSIsMouseDoubleClicked() && textIndex != -1) {
+	case Event_MouseDoubleClick: {
+		UIElement* element = ui.hovered;
+		if (!HasText(element)) return;
 		ui.selected = element;
-		UIText text = ui.selected->text;
-		StringFindWord(text.string, textIndex, &ui.start, &ui.end);
-	}
+		StringFindWord(element->text.string, ui.end, &ui.start, &ui.end);
+		ui.isSelecting = false;
+	} break;
 
-	// Handle triple click
-	if (OSIsMouseTripleClicked() && textIndex != -1) {
+	case Event_MouseTripleClick: {
+		UIElement* element = ui.hovered;
+		if (!HasText(element)) return;
 		ui.selected = element;
 		String string = ui.selected->text.string;
-		ui.start = 1 + StringGetLastIndexOf({string.data, textIndex}, 10);
-		ui.end = textIndex + StringGetFirstIndexOf({string.data + textIndex, string.length - textIndex}, 10);
-	}
+		ui.start = 1 + StringGetLastIndexOf({string.data, ui.end}, 10);
+		ui.end = ui.end + StringGetFirstIndexOf({string.data + ui.end, string.length - ui.end}, 10);
+		ui.isSelecting = false;
+	} break;
 
-	// Handle text selection
-	static int32 selectionCount = 0;
-	static int32 keyCount = 0;
-
-	if (ui.selected) {
-		bool updateScrollPos = false;
-		UIText text = ui.selected->text;
-		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-
-		TextMetrics prev = ui.end == 0
-			? TextMetrics{}
-			: GetTextMetrics(text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
-		TextMetrics metrics = NextTextMetrics(prev, text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
-		TextMetrics next = ui.end == text.string.length
-			? metrics
-			: NextTextMetrics(metrics, text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-
-		bool isStartOfLine = IsStartOfLine(metrics, text.font, text.string,
-										   ui.end, shouldWrap, ui.selected->width);
-
-		// TODO: is it necessarilly the parent?
-		UIElement* scrollable = ui.selected->parent;
-
-		if (ui.isSelecting && textIndex != -1) {
-			selectionCount = 0;
-			ui.end = textIndex;
-		}
-		if (ui.isSelecting && textIndex == -1) {
-			if (selectionCount) {
-				selectionCount--;
+	case Event_KeyboardPress: {
+		switch (event.keyboard.vkCode) {
+		case KEY_TAB: {
+			if (ui.focused) {
+				ui.focused = FindFirstInteractable(ui.focused);
 			}
-			else {
-				selectionCount = 6;
-				Point2 selectedPos = GetScreenPosition(scrollable);
-													   
-
-				// left
-				if (cursorPos.x < selectedPos.x && 0 < ui.end) {
-					bool prevIsStartOfLine = IsStartOfLine(prev, text.font, text.string,
-														   ui.end - 1, shouldWrap, ui.selected->width);
-
-					if ( (prev.y == metrics.y && !isStartOfLine) ||
-						 (prevIsStartOfLine) )
-
-						ui.end--;
-				}
-
-				// right
-				if (selectedPos.x + scrollable->width <= cursorPos.x && ui.end + 1 < text.string.length) {
-					if (next.y == metrics.y) 
-						ui.end++;
-
-					isStartOfLine = false;
-				}
-
-				// up
-				if (cursorPos.y < selectedPos.y) {
-					ui.end = GetCharIndex(text.font, text.string, 
-										  metrics.x, metrics.y - 2*text.font->height,
-										  shouldWrap, ui.selected->width);					
-				}
-
-				// down
-				if (selectedPos.y + scrollable->height < cursorPos.y) {
-					ui.end = GetCharIndex(text.font, text.string, 
-										  metrics.x, metrics.y,
-										  shouldWrap, ui.selected->width);
-				}
-
-				updateScrollPos = true;
+			if (!ui.focused) {
+				ui.focused = FindFirstInteractable(ui.rootElement);
 			}
-		}
-
-		if (OSIsKeyDown(KEY_LEFT) && ui.end > 0) {
-			if (keyCount) {
-				keyCount--;
+		} break;
+		case KEY_SPACE: {
+			if (ui.focused) {
+				if (ui.focused->onClick) ui.focused->onClick(ui.focused);
+				if (ui.focused->flags & UI_SHUFFLABLE)
+					LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
 			}
-			else {
-				keyCount = 6;
+		} break;
+		case KEY_LEFT: {
+			if (ui.selected && ui.end > 0) {
 				ui.end--;
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
-				updateScrollPos = true;
+					
+				UpdateSelectedElementScrollPosition();
 			}
-		}
-
-		if (OSIsKeyDown(KEY_RIGHT) && ui.end < text.string.length - 1) {
-			if (keyCount) {
-				keyCount--;
+			else if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
+				SetPosition(ui.focused, ui.focused->x - 1, ui.focused->y);
+				if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 			}
-			else {
-				keyCount = 6;
+		} break;
+		case KEY_RIGHT: {
+			if (ui.selected && ui.end < ui.selected->text.string.length - 1) {
 				ui.end++;
-				isStartOfLine = IsStartOfLine(next, text.font, text.string,
-													   ui.end, shouldWrap, ui.selected->width);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
-				updateScrollPos = true;
+					
+				UpdateSelectedElementScrollPosition();
 			}
-		}
-
-		if (OSIsKeyDown(KEY_UP) && ui.end > 0) {
-			if (keyCount) {
-				keyCount--;
+			else if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
+				SetPosition(ui.focused, ui.focused->x + 1, ui.focused->y);
+				if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 			}
-			else {
-				keyCount = 6;
-
+		} break;
+		case KEY_UP: {
+			if (ui.selected && ui.end > 0) {
+				UIText text = ui.selected->text;
+				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+				TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
 				ui.end = GetCharIndex(text.font, text.string, 
 									  metrics.x, metrics.y - 2*text.font->height,
 									  shouldWrap, ui.selected->width);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
-				updateScrollPos = true;
+					
+				UpdateSelectedElementScrollPosition();
 			}
-		}
-
-		if (OSIsKeyDown(KEY_DOWN) && ui.end < text.string.length - 1) {
-			if (keyCount) {
-				keyCount--;
+			else if (ui.focused && ui.focused->flags & UI_Y_MOVABLE) {
+				SetPosition(ui.focused, ui.focused->x, ui.focused->y - 1);
+				if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 			}
-			else {
-				keyCount = 6;
-
+		} break;
+		case KEY_DOWN: {
+			if (ui.selected && ui.end < ui.selected->text.string.length - 1) {
+				UIText text = ui.selected->text;
+				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+				TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
 				ui.end = GetCharIndex(text.font, text.string, 
 									  metrics.x, metrics.y,
 									  shouldWrap, ui.selected->width);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
 					ui.start = ui.end;
-				updateScrollPos = true;
+					
+				UpdateSelectedElementScrollPosition();
 			}
-		}
-
-		if (OSIsKeyPressed(KEY_HOME)) {
-			ui.end = OSIsKeyDown(KEY_CTRL)
-				? 0
-				: 1 + StringGetLastIndexOf({text.string.data, ui.end}, 10);
-			isStartOfLine = true;
-
-			if (!OSIsKeyDown(KEY_SHIFT))
-				ui.start = ui.end;
-			updateScrollPos = true;
-		}
-
-		if (OSIsKeyPressed(KEY_END)) {
-			ui.end = OSIsKeyDown(KEY_CTRL)
-				? text.string.length
-				: ui.end + StringGetFirstIndexOf({text.string.data + ui.end, text.string.length - ui.end}, 10);
-			isStartOfLine = false;
-
-			if (!OSIsKeyDown(KEY_SHIFT))
-				ui.start = ui.end;
-
-			updateScrollPos = true;
-		}
-
-		metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-		float32 margin = text.font->height;
-		Box2 box = {metrics.x - margin, metrics.y - margin, 
-					metrics.x + margin, metrics.y};
-
-		// update scroll position
-		if (updateScrollPos && scrollable) {
-			Point2 pos = ui.selected->pos;
-
-			if (isStartOfLine) {
-				scrollable->scroll.x = 0;
+			else if (ui.focused && ui.focused->flags & UI_Y_MOVABLE) {
+				SetPosition(ui.focused, ui.focused->x, ui.focused->y + 1);
+				if (ui.focused->onMove) ui.focused->onMove(ui.focused);
 			}
-			else if (pos.x + box.x0 < scrollable->scroll.x) {
-				scrollable->scroll.x = MAX(pos.x + box.x0, 0); 
+		} break;
+		case KEY_HOME: {
+			if (ui.selected) {
+				UIText text = ui.selected->text;
+				ui.end = event.keyboard.ctrlIsDown
+					? 0
+					: 1 + StringGetLastIndexOf({text.string.data, ui.end}, 10);
+
+				if (!event.keyboard.shiftIsDown)
+					ui.start = ui.end;
+
+				UpdateSelectedElementScrollPosition();
 			}
-			else if (scrollable->scroll.x + scrollable->width < pos.x + box.x1) {
-				scrollable->scroll.x = pos.x + box.x1 - scrollable->width; 
+		} break;
+		case KEY_END: {
+			if (ui.selected) {
+				UIText text = ui.selected->text;
+				ui.end = event.keyboard.ctrlIsDown
+					? text.string.length
+					: ui.end + StringGetFirstIndexOf({text.string.data + ui.end, text.string.length - ui.end}, 10);
+
+				if (!event.keyboard.shiftIsDown)
+					ui.start = ui.end;
+
+				UpdateSelectedElementScrollPosition();
+			}
+		} break;
+		case KEY_C: {
+			if (ui.selected && event.keyboard.ctrlIsDown) {
+				ssize start = MIN(ui.start, ui.end);
+				ssize end = MAX(ui.start, ui.end);
+				String string = ui.selected->text.string;
+				String sub = {string.data + start, end - start};
+				OSCopyToClipboard(sub);
+			}
+		} break;
+		}
+	} break;
+	} 
+}
+
+void UIUpdate() {
+	OSEvent event;
+	while (OSPollEvent(&event)) {
+		UIProcessEvent(event);
+	}
+
+	// NOTE: this is not a response to any os event
+	// TODO: maybe I should trigger an event to handle this
+	if (ui.isSelecting && ui.hovered != ui.selected) {
+		if (ui.selectionCount) {
+			ui.selectionCount--;
+		}
+		else {
+			ui.selectionCount = 6;
+			UIElement* parent = ui.selected->parent;
+			Point2 selectedPos = GetScreenPosition(parent);												
+
+			UIText text = ui.selected->text;
+			bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
+			
+			TextMetrics prev = ui.end == 0
+				? TextMetrics{}
+				: GetTextMetrics(text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
+			TextMetrics metrics = NextTextMetrics(prev, text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
+			TextMetrics next = ui.end == text.string.length
+				? metrics
+				: NextTextMetrics(metrics, text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+
+			bool isStartOfLine = IsStartOfLine(metrics, text.font, text.string,
+											   ui.end, shouldWrap, ui.selected->width);
+
+			Point2i cursorPos = OSGetCursorPosition();
+
+			// left
+			if (cursorPos.x < selectedPos.x && 0 < ui.end) {
+				bool prevIsStartOfLine = IsStartOfLine(prev, text.font, text.string,
+													   ui.end - 1, shouldWrap, ui.selected->width);
+
+				if ( (prev.y == metrics.y && !isStartOfLine) ||
+					 (prevIsStartOfLine) )
+
+					ui.end--;
+			}
+
+			// right
+			if (selectedPos.x + parent->width <= cursorPos.x && ui.end + 1 < text.string.length) {
+				if (next.y == metrics.y) 
+					ui.end++;
 			}
 
 			// up
-			if (box.y0 <= scrollable->scroll.y) {
-				scrollable->scroll.y = MAX(pos.y + box.y0 - text.font->height, 0); 
+			if (cursorPos.y < selectedPos.y) {
+				ui.end = GetCharIndex(text.font, text.string, 
+									  metrics.x, metrics.y - 2*text.font->height,
+									  shouldWrap, ui.selected->width);					
 			}
 
 			// down
-			if (scrollable->scroll.y + scrollable->height < box.y1) {
-				scrollable->scroll.y = pos.y + box.y1 - scrollable->height + 0.5f*text.font->height; 
+			if (selectedPos.y + parent->height < cursorPos.y) {
+				ui.end = GetCharIndex(text.font, text.string, 
+									  metrics.x, metrics.y,
+									  shouldWrap, ui.selected->width);
 			}
-		}
-	}
 
-	// Handle tab
-	if (OSIsKeyPressed(KEY_TAB)) {
-		if (ui.focused) {
-			ui.focused = FindFirstInteractable(ui.focused);
+			UpdateSelectedElementScrollPosition();
 		}
-		if (!ui.focused) {
-			ui.focused = FindFirstInteractable(ui.rootElement);
-		}
-	}
-
-	// Handle space
-	if (OSIsKeyPressed(KEY_SPACE) && ui.focused) {
-		if (ui.focused->onClick) ui.focused->onClick(ui.focused);
-		if (ui.focused->flags & UI_SHUFFLABLE)
-			LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
-	}
-
-	// Handle Arrow Keys
-	if (OSIsKeyDown(KEY_UP)) {
-		if (ui.focused && ui.focused->flags & UI_Y_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x, ui.focused->y - 1);
-			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
-		}
-	}
-	if (OSIsKeyDown(KEY_DOWN)) {
-		if (ui.focused && ui.focused->flags & UI_Y_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x, ui.focused->y + 1);
-			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
-		}
-	}
-	if (OSIsKeyDown(KEY_LEFT)) {
-		if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x - 1, ui.focused->y);
-			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
-		}
-	}
-	if (OSIsKeyDown(KEY_RIGHT)) {
-		if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
-			SetPosition(ui.focused, ui.focused->x + 1, ui.focused->y);
-			if (ui.focused->onMove) ui.focused->onMove(ui.focused);
-		}
-	}
-
-	// Handle copy
-	if (ui.selected && OSIsKeyDown(KEY_CTRL) && OSIsKeyPressed(KEY_C)) {
-		ssize start = MIN(ui.start, ui.end);
-		ssize end = MAX(ui.start, ui.end);
-		String string = ui.selected->text.string;
-		String sub = {string.data + start, end - start};
-		OSCopyToClipboard(sub);
 	}
 }
 

@@ -1,14 +1,59 @@
 #include "geometry.cpp"
 #include "image.cpp"
 
-#define CUR_NONE				0
-#define CUR_ARROW 				1
-#define CUR_MOVE				2	 					
-#define CUR_RESIZE				3
-#define CUR_HAND				4
-#define CUR_MOVESIDE			5
-#define CUR_MOVEUPDN			6
-#define CUR_TEXT				7
+enum : uint32 {
+	Event_none,
+	Event_WindowResize,
+	Event_MouseMove,
+	Event_MouseLeftButtonDown,
+	Event_MouseLeftButtonUp,
+	Event_MouseDoubleClick,
+	Event_MouseTripleClick,
+	Event_MouseVerticalWheel,
+	Event_MouseHorizontalWheel,
+	Event_KeyboardPress,
+
+	Event_count
+};
+
+struct WindowEvent {
+	Dimensions2i dim;
+};
+
+struct MouseEvent {
+	Point2i cursorPos;
+	int32 wheelDelta;
+};
+
+struct KeyboardEvent {
+	uint32 vkCode;
+	uint32 scanCode;
+	bool ctrlIsDown;
+	bool shiftIsDown;
+};
+
+struct OSEvent {
+	uint32 type; 
+	int32 time;
+	union {
+		WindowEvent window;
+		MouseEvent mouse;
+		KeyboardEvent keyboard;
+	};
+};
+
+enum : uint32 {
+	CUR_NONE,
+	CUR_ARROW,
+	CUR_MOVE,
+	CUR_RESIZE,	
+	CUR_HAND,
+	CUR_MOVESIDE,
+	CUR_MOVEUPDN,
+	CUR_TEXT,
+
+	CUR_COUNT
+};
 
 #define KEY_BACKSPACE 			0x08
 #define KEY_TAB 				0x09
@@ -68,33 +113,23 @@
 #  define OSOpenFileDialog			Win32OpenFileDialog
 #  define OSSaveFileDialog			Win32SaveFileDialog
 
-#  define OSIsKeyDown 				Win32IsKeyDown
-#  define OSIsKeyPressed			Win32IsKeyPressed
 #  define OSGetTypedText			Win32GetTypedText
 #  define OSResetTypedText			Win32ResetTypedText
 #  define OSIsMouseLeftButtonDown 	Win32IsMouseLeftButtonDown
-#  define OSIsMouseLeftButtonUp 	Win32IsMouseLeftButtonUp
-#  define OSIsMouseLeftClicked		Win32IsMouseLeftClicked
-#  define OSIsMouseLeftReleased 	Win32IsMouseLeftReleased
-#  define OSIsMouseRightClicked 	Win32IsMouseRightClicked
-#  define OSIsMouseDoubleClicked	Win32IsMouseDoubleClicked
-#  define OSIsMouseTripleClicked	Win32IsMouseTripleClicked
-#  define OSGetMouseWheelDelta		Win32GetMouseWheelDelta
-#  define OSGetMouseHWheelDelta 	Win32GetMouseHWheelDelta
-#  define OSResetMouse				Win32ResetMouse
+#  define OSIsKeyDown				Win32IsKeyDown
 
 #  define OSCopyToClipboard 		Win32CopyToClipboard
 #  define OSRequestClipboardData	Win32RequestClipboardData
+
+#  define OSPollEvent				Win32PollEvent
 #endif
 
 #if defined(__gnu_linux__)
-#  define Font	X11Font
 #  include <X11/Xlib.h>
 #  include <X11/Xutil.h>
 #  include <X11/Xatom.h>
 #  include <X11/cursorfont.h>
 #  include <X11/XKBlib.h>
-#  undef Font
 #  define Button6            6
 #  define Button7            7
 #  include "linuxwindow.cpp"
