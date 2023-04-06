@@ -1,6 +1,6 @@
 /*
  * TODO:
- * EDITABLE TEXT!!! 
+ * delete text, cut text
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
  * theme
@@ -978,6 +978,9 @@ void UIProcessEvent(OSEvent event) {
 				}
 				OSCopyToClipboard({buffer, length});
 			}
+		} break;
+		case KEY_V: {
+			OSRequestClipboardData(InsertText);
 		} break;
 		}
 	} break;
