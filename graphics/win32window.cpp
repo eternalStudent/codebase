@@ -152,10 +152,18 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 
 		} break;
 		case WM_CHAR: {
+			// NOTE: yeah... only ASCII plz...
 			if (wParam == 13) wParam = 10;
 			if (32 <= wParam && wParam <= 127 || 9 <= wParam && wParam <= 10) {
 				window.typed[window.strlength] = (CHAR)wParam;
 				window.strlength++;
+			
+
+				OSEvent event;
+				event.type = Event_KeyboardChar;
+				event.time = GetMessageTime();
+				event.keyboard.character = (byte)wParam;
+				Win32EnqueueEvent(event);
 			}
 		} break;
 

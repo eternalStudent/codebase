@@ -12,6 +12,7 @@ enum : uint32 {
 	Event_MouseVerticalWheel,
 	Event_MouseHorizontalWheel,
 	Event_KeyboardPress,
+	Event_KeyboardChar,
 
 	Event_count
 };
@@ -28,6 +29,7 @@ struct MouseEvent {
 struct KeyboardEvent {
 	uint32 vkCode;
 	uint32 scanCode;
+	byte character;
 	bool ctrlIsDown;
 	bool shiftIsDown;
 };

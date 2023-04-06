@@ -126,6 +126,7 @@ struct UIElement {
 struct {
 	FixedSize allocator;
 	FixedSize stringNodeAllocator;
+	StringBuilder text;
 	BakedFont iconsFont;
 
 	UIElement* rootElement;
@@ -299,6 +300,23 @@ UIElement* GetScrollableAncestor(UIElement* element) {
 	return scrollable;
 }
 
+// Text
+//------------
+
+StringNode* CreateStringNode() {
+	StringNode* result = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+	ASSERT(result);
+	return result;
+}
+
+StringList CreateStringList(String string) {
+	return CreateStringList(string, CreateStringNode());
+}
+
+void DestroyStringNode(StringNode* node) {
+	FixedSizeFree(&ui.stringNodeAllocator, node);
+}
+
 void UpdateSelectedElementScrollPosition() {
 	// TODO: is it necessarilly the parent?
 	UIElement* scrollable = ui.selected->parent;
@@ -334,21 +352,73 @@ void UpdateSelectedElementScrollPosition() {
 	}
 }
 
-// Text
-//------------
+void InsertText(String newString) {
+	if (!newString.length) 
+		return;
+	StringCopy(newString, ui.text.ptr);
+	StringList* list = &ui.selected->text.editable;
+	/*
+	if (ui.start != ui.end) {
+		// TODO: if the selected length is smaller or equal to newString length, insert it in place.
+		DeleteSelectedText();
+		ASSERT(ui.start == ui.end);
+	}
+	*/
+	if (StringListIsEnd(ui.head)) {
+	 	if (list->last == NULL || list->last->string.data + list->last->string.length != ui.text.ptr) {
+	 		StringNode* node = CreateStringNode();
+	 		LINKEDLIST_ADD(list, node);
+	 		node->string.data = ui.text.ptr;
+	 		ui.head.node = node;
+	 		ui.head.index = 0;
+	 	}
+	 	list->last->string.length += newString.length;
+	}
+	else if (StringListIsStart(ui.head)) {
+		StringNode* node = CreateStringNode();
+	 	LINKEDLIST_ADD_TO_START(list, node);
+		node->string.data = ui.text.ptr;
+		node->string.length = newString.length;
+	}
+	else if (ui.head.index == 0) {
+		ui.head.node = ui.head.node->prev;
+		ui.head.index = ui.head.node->string.length;
 
-StringNode* CreateStringNode() {
-	StringNode* result = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
-	ASSERT(result);
-	return result;
-}
+		String string = ui.head.node->string;
+		if (string.data + string.length == ui.text.ptr) {
+			ui.head.node->string.length += newString.length;
+		}
+		else {
+			StringNode* node = CreateStringNode();
+			LINKEDLIST_ADD_AFTER(list, ui.head.node, node);
+			node->string.data = ui.text.ptr;
+			node->string.length = newString.length;
+			ui.head.node = node;
+			ui.head.node = 0;
+		}
+	}
+	else {
+		String string = ui.head.node->string;
+		ssize length1 = ui.head.index;
+		ssize length2 = string.length - length1;
+		ui.head.node->string.length = length1;
+		StringNode* node1 = CreateStringNode();
+		LINKEDLIST_ADD_AFTER(list, ui.head.node, node1);
+		node1->string.data = ui.head.node->string.data + ui.head.node->string.length;
+		node1->string.length = length2;
+		StringNode* node2 = CreateStringNode();
+		LINKEDLIST_ADD_AFTER(list, ui.head.node, node2);
+		node2->string.data = ui.text.ptr;
+		node2->string.length = newString.length;
+		ui.head.node = node2;
+		ui.head.index = 0;
+	}
 
-StringList CreateStringList(String string) {
-	return CreateStringList(string, CreateStringNode());
-}
-
-void DestroyStringNode(StringNode* node) {
-	FixedSizeFree(&ui.stringNodeAllocator, node);
+	ui.text.ptr += newString.length;
+	list->totalLength += newString.length;
+	ui.head.index += newString.length;
+	ui.tail = ui.head;
+	UpdateSelectedElementScrollPosition();
 }
 
 // Render
@@ -513,6 +583,8 @@ void UIInit(Arena* persist, Arena* scratch, AtlasBitmap* atlas) {
 	ui = {};
 	ui.allocator = CreateFixedSize(persist, 200, sizeof(UIElement));
 	ui.stringNodeAllocator = CreateFixedSize(persist, 200, sizeof(StringNode));
+	ui.text.buffer = ArenaAlloc(persist, 512);
+	ui.text.ptr = ui.text.buffer;
 	ui.iconsFont = LoadAndBakeIconsFont(scratch, atlas, 24);
 }
 
@@ -908,6 +980,10 @@ void UIProcessEvent(OSEvent event) {
 			}
 		} break;
 		}
+	} break;
+	case Event_KeyboardChar: {
+		byte b = event.keyboard.character;
+		InsertText({&b, 1});
 	} break;
 	} 
 }
