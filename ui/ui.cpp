@@ -1,6 +1,5 @@
 /*
  * TODO:
- * StringList
  * EDITABLE TEXT!!! 
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
@@ -126,6 +125,7 @@ struct UIElement {
 
 struct {
 	FixedSize allocator;
+	FixedSize stringNodeAllocator;
 	BakedFont iconsFont;
 
 	UIElement* rootElement;
@@ -145,8 +145,8 @@ struct {
 	int32 selectionCount;
 	int32 keyCount;
 
-	ssize start;
-	ssize end;
+	StringListPos tail;
+	StringListPos head;
 } ui;
 
 // Util
@@ -183,7 +183,8 @@ bool HasQuad(UIElement* e) {
 }
 
 bool HasText(UIElement* e) {
-	return e->text.string.data && e->text.string.length && e->text.color.a;
+	return ((e->text.string.data && e->text.string.length)
+		 || (e->text.editable.length)) && e->text.color.a;
 }
 
 bool HasImage(UIElement* e) {
@@ -253,7 +254,7 @@ Dimensions2 GetContentDim(UIElement* e) {
 	if (HasText(e)) {
 		UIText text = e->text;
 		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-		TextMetrics metrics = GetTextMetrics(text.font, text.string, shouldWrap, e->width);
+		TextMetrics metrics = GetTextMetrics(text.font, text.editable, shouldWrap, e->width);
 		width = metrics.maxx;
 		height = metrics.y + 0.5f*text.font->height;
 	}
@@ -305,9 +306,9 @@ void UpdateSelectedElementScrollPosition() {
 	Point2 pos = ui.selected->pos;
 	UIText text = ui.selected->text;
 	bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-	TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-	bool isStartOfLine = IsStartOfLine(metrics, text.font, text.string,
-									   ui.end, shouldWrap, ui.selected->width);
+	TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, ui.selected->width);
+	bool isStartOfLine = IsStartOfLine(metrics, text.font, 
+									   ui.head, shouldWrap, ui.selected->width);
 	float32 margin = text.font->height;
 	Box2 box = {metrics.x - margin, metrics.y - margin, 
 				metrics.x + margin, metrics.y};
@@ -331,6 +332,23 @@ void UpdateSelectedElementScrollPosition() {
 	if (scrollable->scroll.y + scrollable->height < box.y1) {
 		scrollable->scroll.y = pos.y + box.y1 - scrollable->height + 0.5f*text.font->height; 
 	}
+}
+
+// Text
+//------------
+
+StringNode* CreateStringNode() {
+	StringNode* result = (StringNode*)FixedSizeAlloc(&ui.stringNodeAllocator);
+	ASSERT(result);
+	return result;
+}
+
+StringList CreateStringList(String string) {
+	return CreateStringList(string, CreateStringNode());
+}
+
+void DestroyStringNode(StringNode* node) {
+	FixedSizeFree(&ui.stringNodeAllocator, node);
 }
 
 // Render
@@ -444,17 +462,24 @@ void RenderElement(UIElement* element) {
 	if (HasText(element)) {
 		UIText text = element->text;
 		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-		RenderText(pos, text.font, text.color, text.string, shouldWrap, pos.x + element->width);
+		RenderText(pos, text.font, text.color, text.editable, shouldWrap, pos.x + element->width);
 		
 		if (ui.selected == element) {
-			if (ui.start != ui.end) {
-				ssize start = MIN(ui.start, ui.end);
-				ssize end = MAX(ui.start, ui.end);
-				RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.string,
+			if (ui.head.node != ui.tail.node || ui.head.index != ui.tail.index) {
+				StringListPos start, end;
+				if (StringListPosCompare(ui.tail, ui.head)) {
+					start = ui.tail;
+					end = ui.head;
+				}
+				else {
+					start = ui.head;
+					end = ui.tail;
+				}
+				RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.editable,
 						 			start, end, shouldWrap, element->width);
 			}
 
-			TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, element->width);
+			TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, element->width);
 			float32 caretx = round(pos.x + metrics.x);
 			float32 carety = round(pos.y + metrics.y - text.font->height + 2);
 			if (metrics.lastCharIsNewLine) {
@@ -487,6 +512,7 @@ void RenderElement(UIElement* element) {
 void UIInit(Arena* persist, Arena* scratch, AtlasBitmap* atlas) {
 	ui = {};
 	ui.allocator = CreateFixedSize(persist, 200, sizeof(UIElement));
+	ui.stringNodeAllocator = CreateFixedSize(persist, 200, sizeof(StringNode));
 	ui.iconsFont = LoadAndBakeIconsFont(scratch, atlas, 24);
 }
 
@@ -528,6 +554,7 @@ UIElement* UICreateElement(
 
 UIElement* UIAddText(UIElement* parent, UIText text) {
 	UIElement* textElement = UICreateElement(parent);
+	text.editable = CreateStringList(text.string);
 	textElement->text = text;
 	textElement->flags = UI_FIT_CONTENT | UI_MIDDLE | UI_CENTER;
 	return textElement;
@@ -535,6 +562,7 @@ UIElement* UIAddText(UIElement* parent, UIText text) {
 
 UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	UIElement* textElement = UICreateElement(parent);
+	text.editable = CreateStringList(text.string);
 	textElement->x = xmargin;
 	textElement->text = text;
 	textElement->flags = UI_FIT_CONTENT;
@@ -629,7 +657,7 @@ void UIProcessEvent(OSEvent event) {
 				float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
 				float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
 				
-				ui.end = GetCharIndex(text.font, text.string, relx, rely, shouldWrap, element->width);
+				ui.head = GetCharPos(text.font, text.editable, relx, rely, shouldWrap, element->width);
 			}
 			
 			return;
@@ -663,8 +691,8 @@ void UIProcessEvent(OSEvent event) {
 			float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
 			float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
 			bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-			ui.end = GetCharIndex(text.font, text.string, relx, rely, shouldWrap, element->width);
-			ui.start = ui.end;
+			ui.head = GetCharPos(text.font, text.editable, relx, rely, shouldWrap, element->width);
+			ui.tail = ui.head;
 			ui.selected = element;
 			ui.isSelecting = true;
 		}
@@ -736,7 +764,7 @@ void UIProcessEvent(OSEvent event) {
 		UIElement* element = ui.hovered;
 		if (!HasText(element)) return;
 		ui.selected = element;
-		StringFindWord(element->text.string, ui.end, &ui.start, &ui.end);
+		StringListFindWord(element->text.editable, ui.head, &ui.tail, &ui.head);
 		ui.isSelecting = false;
 	} break;
 
@@ -744,9 +772,9 @@ void UIProcessEvent(OSEvent event) {
 		UIElement* element = ui.hovered;
 		if (!HasText(element)) return;
 		ui.selected = element;
-		String string = ui.selected->text.string;
-		ui.start = 1 + StringGetLastIndexOf({string.data, ui.end}, 10);
-		ui.end = ui.end + StringGetFirstIndexOf({string.data + ui.end, string.length - ui.end}, 10);
+		StringList list = ui.selected->text.editable;
+		ui.tail = StringListPosInc(StringListGetLastPosOf(SL_START(list), ui.head, 10));
+		ui.head = StringListGetFirstPosOf(ui.head, SL_END(list), 10);
 		ui.isSelecting = false;
 	} break;
 
@@ -768,11 +796,11 @@ void UIProcessEvent(OSEvent event) {
 			}
 		} break;
 		case KEY_LEFT: {
-			if (ui.selected && ui.end > 0) {
-				ui.end--;
+			if (ui.selected && !StringListIsStart(ui.head)) {
+				StringListPosDec(&ui.head);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
+					ui.tail = ui.head;
 					
 				UpdateSelectedElementScrollPosition();
 			}
@@ -782,11 +810,11 @@ void UIProcessEvent(OSEvent event) {
 			}
 		} break;
 		case KEY_RIGHT: {
-			if (ui.selected && ui.end < ui.selected->text.string.length - 1) {
-				ui.end++;
+			if (ui.selected && !StringListIsEnd(ui.head)) {
+				StringListPosInc(&ui.head);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
+					ui.tail = ui.head;
 					
 				UpdateSelectedElementScrollPosition();
 			}
@@ -796,16 +824,16 @@ void UIProcessEvent(OSEvent event) {
 			}
 		} break;
 		case KEY_UP: {
-			if (ui.selected && ui.end > 0) {
+			if (ui.selected && !StringListIsStart(ui.head)) {
 				UIText text = ui.selected->text;
 				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-				TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-				ui.end = GetCharIndex(text.font, text.string, 
+				TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, ui.selected->width);
+				ui.head = GetCharPos(text.font, text.editable, 
 									  metrics.x, metrics.y - 2*text.font->height,
 									  shouldWrap, ui.selected->width);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
+					ui.tail = ui.head;
 					
 				UpdateSelectedElementScrollPosition();
 			}
@@ -815,16 +843,16 @@ void UIProcessEvent(OSEvent event) {
 			}
 		} break;
 		case KEY_DOWN: {
-			if (ui.selected && ui.end < ui.selected->text.string.length - 1) {
+			if (ui.selected && !StringListIsEnd(ui.head)) {
 				UIText text = ui.selected->text;
 				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-				TextMetrics metrics = GetTextMetrics(text.font, text.string, ui.end, shouldWrap, ui.selected->width);
-				ui.end = GetCharIndex(text.font, text.string, 
+				TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, ui.selected->width);
+				ui.head = GetCharPos(text.font, text.editable, 
 									  metrics.x, metrics.y,
 									  shouldWrap, ui.selected->width);
 
 				if (!OSIsKeyDown(KEY_SHIFT))
-					ui.start = ui.end;
+					ui.tail = ui.head;
 					
 				UpdateSelectedElementScrollPosition();
 			}
@@ -836,12 +864,12 @@ void UIProcessEvent(OSEvent event) {
 		case KEY_HOME: {
 			if (ui.selected) {
 				UIText text = ui.selected->text;
-				ui.end = event.keyboard.ctrlIsDown
-					? 0
-					: 1 + StringGetLastIndexOf({text.string.data, ui.end}, 10);
+				ui.head = event.keyboard.ctrlIsDown
+					? SL_START(text.editable)
+					: StringListGetLastPosOf(SL_START(text.editable), ui.head, 10);
 
 				if (!event.keyboard.shiftIsDown)
-					ui.start = ui.end;
+					ui.tail = ui.head;
 
 				UpdateSelectedElementScrollPosition();
 			}
@@ -849,23 +877,28 @@ void UIProcessEvent(OSEvent event) {
 		case KEY_END: {
 			if (ui.selected) {
 				UIText text = ui.selected->text;
-				ui.end = event.keyboard.ctrlIsDown
-					? text.string.length
-					: ui.end + StringGetFirstIndexOf({text.string.data + ui.end, text.string.length - ui.end}, 10);
+				ui.head = event.keyboard.ctrlIsDown
+					? SL_END(text.editable)
+					: StringListGetFirstPosOf(ui.head, SL_END(text.editable), 10);
 
 				if (!event.keyboard.shiftIsDown)
-					ui.start = ui.end;
+					ui.tail = ui.head;
 
 				UpdateSelectedElementScrollPosition();
 			}
 		} break;
 		case KEY_C: {
 			if (ui.selected && event.keyboard.ctrlIsDown) {
-				ssize start = MIN(ui.start, ui.end);
-				ssize end = MAX(ui.start, ui.end);
-				String string = ui.selected->text.string;
-				String sub = {string.data + start, end - start};
-				OSCopyToClipboard(sub);
+				// TODO: obviously problematic
+				static byte buffer[256];
+				ssize length;
+				if (StringListPosCompare(ui.tail, ui.head)) {
+					length = StringListCopy(ui.tail, ui.head, buffer);
+				}
+				else {
+					length = StringListCopy(ui.head, ui.tail, buffer);
+				}
+				OSCopyToClipboard({buffer, length});
 			}
 		} break;
 		}
@@ -893,46 +926,46 @@ void UIUpdate() {
 			UIText text = ui.selected->text;
 			bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
 			
-			TextMetrics prev = ui.end == 0
+			TextMetrics prev = StringListIsStart(ui.head)
 				? TextMetrics{}
-				: GetTextMetrics(text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
-			TextMetrics metrics = NextTextMetrics(prev, text.font, text.string, ui.end - 1, shouldWrap, ui.selected->width);
-			TextMetrics next = ui.end == text.string.length
+				: GetTextMetrics(text.font, text.editable, StringListPosDec(ui.head), shouldWrap, ui.selected->width);
+			TextMetrics metrics = NextTextMetrics(prev, text.font, StringListPosDec(ui.head), shouldWrap, ui.selected->width);
+			TextMetrics next = StringListIsEnd(ui.head)
 				? metrics
-				: NextTextMetrics(metrics, text.font, text.string, ui.end, shouldWrap, ui.selected->width);
+				: NextTextMetrics(metrics, text.font, ui.head, shouldWrap, ui.selected->width);
 
-			bool isStartOfLine = IsStartOfLine(metrics, text.font, text.string,
-											   ui.end, shouldWrap, ui.selected->width);
+			bool isStartOfLine = IsStartOfLine(metrics, text.font,
+											   ui.head, shouldWrap, ui.selected->width);
 
 			Point2i cursorPos = OSGetCursorPosition();
 
 			// left
-			if (cursorPos.x < selectedPos.x && 0 < ui.end) {
-				bool prevIsStartOfLine = IsStartOfLine(prev, text.font, text.string,
-													   ui.end - 1, shouldWrap, ui.selected->width);
+			if (cursorPos.x < selectedPos.x && !StringListIsStart(ui.head)) {
+				bool prevIsStartOfLine = IsStartOfLine(prev, text.font, 
+													   StringListPosDec(ui.head), shouldWrap, ui.selected->width);
 
 				if ( (prev.y == metrics.y && !isStartOfLine) ||
 					 (prevIsStartOfLine) )
 
-					ui.end--;
+					StringListPosDec(&ui.head);
 			}
 
 			// right
-			if (selectedPos.x + parent->width <= cursorPos.x && ui.end + 1 < text.string.length) {
+			if (selectedPos.x + parent->width <= cursorPos.x && !StringListIsEnd(ui.head)) {
 				if (next.y == metrics.y) 
-					ui.end++;
+					StringListPosInc(&ui.head);
 			}
 
 			// up
 			if (cursorPos.y < selectedPos.y) {
-				ui.end = GetCharIndex(text.font, text.string, 
+				ui.head = GetCharPos(text.font, text.editable, 
 									  metrics.x, metrics.y - 2*text.font->height,
 									  shouldWrap, ui.selected->width);					
 			}
 
 			// down
 			if (selectedPos.y + parent->height < cursorPos.y) {
-				ui.end = GetCharIndex(text.font, text.string, 
+				ui.head = GetCharPos(text.font, text.editable, 
 									  metrics.x, metrics.y,
 									  shouldWrap, ui.selected->width);
 			}

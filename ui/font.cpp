@@ -87,6 +87,9 @@ float32 GetCharWidth(BakedFont* font, byte b) {
 	return 0;
 }
 
+// String
+//------------
+
 float32 GetWordWidth(BakedFont* font, String string, ssize i) {
 	float32 width = 0;
 	for (; i < string.length; i++) {
@@ -324,6 +327,267 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 			y += font->height;
 		}
 		prevCharWasWhiteSpace = whiteSpace;
+	}
+
+	selection.x = round(pos.x + startx);
+	selection.y = round(pos.y + y + 2);
+	GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+}
+
+// StringList
+//------------
+
+float32 GetWordWidth(BakedFont* font, StringListPos pos) {
+	float32 width = 0;
+	for (StringNode* node = pos.node; node != NULL; node = node->next) {
+		String string = node->string;
+		ssize i = node == pos.node ? pos.index : 0;
+		for (; i < string.length; i++) {
+			byte b = string.data[i];
+			if (IsWhiteSpace(b)) return width;
+			width += GetCharWidth(font, b);
+		}
+	}
+	return width;
+}
+
+void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
+				bool shouldWrap, float32 wrapX) {
+
+	bool prevCharWasWhiteSpace = false;
+	float32 initialX = pos.x;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		for (ssize i = 0; i < string.length; i++) {
+			byte b = string.data[i];
+			bool whiteSpace = IsWhiteSpace(b);
+			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
+				float32 wordWidth = GetWordWidth(font, {node, i});
+				if (wrapX <= pos.x + wordWidth) {
+					pos.y += font->height;
+					pos.x = initialX;
+				}
+			}
+			if (b == 9) {
+				pos.x += 4*font->chardata[32 - font->firstChar].xadvance;
+			}
+			if (b == 10) {
+				pos.y += font->height;
+				pos.x = initialX;
+			}
+			if (font->firstChar <= b && b <= font->lastChar) {
+				pos.x += RenderGlyph(pos, font, color, b);
+			}
+			prevCharWasWhiteSpace = whiteSpace;
+		}
+	}
+}
+
+StringListPos GetCharPos(BakedFont* font, StringList list, 
+						 float32 cursorx, float32 cursory,
+						 bool shouldWrap, float32 wrapX) {
+
+	if (cursorx <= 2 && cursory <= 0) return {list.first, 0};
+
+	float32 x = 0;
+	float32 y = 0;
+
+	bool prevCharWasWhiteSpace = false;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		for (ssize i = 0; i < string.length; i++) {
+			byte b = string.data[i];
+			bool whiteSpace = IsWhiteSpace(b);
+			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
+				float32 wordWidth = GetWordWidth(font, {node, i});
+				if (wrapX <= x + wordWidth) {
+					if (cursory <= y) return {node, i};
+					y += font->height;
+					x = 0;
+					if (cursorx <= x && cursory <= y) return {node, i + 1};
+				}
+			}
+			x += GetCharWidth(font, b);
+
+			if (b == 10) {
+				if (cursory <= y) return {node, i + 1};
+				y += font->height;
+				x = 0;
+			}
+			if (cursorx <= x && cursory <= y) return {node, i + 1};
+			
+			prevCharWasWhiteSpace = whiteSpace;
+		}
+	}
+
+	return {list.last, list.last->string.length};
+}
+
+bool IsStartOfLine(TextMetrics metrics, BakedFont* font,
+				   StringListPos start, bool shouldWrap, float32 wrapX) {
+
+	if (metrics.lastCharIsNewLine)
+		return true;
+	if (!shouldWrap || !metrics.lastCharIsWhiteSpace) 
+		return false;
+	byte b = start.node->string.data[start.index];
+	if (IsWhiteSpace(b)) 
+		return false;
+	float32 wordWidth = GetWordWidth(font, start);
+	return wrapX <= metrics.x + wordWidth;
+}
+
+TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, StringListPos pos,
+							bool shouldWrap, float32 wrapX) {
+
+	if (metrics.lastCharIsNewLine) {
+		metrics.x = 0;
+		metrics.y += font->height;
+	}
+	byte b = pos.node->string.data[pos.index];
+	bool whiteSpace = IsWhiteSpace(b);
+	if (shouldWrap && metrics.lastCharIsWhiteSpace && !whiteSpace) {
+		float32 wordWidth = GetWordWidth(font, pos);
+		if (wrapX <= metrics.x + wordWidth) {
+			metrics.maxx = MAX(metrics.maxx, metrics.x);
+			metrics.x = 0;
+			metrics.y += font->height;
+		}
+	}
+	metrics.x += GetCharWidth(font, b);
+	metrics.maxx = MAX(metrics.x, metrics.maxx);
+	metrics.lastCharIsNewLine = b == 10;
+	metrics.lastCharIsWhiteSpace = whiteSpace;
+	return metrics;
+}
+
+TextMetrics GetTextMetrics(BakedFont* font, StringList list, StringListPos end, 
+						   bool shouldWrap, float32 wrapX) {
+	
+	TextMetrics metrics = {};
+	if (list.length == 0) return metrics;
+
+	metrics.y = font->height;
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		ssize endIndex = node == end.node ? end.index : node->string.length;
+		for (ssize i = 0; i < endIndex; i++) {
+			metrics = NextTextMetrics(metrics, font, {node, i}, shouldWrap, wrapX);
+		}
+		if (node == end.node) break;
+	}
+
+	return metrics;
+}
+
+TextMetrics GetTextMetrics(BakedFont* font, StringList list, 
+						   bool shouldWrap, float32 wrapX) {
+
+	return GetTextMetrics(font, list, {list.last, list.last->string.length}, shouldWrap, wrapX);
+}
+
+void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList list,
+						 StringListPos start, StringListPos end, 
+						 bool shouldWrap, float32 wrapX) {
+
+	bool prevCharWasWhiteSpace = false;
+	float32 x = 0;
+	float32 y = 0;
+	int32 state = 0;
+	float32 startx = 0;
+	Point2 selection;
+
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		ssize endIndex = node == end.node ? end.index : string.length;
+		for (ssize i = 0; i < endIndex; i++) {
+			byte b = string.data[i];
+			bool whiteSpace = IsWhiteSpace(b);
+
+			if (state == 0) {
+				// start by finding position of start.
+				if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
+					float32 wordWidth = GetWordWidth(font, string, i);
+					if (wrapX <= x + wordWidth) {
+						x = 0;
+						y += font->height;
+					}
+				}
+				if (node == start.node && i == start.index) {
+					state++;
+					startx = x;
+					i--;
+					continue;
+				}
+
+				x += GetCharWidth(font, b);
+				if (b == 10) {
+					x = 0;
+					y += font->height;
+				}
+			}
+
+			if (state == 1) {
+				// iterate till end of line
+				if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
+					float32 wordWidth = GetWordWidth(font, string, i);
+					if (wrapX <= x + wordWidth) {
+
+						selection.x = round(pos.x + startx);
+						selection.y = round(pos.y + y + 2);
+						GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+						startx = 0;
+
+						x = 0;
+						y += font->height;
+						state++;
+						i--;
+						continue;
+					}
+				}
+				x += GetCharWidth(font, b);
+				if (b == 10) {
+
+					selection.x = round(pos.x + startx);
+					selection.y = round(pos.y + y + 2);
+					GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+					startx = 0;
+					
+					x = 0;
+					y += font->height;
+					state++;
+					continue;
+				}
+			}
+
+			if (state == 2) {
+				// now keep iterating until end
+				if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
+					float32 wordWidth = GetWordWidth(font, string, i);
+					if (wrapX <= x + wordWidth) {
+
+						selection.x = round(pos.x);
+						selection.y = round(pos.y + y + 2);
+						GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
+
+						x = 0;
+						y += font->height;
+					}
+				}
+				x += GetCharWidth(font, b);
+				if (b == 10) {
+
+					selection.x = round(pos.x);
+					selection.y = round(pos.y + y + 2);
+					GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
+
+					x = 0;
+					y += font->height;
+				}
+			}
+
+			prevCharWasWhiteSpace = whiteSpace;
+		}
+		if (end.node == node) break;
 	}
 
 	selection.x = round(pos.x + startx);

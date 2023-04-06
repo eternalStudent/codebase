@@ -304,7 +304,10 @@ struct StringNode {
 struct StringList {
 	StringNode* first;
 	StringNode* last;
-	ssize totalLength;
+	union {
+		ssize totalLength;
+		ssize length;
+	};
 };
 
 StringList CreateStringList(String string, StringNode* node) {
@@ -318,82 +321,152 @@ void StringListAppend(StringList* list, StringNode* node) {
 	list->totalLength += node->string.length;
 }
 
-void StringListCopy(StringList list, byte* buffer) {
+struct StringListPos {
+	StringNode* node;
+	ssize index;
+};
+
+#define SL_START(list)  StringListPos{list.first, 0}
+#define SL_END(list)  	StringListPos{list.last, list.last->string.length}
+
+bool StringListIsStart(StringListPos pos) {
+	return pos.node->prev == NULL && pos.index == 0;
+}
+
+bool StringListIsEnd(StringListPos pos) {
+	return pos.node->next == NULL && pos.index == pos.node->string.length;
+}
+
+StringListPos StringListPosInc(StringListPos pos) {
+	if (pos.index < pos.node->string.length - 1 ||
+		 pos.index == pos.node->string.length - 1 && pos.node->next == NULL)
+
+		pos.index++;
+	else {
+		pos.node = pos.node->next;
+		pos.index = 0;
+	}
+	return pos;
+}
+
+void StringListPosInc(StringListPos* pos) {
+	if (pos->index < pos->node->string.length - 1 ||
+		 pos->index == pos->node->string.length - 1 && pos->node->next == NULL)
+
+		pos->index++;
+	else {
+		pos->node = pos->node->next;
+		pos->index = 0;
+	}
+}
+
+StringListPos StringListPosDec(StringListPos pos) {
+	if (pos.index > 0 ||
+		 pos.index == 0 && pos.node->prev == NULL)
+
+		pos.index--;
+	else {
+		pos.node = pos.node->prev;
+		pos.index = pos.node->string.length - 1;
+	}
+	return pos;
+}
+
+void StringListPosDec(StringListPos* pos) {
+	if (pos->index > 0 ||
+		 pos->index == 0 && pos->node->prev == NULL)
+		pos->index--;
+	else {
+		pos->node = pos->node->prev;
+		pos->index = pos->node->string.length - 1;
+	}
+}
+
+// NOTE: returns true if and only if a < b
+bool StringListPosCompare(StringListPos a, StringListPos b) {
+	if (a.node == b.node)
+		return a.index < b.index;
+
+	for (StringNode* node = a.node; node != NULL; node = node->next) {
+		if (node == b.node) return true;
+	}
+
+	return false;
+}
+
+ssize StringListCopy(StringListPos start, StringListPos end, byte* buffer) {
 	byte* ptr = buffer;
-	LINKEDLIST_FOREACH(&list, StringNode, node) {
+	for (StringNode* node = start.node; node != NULL; node = node->next) {
 		String string = node->string;
-		ptr += StringCopy(string, ptr);
+		ssize startIndex = node == start.node ? start.index : 0;
+		ssize endIndex = node == end.node ? end.index : string.length;
+		ptr += StringCopy({string.data + startIndex, endIndex - startIndex}, ptr);
+
+		if (node == end.node) break;
 	}
+	return ptr - buffer;
 }
 
-byte GetChar(StringList list, ssize index) {
-	ssize i = 0;
-	LINKEDLIST_FOREACH(&list, StringNode, node) {
+StringListPos StringListGetFirstPosOf(StringListPos start, StringListPos end, byte b) {
+	for (StringNode* node = start.node; node != NULL; node = node->next) {
 		String string = node->string;
-		if (index < i + string.length) {
-			return string.data[index - i];
-		}
-		i += string.length;
+		
+		ssize startIndex = node == start.node ? start.index : 0;
+		ssize endIndex = node == end.node ? end.index : string.length;
+		String substring = {string.data + startIndex, endIndex - startIndex};
+
+		ssize index = StringGetFirstIndexOf(substring, b);
+		if (index != string.length) return {node, startIndex + index};
+
+		if (node == end.node) break;
 	}
-	return 0;
+
+	return end;
 }
 
-ssize StringListGetIndexOf(StringList list, ssize start, ssize end, byte b) {
-	ssize i = 0;
-	LINKEDLIST_FOREACH(&list, StringNode, node) {
+StringListPos StringListGetLastPosOf(StringListPos start, StringListPos end, byte b) {
+	for (StringNode* node = start.node; node != NULL; node = node->next) {
 		String string = node->string;
-		if (string.length <= start - i) {
-			i += string.length;
-			continue;
-		}
-		for (ssize j = 0; j < string.length; j++, i++) {
-			if (i == end) return -1;
-			if (start <= i && string.data[j] == b)
-				return i;
-		}
+
+		ssize startIndex = node == start.node ? start.index : 0;
+		ssize endIndex = node == end.node ? end.index : string.length;
+		String substring = {string.data + startIndex, endIndex - startIndex};
+		
+		ssize index = StringGetLastIndexOf(substring, b);
+		if (index != -1) return {node, startIndex + index};
+
+		if (node == end.node) break;
 	}
-	return -1;
+
+	return StringListPosDec(start);
 }
 
-ssize StringListGetLastIndexOf(StringList list, ssize start, ssize end, byte b) {
-	ssize i = 0;
-	ssize result = -1;
+void StringListFindWord(StringList list, StringListPos pos, StringListPos* start, StringListPos* end) {
+	*start = SL_START(list);
+	bool afterPos = false;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
-		if (string.length <= start - i) {
-			i += string.length;
-			continue;
-		}
-		for (ssize j = 0; j < string.length; j++, i++) {
-			if (i == end) return result;
-			if (start <= i && string.data[j] == b)
-				result = i;
-		}
-	}
-	return result;
-}
-
-void StringListFindWord(StringList list, ssize index, ssize* start, ssize* end) {
-	ssize i = 0;
-	*start = 0;
-	LINKEDLIST_FOREACH(&list, StringNode, node) {
-		String string = node->string;
-		for (ssize j = 0; j < string.length; j++, i++) {
-			byte b = string.data[j];
+		for (ssize i = 0; i < string.length; i++) {
+			byte b = string.data[i];
 			bool alphaNumeric = 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || b == '_';
-			if (i == index && !alphaNumeric) {
-				*start = i;
-				*end = i + 1;
-				return;
+			if (pos.node == node && pos.index == i) {
+				if (!alphaNumeric) {
+					*start = {node, i};
+					*end = {node, i + 1};
+					return;
+				}
+				afterPos = true;
+				continue;
 			}
-			if (i < index && !alphaNumeric) {
-				*start = i + 1;
+
+			if (!afterPos && !alphaNumeric) {
+				*start = {node, i + 1};
 			}
-			if (index < i && !alphaNumeric) {
-				*end = i;
+			if (afterPos && !alphaNumeric) {
+				*end = {node, i};
 				return;
 			}
 		}
 	}
-	*end = list.totalLength;
+	*end = SL_END(list);
 }
