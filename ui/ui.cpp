@@ -575,6 +575,12 @@ UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	return textElement;
 }
 
+void UIAddMoreText(UIElement* element, String string) {
+	StringNode* node = CreateStringNode();
+	node->string = string;
+	StringListAppend(&element->text.editable, node);
+}
+
 UIElement* UIAddImage(UIElement* parent, Point2 pos, Dimensions2 dim, TextureId atlas, Box2 crop) {
 	UIElement* imageElement = UICreateElement(parent, pos, dim);
 	imageElement->image = {atlas, crop};

@@ -341,8 +341,8 @@ float32 GetWordWidth(BakedFont* font, StringListPos pos) {
 	float32 width = 0;
 	for (StringNode* node = pos.node; node != NULL; node = node->next) {
 		String string = node->string;
-		ssize i = node == pos.node ? pos.index : 0;
-		for (; i < string.length; i++) {
+		ssize start = node == pos.node ? pos.index : 0;
+		for (ssize i = start; i < string.length; i++) {
 			byte b = string.data[i];
 			if (IsWhiteSpace(b)) return width;
 			width += GetCharWidth(font, b);
@@ -506,7 +506,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 			if (state == 0) {
 				// start by finding position of start.
 				if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
-					float32 wordWidth = GetWordWidth(font, string, i);
+					float32 wordWidth = GetWordWidth(font, {node, i});
 					if (wrapX <= x + wordWidth) {
 						x = 0;
 						y += font->height;
@@ -529,7 +529,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 			if (state == 1) {
 				// iterate till end of line
 				if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
-					float32 wordWidth = GetWordWidth(font, string, i);
+					float32 wordWidth = GetWordWidth(font, {node, i});
 					if (wrapX <= x + wordWidth) {
 
 						selection.x = round(pos.x + startx);
@@ -562,7 +562,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 			if (state == 2) {
 				// now keep iterating until end
 				if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
-					float32 wordWidth = GetWordWidth(font, string, i);
+					float32 wordWidth = GetWordWidth(font, {node, i});
 					if (wrapX <= x + wordWidth) {
 
 						selection.x = round(pos.x);
