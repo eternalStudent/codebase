@@ -1,6 +1,7 @@
 /*
  * TODO:
- * delete text, cut text
+ * focused-to-selected, KEY_ENTER
+ * ctrl+left/right
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
  * theme
@@ -352,33 +353,142 @@ void UpdateSelectedElementScrollPosition() {
 	}
 }
 
+void DeleteSelectedText() {
+	StringList* list = &ui.selected->text.editable;
+	if (!StringListPosCompare(ui.tail, ui.head)) {
+		StringListPos tmp = ui.tail;
+		ui.tail = ui.head;
+		ui.head = tmp;
+	}
+	if (StringListIsStart(ui.head)) {
+		return;
+	}
+
+	if (ui.tail.node == ui.head.node && ui.tail.index == ui.head.index) {
+		if (ui.head.index == ui.head.node->string.length) {
+			if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) 
+				ui.text.ptr--;
+			if (ui.head.node->string.length == 1) {
+				LINKEDLIST_REMOVE(list, ui.head.node);
+				DestroyStringNode(ui.head.node);
+			}
+			else {
+				ui.head.node->string.length--;
+			}
+		}
+		else if (ui.head.index == 0) {
+			ui.head.node = ui.head.node->prev;
+			ui.head.index = ui.head.node->string.length;
+
+			if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) 
+				ui.text.ptr--;
+			if (ui.head.node->string.length == 1) {
+				LINKEDLIST_REMOVE(list, ui.head.node);
+				DestroyStringNode(ui.head.node);
+			}
+			else {
+				ui.head.node->string.length--;
+			}
+		}
+		else {
+			ssize length1 = ui.head.index - 1;
+			ssize length2 = ui.head.node->string.length - length1 - 1;
+
+			if (length1 == 0) {
+				ui.head.node->string.data++;
+				ui.head.node->string.length--;
+			}
+			else {
+				ui.head.node->string.length = length1;
+				StringNode* node2 = CreateStringNode();
+				LINKEDLIST_ADD_AFTER(list, ui.head.node, node2);
+				node2->string.data = ui.head.node->string.data + ui.head.index;
+				node2->string.length = length2;
+			}
+		}
+		list->totalLength--;
+		StringListPosDec(&ui.head);
+
+		ui.tail = ui.head;
+	}
+	else {
+		StringNode* next;
+		for (StringNode* node = ui.tail.node; node != NULL; node = next) {
+			next = node->next;
+			String string = node->string;
+			ssize start = node == ui.tail.node ? ui.tail.index : 0;
+			ssize end = node == ui.head.node ? ui.head.index : string.length;
+
+			if (end == string.length && string.data + end == ui.text.ptr) {
+				ui.text.ptr -= end - start;
+			}
+
+			if (start == 0 && end == string.length) {
+				LINKEDLIST_REMOVE(list, node);
+				DestroyStringNode(node);
+			}
+			else if (start == 0) {
+				node->string.data += end;
+				node->string.length -= end;
+			}
+			else if (end == string.length) {
+				node->string.length = start;
+			}
+			else {
+				node->string.length = start;
+				StringNode* node1 = CreateStringNode();
+				node1->string.data = string.data + end;
+				node1->string.length = string.length - end;
+				LINKEDLIST_ADD_AFTER(list, node, node1);
+			}
+
+			list->totalLength -= end - start;
+			if (node == ui.head.node) break;
+		}
+
+		ui.head = ui.tail;
+	}
+	UpdateSelectedElementScrollPosition();
+}
+
 void InsertText(String newString) {
 	if (!newString.length) 
 		return;
 	StringCopy(newString, ui.text.ptr);
 	StringList* list = &ui.selected->text.editable;
-	/*
-	if (ui.start != ui.end) {
+	if (ui.tail.node != ui.head.node || ui.tail.index != ui.head.index) {
 		// TODO: if the selected length is smaller or equal to newString length, insert it in place.
 		DeleteSelectedText();
-		ASSERT(ui.start == ui.end);
+		ASSERT(ui.tail.node == ui.head.node && ui.tail.index == ui.head.index);
 	}
-	*/
-	if (StringListIsEnd(ui.head)) {
-	 	if (list->last == NULL || list->last->string.data + list->last->string.length != ui.text.ptr) {
+	if (ui.head.node == NULL) {
+		StringNode* node = CreateStringNode();
+		LINKEDLIST_ADD(list, node);
+		node->string.data = ui.text.ptr;
+		node->string.length = newString.length;
+		ui.head.node = node;
+		ui.head.index = 0;
+	}
+	if (ui.head.index == ui.head.node->string.length) {
+		if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) {
+			ui.head.node->string.length += newString.length;
+		}
+	 	else {
 	 		StringNode* node = CreateStringNode();
-	 		LINKEDLIST_ADD(list, node);
+	 		LINKEDLIST_ADD_AFTER(list, ui.head.node, node);
 	 		node->string.data = ui.text.ptr;
+	 		node->string.length = newString.length;
 	 		ui.head.node = node;
 	 		ui.head.index = 0;
 	 	}
-	 	list->last->string.length += newString.length;
 	}
 	else if (StringListIsStart(ui.head)) {
 		StringNode* node = CreateStringNode();
 	 	LINKEDLIST_ADD_TO_START(list, node);
 		node->string.data = ui.text.ptr;
 		node->string.length = newString.length;
+		ui.head.node = node;
+		ui.head.index = 0;
 	}
 	else if (ui.head.index == 0) {
 		ui.head.node = ui.head.node->prev;
@@ -419,6 +529,19 @@ void InsertText(String newString) {
 	ui.head.index += newString.length;
 	ui.tail = ui.head;
 	UpdateSelectedElementScrollPosition();
+}
+
+void CopySelectedTextToClipboard() {
+	// TODO: obviously problematic
+	static byte buffer[256];
+	ssize length;
+	if (StringListPosCompare(ui.tail, ui.head)) {
+		length = StringListCopy(ui.tail, ui.head, buffer);
+	}
+	else {
+		length = StringListCopy(ui.head, ui.tail, buffer);
+	}
+	OSCopyToClipboard({buffer, length});
 }
 
 // Render
@@ -628,16 +751,18 @@ UIElement* UIAddText(UIElement* parent, UIText text) {
 	UIElement* textElement = UICreateElement(parent);
 	text.editable = CreateStringList(text.string);
 	textElement->text = text;
-	textElement->flags = UI_FIT_CONTENT | UI_MIDDLE | UI_CENTER;
+	textElement->flags = UI_MIN_CONTENT | UI_MIDDLE | UI_CENTER;
 	return textElement;
 }
 
 UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	UIElement* textElement = UICreateElement(parent);
-	text.editable = CreateStringList(text.string);
+	StringCopy(text.string, ui.text.ptr);
+	text.editable = CreateStringList({ui.text.ptr, text.string.length});
+	ui.text.ptr += text.string.length;
 	textElement->x = xmargin;
 	textElement->text = text;
-	textElement->flags = UI_FIT_CONTENT;
+	textElement->flags = UI_MIN_CONTENT;
 
 	if (text.flags & TEXT_WRAPPING) {
 		textElement->width = parent->width - 2*xmargin;
@@ -649,7 +774,9 @@ UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 
 void UIAddMoreText(UIElement* element, String string) {
 	StringNode* node = CreateStringNode();
-	node->string = string;
+	StringCopy(string, ui.text.ptr);
+	node->string = {ui.text.ptr, string.length};
+	ui.text.ptr += string.length;
 	StringListAppend(&element->text.editable, node);
 }
 
@@ -724,6 +851,7 @@ void UIProcessEvent(OSEvent event) {
 
 		ui.hovered = GetElementByPosition(cursorPos);
 		element = ui.hovered;
+		if (element == NULL) return;
 		Point2 screenPos = GetScreenPosition(element);
 
 		if (ui.isSelecting) {
@@ -772,6 +900,7 @@ void UIProcessEvent(OSEvent event) {
 			ui.head = GetCharPos(text.font, text.editable, relx, rely, shouldWrap, element->width);
 			ui.tail = ui.head;
 			ui.selected = element;
+			if (ui.focused == element) ui.focused = NULL;
 			ui.isSelecting = true;
 		}
 		else {
@@ -842,6 +971,7 @@ void UIProcessEvent(OSEvent event) {
 		UIElement* element = ui.hovered;
 		if (!HasText(element)) return;
 		ui.selected = element;
+		if (ui.focused == element) ui.focused = NULL;
 		StringListFindWord(element->text.editable, ui.head, &ui.tail, &ui.head);
 		ui.isSelecting = false;
 	} break;
@@ -850,6 +980,7 @@ void UIProcessEvent(OSEvent event) {
 		UIElement* element = ui.hovered;
 		if (!HasText(element)) return;
 		ui.selected = element;
+		if (ui.focused == element) ui.focused = NULL;
 		StringList list = ui.selected->text.editable;
 		ui.tail = StringListPosInc(StringListGetLastPosOf(SL_START(list), ui.head, 10));
 		ui.head = StringListGetFirstPosOf(ui.head, SL_END(list), 10);
@@ -967,26 +1098,43 @@ void UIProcessEvent(OSEvent event) {
 		} break;
 		case KEY_C: {
 			if (ui.selected && event.keyboard.ctrlIsDown) {
-				// TODO: obviously problematic
-				static byte buffer[256];
-				ssize length;
-				if (StringListPosCompare(ui.tail, ui.head)) {
-					length = StringListCopy(ui.tail, ui.head, buffer);
-				}
-				else {
-					length = StringListCopy(ui.head, ui.tail, buffer);
-				}
-				OSCopyToClipboard({buffer, length});
+				CopySelectedTextToClipboard();
+			}
+		} break;
+		case KEY_X: {
+			if (ui.selected && event.keyboard.ctrlIsDown) {
+				CopySelectedTextToClipboard();
+				if ( (ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)
+					DeleteSelectedText();
 			}
 		} break;
 		case KEY_V: {
-			OSRequestClipboardData(InsertText);
+			if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+				OSRequestClipboardData(InsertText);
+			}
+		} break;
+		case KEY_BACKSPACE: {
+			if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+				DeleteSelectedText();
+			}
+		} break;
+		case KEY_DELETE: {
+			if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+				if (ui.tail.node == ui.head.node && ui.tail.index == ui.head.index) {
+					if (StringListIsEnd(ui.head)) break;
+					StringListPosInc(&ui.head);
+					ui.tail = ui.head;
+				}
+				DeleteSelectedText();
+			}
 		} break;
 		}
 	} break;
 	case Event_KeyboardChar: {
-		byte b = event.keyboard.character;
-		InsertText({&b, 1});
+		if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+			byte b = event.keyboard.character;
+			InsertText({&b, 1});
+		}
 	} break;
 	} 
 }

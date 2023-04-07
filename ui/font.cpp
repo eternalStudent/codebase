@@ -404,17 +404,17 @@ StringListPos GetCharPos(BakedFont* font, StringList list,
 					if (cursory <= y) return {node, i};
 					y += font->height;
 					x = 0;
-					if (cursorx <= x && cursory <= y) return {node, i + 1};
+					if (cursorx <= x && cursory <= y) return StringListPosInc({node, i});
 				}
 			}
 			x += GetCharWidth(font, b);
 
 			if (b == 10) {
-				if (cursory <= y) return {node, i + 1};
+				if (cursory <= y) return StringListPosInc({node, i});
 				y += font->height;
 				x = 0;
 			}
-			if (cursorx <= x && cursory <= y) return {node, i + 1};
+			if (cursorx <= x && cursory <= y) return StringListPosInc({node, i});
 			
 			prevCharWasWhiteSpace = whiteSpace;
 		}
@@ -482,6 +482,7 @@ TextMetrics GetTextMetrics(BakedFont* font, StringList list, StringListPos end,
 TextMetrics GetTextMetrics(BakedFont* font, StringList list, 
 						   bool shouldWrap, float32 wrapX) {
 
+	if (list.length == 0) return {};
 	return GetTextMetrics(font, list, {list.last, list.last->string.length}, shouldWrap, wrapX);
 }
 

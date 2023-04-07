@@ -330,14 +330,19 @@ struct StringListPos {
 #define SL_END(list)  	StringListPos{list.last, list.last->string.length}
 
 bool StringListIsStart(StringListPos pos) {
-	return pos.node->prev == NULL && pos.index == 0;
+	return pos.node == NULL || pos.node->prev == NULL && pos.index == 0;
 }
 
 bool StringListIsEnd(StringListPos pos) {
-	return pos.node->next == NULL && pos.index == pos.node->string.length;
+	return pos.node == NULL || pos.node->next == NULL && pos.index == pos.node->string.length;
 }
 
 StringListPos StringListPosInc(StringListPos pos) {
+	if (pos.index == pos.node->string.length && pos.node->next != NULL) {
+		pos.index = 0;
+		pos.node = pos.node->next;
+	}
+
 	if (pos.index < pos.node->string.length - 1 ||
 		 pos.index == pos.node->string.length - 1 && pos.node->next == NULL)
 
@@ -350,6 +355,11 @@ StringListPos StringListPosInc(StringListPos pos) {
 }
 
 void StringListPosInc(StringListPos* pos) {
+	if (pos->index == pos->node->string.length && pos->node->next != NULL) {
+		pos->index = 0;
+		pos->node = pos->node->next;
+	}
+
 	if (pos->index < pos->node->string.length - 1 ||
 		 pos->index == pos->node->string.length - 1 && pos->node->next == NULL)
 
