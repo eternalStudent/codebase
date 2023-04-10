@@ -1,7 +1,7 @@
 /*
  * TODO:
- * focused-to-selected, KEY_ENTER
  * ctrl+left/right
+ * multi/single line text
  * drop-down, menu-bar, list-box, combo-box
  * tooltip, context-menu
  * theme
@@ -18,8 +18,10 @@
 #define UI_SHUFFLABLE		 (1ull << 3)
 #define UI_CLICKABLE		 (1ull << 4)
 #define UI_HIDE_OVERFLOW	 (1ull << 5)
-#define UI_SCROLLABLE		((1ull << 6) | UI_HIDE_OVERFLOW)
-#define UI_INFINITE_SCROLL	((1ull << 7) | UI_SCROLLABLE)
+#define UI_XSCROLLABLE		((1ull << 6) | UI_HIDE_OVERFLOW)
+#define UI_YSCROLLABLE		((1ull << 7) | UI_HIDE_OVERFLOW)
+#define UI_XYSCROLLABLE		 (UI_XSCROLLABLE | UI_YSCROLLABLE)
+#define UI_INFINITE_SCROLL	((1ull << 8) | UI_XYSCROLLABLE)
 
 #define UI_CENTER			 (1ull << 10)
 #define UI_MIDDLE			 (1ull << 11)
@@ -59,7 +61,7 @@ struct UIText {
 	Color color;
 	String string;
 	uint32 flags;
-	StringList editable;
+	StringList list;
 };
 
 struct UIImage {
@@ -176,21 +178,36 @@ Box2 GetScreenHitBox(UIElement* element) {
 	}
 }
 
-// NOTE: both for drawing and for intercepting hit-box
-// TODO: probably should split
 bool HasQuad(UIElement* e) {
-	return (e->background.a) || (e->borderWidth && e->borderColor.a) 
-		|| (e->flags & UI_CLICKABLE) || e->onClick 
-		|| (e->text.flags & TEXT_SELECTABLE);
+	return (e->background.a) || (e->borderWidth && e->borderColor.a) || (e == ui.focused);
 }
 
 bool HasText(UIElement* e) {
-	return ((e->text.string.data && e->text.string.length)
-		 || (e->text.editable.length)) && e->text.color.a;
+	return e->text.list.length;
 }
 
 bool HasImage(UIElement* e) {
 	return e->image.atlas != 0;
+}
+
+bool HasSelectableText(UIElement* e) {
+	return HasText(e) && ( (e->text.flags & TEXT_SELECTABLE) == TEXT_SELECTABLE);
+}
+
+bool HasEditableText(UIElement* e) {
+	return HasText(e) && ( (e->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE);
+}
+
+bool IsInteractable(UIElement* e) {
+	return (e->flags & (UI_CLICKABLE | UI_MOVABLE) ) || e->onClick || HasSelectableText(e);
+}
+
+bool IsXScrollable(UIElement* e) {
+	return (e->flags & UI_XSCROLLABLE) == UI_XSCROLLABLE;
+}
+
+bool IsYScrollable(UIElement* e) {
+	return (e->flags & UI_YSCROLLABLE) == UI_YSCROLLABLE;
 }
 
 bool IsAncestorHidden(UIElement* e) {
@@ -211,7 +228,7 @@ UIElement* GetElementByPosition(Point2i cursorPos) {
 	while (element->last) element = element->last;
 
 	while (element) {
-		if ((HasQuad(element) || HasImage(element)) 
+		if ((IsInteractable(element) || HasImage(element)) 
 				&& !IsAncestorHidden(element)) {
 
 			Box2 box = GetScreenHitBox(element);
@@ -256,7 +273,7 @@ Dimensions2 GetContentDim(UIElement* e) {
 	if (HasText(e)) {
 		UIText text = e->text;
 		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-		TextMetrics metrics = GetTextMetrics(text.font, text.editable, shouldWrap, e->width);
+		TextMetrics metrics = GetTextMetrics(text.font, text.list, shouldWrap, e->width);
 		width = metrics.maxx;
 		height = metrics.y + 0.5f*text.font->height;
 	}
@@ -266,10 +283,6 @@ Dimensions2 GetContentDim(UIElement* e) {
 		height = MAX(child->y + child->height, height);
 	}
 	return {width, height};
-}
-
-bool IsInteractable(UIElement* e) {
-	return (e->flags & (UI_CLICKABLE | UI_MOVABLE)) || e->onClick;
 }
 
 UIElement* GetNext(UIElement* e) {
@@ -294,13 +307,6 @@ UIElement* FindFirstInteractable(UIElement* e) {
 	return NULL;
 }
 
-UIElement* GetScrollableAncestor(UIElement* element) {
-	UIElement* scrollable = element;
-	while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
-		scrollable = scrollable->parent;
-	return scrollable;
-}
-
 // Text
 //------------
 
@@ -321,40 +327,44 @@ void DestroyStringNode(StringNode* node) {
 void UpdateSelectedElementScrollPosition() {
 	// TODO: is it necessarilly the parent?
 	UIElement* scrollable = ui.selected->parent;
-	if ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE) return;
+	if (!IsXScrollable(scrollable) && !IsYScrollable(scrollable)) return;
 	Point2 pos = ui.selected->pos;
 	UIText text = ui.selected->text;
 	bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-	TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, ui.selected->width);
+	TextMetrics metrics = GetTextMetrics(text.font, text.list, ui.head, shouldWrap, ui.selected->width);
 	bool isStartOfLine = IsStartOfLine(metrics, text.font, 
 									   ui.head, shouldWrap, ui.selected->width);
 	float32 margin = text.font->height;
 	Box2 box = {metrics.x - margin, metrics.y - margin, 
 				metrics.x + margin, metrics.y};
 
-	if (isStartOfLine) {
-		scrollable->scroll.x = 0;
-	}
-	else if (pos.x + box.x0 < scrollable->scroll.x) {
-		scrollable->scroll.x = MAX(pos.x + box.x0, 0); 
-	}
-	else if (scrollable->scroll.x + scrollable->width < pos.x + box.x1) {
-		scrollable->scroll.x = pos.x + box.x1 - scrollable->width; 
-	}
-
-	// up
-	if (box.y0 <= scrollable->scroll.y) {
-		scrollable->scroll.y = MAX(pos.y + box.y0 - text.font->height, 0); 
+	if (IsXScrollable(scrollable)) {
+		if (isStartOfLine) {
+			scrollable->scroll.x = 0;
+		}
+		else if (pos.x + box.x0 < scrollable->scroll.x) {
+			scrollable->scroll.x = MAX(pos.x + box.x0, 0); 
+		}
+		else if (scrollable->scroll.x + scrollable->width < pos.x + box.x1) {
+			scrollable->scroll.x = pos.x + box.x1 - scrollable->width; 
+		}
 	}
 
-	// down
-	if (scrollable->scroll.y + scrollable->height < box.y1) {
-		scrollable->scroll.y = pos.y + box.y1 - scrollable->height + 0.5f*text.font->height; 
+	if (IsYScrollable(scrollable)) {
+		// up
+		if (box.y0 <= scrollable->scroll.y) {
+			scrollable->scroll.y = MAX(pos.y + box.y0 - text.font->height, 0); 
+		}
+
+		// down
+		if (scrollable->scroll.y + scrollable->height < box.y1) {
+			scrollable->scroll.y = pos.y + box.y1 - scrollable->height + 0.5f*text.font->height; 
+		}
 	}
 }
 
 void DeleteSelectedText() {
-	StringList* list = &ui.selected->text.editable;
+	StringList* list = &ui.selected->text.list;
 	if (!StringListPosCompare(ui.tail, ui.head)) {
 		StringListPos tmp = ui.tail;
 		ui.tail = ui.head;
@@ -369,8 +379,11 @@ void DeleteSelectedText() {
 			if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) 
 				ui.text.ptr--;
 			if (ui.head.node->string.length == 1) {
+				StringNode* next = ui.head.node->next;
 				LINKEDLIST_REMOVE(list, ui.head.node);
 				DestroyStringNode(ui.head.node);
+				ui.head.node = next;
+				ui.head.index = 1;
 			}
 			else {
 				ui.head.node->string.length--;
@@ -383,8 +396,11 @@ void DeleteSelectedText() {
 			if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) 
 				ui.text.ptr--;
 			if (ui.head.node->string.length == 1) {
+				StringNode* next = ui.head.node->next;
 				LINKEDLIST_REMOVE(list, ui.head.node);
 				DestroyStringNode(ui.head.node);
+				ui.head.node = next;
+				ui.head.index = 1;
 			}
 			else {
 				ui.head.node->string.length--;
@@ -455,7 +471,7 @@ void InsertText(String newString) {
 	if (!newString.length) 
 		return;
 	StringCopy(newString, ui.text.ptr);
-	StringList* list = &ui.selected->text.editable;
+	StringList* list = &ui.selected->text.list;
 	if (ui.tail.node != ui.head.node || ui.tail.index != ui.head.index) {
 		// TODO: if the selected length is smaller or equal to newString length, insert it in place.
 		DeleteSelectedText();
@@ -597,7 +613,7 @@ void RenderElement(UIElement* element) {
 		UIElement* pane = scrollBar->parent->first;
 		Dimensions2 paneDim = GetContentDim(pane);
 
-		if (paneDim.width <= pane->width) scrollBar->flags |= UI_HIDDEN;
+		if (round(paneDim.width - 0.5f) <= pane->width) scrollBar->flags |= UI_HIDDEN;
 		else {
 			scrollBar->flags &= ~UI_HIDDEN;
 			element->width = (pane->width*scrollBar->width)/paneDim.width;
@@ -655,7 +671,7 @@ void RenderElement(UIElement* element) {
 	if (HasText(element)) {
 		UIText text = element->text;
 		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-		RenderText(pos, text.font, text.color, text.editable, shouldWrap, pos.x + element->width);
+		RenderText(pos, text.font, text.color, text.list, shouldWrap, pos.x + element->width);
 		
 		if (ui.selected == element) {
 			if (ui.head.node != ui.tail.node || ui.head.index != ui.tail.index) {
@@ -668,11 +684,11 @@ void RenderElement(UIElement* element) {
 					start = ui.head;
 					end = ui.tail;
 				}
-				RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.editable,
+				RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.list,
 						 			start, end, shouldWrap, element->width);
 			}
 
-			TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, element->width);
+			TextMetrics metrics = GetTextMetrics(text.font, text.list, ui.head, shouldWrap, element->width);
 			float32 caretx = round(pos.x + metrics.x);
 			float32 carety = round(pos.y + metrics.y - text.font->height + 2);
 			if (metrics.lastCharIsNewLine) {
@@ -749,7 +765,7 @@ UIElement* UICreateElement(
 
 UIElement* UIAddText(UIElement* parent, UIText text) {
 	UIElement* textElement = UICreateElement(parent);
-	text.editable = CreateStringList(text.string);
+	text.list = CreateStringList(text.string);
 	textElement->text = text;
 	textElement->flags = UI_MIN_CONTENT | UI_MIDDLE | UI_CENTER;
 	return textElement;
@@ -758,7 +774,7 @@ UIElement* UIAddText(UIElement* parent, UIText text) {
 UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	UIElement* textElement = UICreateElement(parent);
 	StringCopy(text.string, ui.text.ptr);
-	text.editable = CreateStringList({ui.text.ptr, text.string.length});
+	text.list = CreateStringList({ui.text.ptr, text.string.length});
 	ui.text.ptr += text.string.length;
 	textElement->x = xmargin;
 	textElement->text = text;
@@ -777,7 +793,7 @@ void UIAddMoreText(UIElement* element, String string) {
 	StringCopy(string, ui.text.ptr);
 	node->string = {ui.text.ptr, string.length};
 	ui.text.ptr += string.length;
-	StringListAppend(&element->text.editable, node);
+	StringListAppend(&element->text.list, node);
 }
 
 UIElement* UIAddImage(UIElement* parent, Point2 pos, Dimensions2 dim, TextureId atlas, Box2 crop) {
@@ -863,7 +879,7 @@ void UIProcessEvent(OSEvent event) {
 				float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
 				float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
 				
-				ui.head = GetCharPos(text.font, text.editable, relx, rely, shouldWrap, element->width);
+				ui.head = GetCharPos(text.font, text.list, relx, rely, shouldWrap, element->width);
 			}
 			
 			return;
@@ -897,7 +913,7 @@ void UIProcessEvent(OSEvent event) {
 			float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
 			float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
 			bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-			ui.head = GetCharPos(text.font, text.editable, relx, rely, shouldWrap, element->width);
+			ui.head = GetCharPos(text.font, text.list, relx, rely, shouldWrap, element->width);
 			ui.tail = ui.head;
 			ui.selected = element;
 			if (ui.focused == element) ui.focused = NULL;
@@ -929,7 +945,7 @@ void UIProcessEvent(OSEvent event) {
 
 	case Event_MouseVerticalWheel: {
 		UIElement* scrollable = ui.hovered;
-		while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
+		while (scrollable && !IsYScrollable(scrollable))
 			scrollable = scrollable->parent;
 		if (scrollable) {
 			Dimensions2 contentDim = GetContentDim(scrollable);
@@ -949,7 +965,7 @@ void UIProcessEvent(OSEvent event) {
 
 	case Event_MouseHorizontalWheel: {
 		UIElement* scrollable = ui.hovered;
-		while (scrollable && ((scrollable->flags & UI_SCROLLABLE) != UI_SCROLLABLE))
+		while (scrollable && !IsXScrollable(scrollable))
 			scrollable = scrollable->parent;
 		if (scrollable) {
 			Dimensions2 contentDim = GetContentDim(scrollable);
@@ -972,7 +988,7 @@ void UIProcessEvent(OSEvent event) {
 		if (!HasText(element)) return;
 		ui.selected = element;
 		if (ui.focused == element) ui.focused = NULL;
-		StringListFindWord(element->text.editable, ui.head, &ui.tail, &ui.head);
+		StringListFindWord(element->text.list, ui.head, &ui.tail, &ui.head);
 		ui.isSelecting = false;
 	} break;
 
@@ -981,7 +997,7 @@ void UIProcessEvent(OSEvent event) {
 		if (!HasText(element)) return;
 		ui.selected = element;
 		if (ui.focused == element) ui.focused = NULL;
-		StringList list = ui.selected->text.editable;
+		StringList list = ui.selected->text.list;
 		ui.tail = StringListPosInc(StringListGetLastPosOf(SL_START(list), ui.head, 10));
 		ui.head = StringListGetFirstPosOf(ui.head, SL_END(list), 10);
 		ui.isSelecting = false;
@@ -990,18 +1006,42 @@ void UIProcessEvent(OSEvent event) {
 	case Event_KeyboardPress: {
 		switch (event.keyboard.vkCode) {
 		case KEY_TAB: {
-			if (ui.focused) {
-				ui.focused = FindFirstInteractable(ui.focused);
+			if (ui.selected) {
+				// do nothing
 			}
-			if (!ui.focused) {
-				ui.focused = FindFirstInteractable(ui.rootElement);
+			else {
+				if (ui.focused) {
+					ui.focused = FindFirstInteractable(ui.focused);
+				}
+				if (!ui.focused) {
+					ui.focused = FindFirstInteractable(ui.rootElement);
+				}
 			}
 		} break;
 		case KEY_SPACE: {
-			if (ui.focused) {
+			if (ui.selected) {
+				// do nothing
+			}
+			else if (ui.focused) {
 				if (ui.focused->onClick) ui.focused->onClick(ui.focused);
 				if (ui.focused->flags & UI_SHUFFLABLE)
 					LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
+			}
+		} break;
+		case KEY_ENTER: {
+			if (ui.selected) {
+				// do nothing
+			}
+			else if (ui.focused) {
+				if (ui.focused->onClick) ui.focused->onClick(ui.focused);
+				if (ui.focused->flags & UI_SHUFFLABLE)
+					LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
+				if (HasEditableText(ui.focused)) {
+					ui.selected = ui.focused;
+					//ui.focused = NULL;
+					ui.head = SL_START(ui.selected->text.list);
+					ui.tail = ui.head; 
+				}
 			}
 		} break;
 		case KEY_LEFT: {
@@ -1013,9 +1053,17 @@ void UIProcessEvent(OSEvent event) {
 					
 				UpdateSelectedElementScrollPosition();
 			}
-			else if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
-				SetPosition(ui.focused, ui.focused->x - 1, ui.focused->y);
-				if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+			else if (ui.focused) {
+				if (ui.focused->flags & UI_X_MOVABLE) {
+					SetPosition(ui.focused, ui.focused->x - 1, ui.focused->y);
+					if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+				}
+				else if (HasSelectableText(ui.focused)) {
+					ui.selected = ui.focused;
+					ui.focused = NULL;
+					ui.head = SL_END(ui.selected->text.list);
+					ui.tail = ui.head;
+				}
 			}
 		} break;
 		case KEY_RIGHT: {
@@ -1027,17 +1075,25 @@ void UIProcessEvent(OSEvent event) {
 					
 				UpdateSelectedElementScrollPosition();
 			}
-			else if (ui.focused && ui.focused->flags & UI_X_MOVABLE) {
-				SetPosition(ui.focused, ui.focused->x + 1, ui.focused->y);
-				if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+			else if (ui.focused) {
+				if (ui.focused->flags & UI_X_MOVABLE) {
+					SetPosition(ui.focused, ui.focused->x + 1, ui.focused->y);
+					if (ui.focused->onMove) ui.focused->onMove(ui.focused);
+				}
+				else if (HasSelectableText(ui.focused)) {
+					ui.selected = ui.focused;
+					ui.focused = NULL;
+					ui.head = SL_START(ui.selected->text.list);
+					ui.tail = ui.head;
+				}
 			}
 		} break;
 		case KEY_UP: {
 			if (ui.selected && !StringListIsStart(ui.head)) {
 				UIText text = ui.selected->text;
 				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-				TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, ui.selected->width);
-				ui.head = GetCharPos(text.font, text.editable, 
+				TextMetrics metrics = GetTextMetrics(text.font, text.list, ui.head, shouldWrap, ui.selected->width);
+				ui.head = GetCharPos(text.font, text.list, 
 									  metrics.x, metrics.y - 2*text.font->height,
 									  shouldWrap, ui.selected->width);
 
@@ -1055,8 +1111,8 @@ void UIProcessEvent(OSEvent event) {
 			if (ui.selected && !StringListIsEnd(ui.head)) {
 				UIText text = ui.selected->text;
 				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-				TextMetrics metrics = GetTextMetrics(text.font, text.editable, ui.head, shouldWrap, ui.selected->width);
-				ui.head = GetCharPos(text.font, text.editable, 
+				TextMetrics metrics = GetTextMetrics(text.font, text.list, ui.head, shouldWrap, ui.selected->width);
+				ui.head = GetCharPos(text.font, text.list, 
 									  metrics.x, metrics.y,
 									  shouldWrap, ui.selected->width);
 
@@ -1074,8 +1130,8 @@ void UIProcessEvent(OSEvent event) {
 			if (ui.selected) {
 				UIText text = ui.selected->text;
 				ui.head = event.keyboard.ctrlIsDown
-					? SL_START(text.editable)
-					: StringListGetLastPosOf(SL_START(text.editable), ui.head, 10);
+					? SL_START(text.list)
+					: StringListGetLastPosOf(SL_START(text.list), ui.head, 10);
 
 				if (!event.keyboard.shiftIsDown)
 					ui.tail = ui.head;
@@ -1087,8 +1143,8 @@ void UIProcessEvent(OSEvent event) {
 			if (ui.selected) {
 				UIText text = ui.selected->text;
 				ui.head = event.keyboard.ctrlIsDown
-					? SL_END(text.editable)
-					: StringListGetFirstPosOf(ui.head, SL_END(text.editable), 10);
+					? SL_END(text.list)
+					: StringListGetFirstPosOf(ui.head, SL_END(text.list), 10);
 
 				if (!event.keyboard.shiftIsDown)
 					ui.tail = ui.head;
@@ -1104,22 +1160,22 @@ void UIProcessEvent(OSEvent event) {
 		case KEY_X: {
 			if (ui.selected && event.keyboard.ctrlIsDown) {
 				CopySelectedTextToClipboard();
-				if ( (ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)
+				if (HasEditableText(ui.selected))
 					DeleteSelectedText();
 			}
 		} break;
 		case KEY_V: {
-			if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+			if (ui.selected && (HasEditableText(ui.selected))) {
 				OSRequestClipboardData(InsertText);
 			}
 		} break;
 		case KEY_BACKSPACE: {
-			if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+			if (ui.selected && (HasEditableText(ui.selected))) {
 				DeleteSelectedText();
 			}
 		} break;
 		case KEY_DELETE: {
-			if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+			if (ui.selected && (HasEditableText(ui.selected))) {
 				if (ui.tail.node == ui.head.node && ui.tail.index == ui.head.index) {
 					if (StringListIsEnd(ui.head)) break;
 					StringListPosInc(&ui.head);
@@ -1131,9 +1187,27 @@ void UIProcessEvent(OSEvent event) {
 		}
 	} break;
 	case Event_KeyboardChar: {
-		if (ui.selected && ((ui.selected->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE)) {
+		if (ui.selected && (HasEditableText(ui.selected))) {
 			byte b = event.keyboard.character;
-			InsertText({&b, 1});
+			if (b == 10 && ui.focused == ui.selected) {
+				ui.focused = NULL;
+			}
+			else {
+				InsertText({&b, 1});
+			}
+		}
+		else if (ui.focused && HasEditableText(ui.focused)) {
+			byte b = event.keyboard.character;
+			if (b == 9 || b == 10) {
+				// do nothing
+			}
+			else {
+				ui.selected = ui.focused;
+				ui.focused = NULL;
+				ui.head = SL_START(ui.selected->text.list);
+				ui.tail = ui.head;
+				InsertText({&b, 1});
+			}
 		}
 	} break;
 	} 
@@ -1161,7 +1235,7 @@ void UIUpdate() {
 			
 			TextMetrics prev = StringListIsStart(ui.head)
 				? TextMetrics{}
-				: GetTextMetrics(text.font, text.editable, StringListPosDec(ui.head), shouldWrap, ui.selected->width);
+				: GetTextMetrics(text.font, text.list, StringListPosDec(ui.head), shouldWrap, ui.selected->width);
 			TextMetrics metrics = NextTextMetrics(prev, text.font, StringListPosDec(ui.head), shouldWrap, ui.selected->width);
 			TextMetrics next = StringListIsEnd(ui.head)
 				? metrics
@@ -1191,14 +1265,14 @@ void UIUpdate() {
 
 			// up
 			if (cursorPos.y < selectedPos.y) {
-				ui.head = GetCharPos(text.font, text.editable, 
+				ui.head = GetCharPos(text.font, text.list, 
 									  metrics.x, metrics.y - 2*text.font->height,
 									  shouldWrap, ui.selected->width);					
 			}
 
 			// down
 			if (selectedPos.y + parent->height < cursorPos.y) {
-				ui.head = GetCharPos(text.font, text.editable, 
+				ui.head = GetCharPos(text.font, text.list, 
 									  metrics.x, metrics.y,
 									  shouldWrap, ui.selected->width);
 			}
@@ -1351,7 +1425,7 @@ void __scroll_y(UIElement* e) {
 
 UIElement* UICreateScrollPane(UIElement* parent, Point2 pos, Dimensions2 dim, UIStyle style) {
 	UIElement* container = UICreateElement(parent, pos, {dim.width + 15, dim.height + 15});
-	UIElement* scrollPane = UICreateElement(container, {}, dim, style, UI_SCROLLABLE);
+	UIElement* scrollPane = UICreateElement(container, {}, dim, style, UI_XYSCROLLABLE);
 
 	UIElement* yscrollBar = UICreateElement(container, {dim.width + 4, 6}, {7, dim.height - 12}, {{0, 0, 0, 0.25f}, 3});
 	UIElement* ythumb = UICreateElement(yscrollBar, {}, {7, 14}, {{1, 1, 1, 0.33f}, 3}, UI_Y_MOVABLE | UI_Y_THUMB);
@@ -1442,4 +1516,20 @@ UIElement* UICreateTreeItem(UIElement* parent) {
 	UICreateElement(item, parent->first->pos, {}, {}, UI_FIT_CONTENT); // children container
 
 	return item;
+}
+
+UIElement* UICreateTextBox(UIElement* parent, Point2 pos, Dimensions2 dim, UIText text) {
+	UIElement* textBox = UICreateScrollPane(parent, pos, dim, {{0.9f, 0.9f, 0.9f, 1}, 0, 1, COLOR_BLACK});
+	UIAddText(textBox, text, 6);
+
+	textBox->name = STR("text box");
+	return textBox;
+}
+
+UIElement* UICreateTextBox(UIElement* parent, Point2 pos, Dimensions2 dim, UIText text, float32 innerWidth) {
+	UIElement* textBox = UICreateScrollPane(parent, pos, dim, {{0.9f, 0.9f, 0.9f, 1}, 0, 1, COLOR_BLACK});
+	UIElement* textElement = UIAddText(textBox, text, 6);
+	textElement->width = innerWidth;
+
+	return textBox;
 }

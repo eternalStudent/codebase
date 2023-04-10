@@ -193,6 +193,39 @@ void main() {
 	return CreateProgram(vertexSource, fragmentSource);
 }
 
+GLuint CreateShapeProgram() {
+	GLchar* vertexSource = (GLchar*)R"STRING(
+#version 330 core
+
+layout (location = 0) in vec2 in_position;
+layout (location = 1) in vec4 in_color;
+
+out vec4 color;
+
+uniform mat4 mvp;
+
+void main() {
+	color = in_color;
+
+	gl_Position = mvp * vec4(in_position, 0.0, 1.0);
+}
+	)STRING";
+
+	GLchar* fragmentSource = (GLchar*)R"STRING(
+#version 330 core
+
+in vec4 color;
+
+out vec4 out_color;
+
+void main() {
+	out_color = color;
+}   
+	)STRING";
+
+	return CreateProgram(vertexSource, fragmentSource);
+}
+
 GLuint OpenGLGenerateTexture(Image image, GLint filter) {
 	GLuint texture;
 	glGenTextures(1, &texture);
