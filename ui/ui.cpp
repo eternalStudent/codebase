@@ -1,5 +1,6 @@
 /*
  * TODO:
+ * Canvas
  * ctrl+left/right
  * multi/single line text
  * drop-down, menu-bar, list-box, combo-box
@@ -151,32 +152,12 @@ struct {
 
 	StringListPos tail;
 	StringListPos head;
+
+	float32 zoomScale;
+	Point2 zoomOffset;
 } ui;
 
-// Util
-//-------------
-
-Box2 GetScreenHitBox(UIElement* element) {
-	UIElement* parent = element->parent;
-	if (parent == NULL) 
-		return {element->x, element->y, element->x + element->width, element->y + element->height};
-
-	Box2 parentBox = GetScreenHitBox(parent);
-	if (parent->flags & UI_HIDE_OVERFLOW) {
-		float32 x0 = parentBox.x0 + MAX(element->x, 0);
-		float32 y0 = parentBox.y0 + MAX(element->y, 0);
-		float32 x1 = MIN(parentBox.x0 + element->x + element->width, parentBox.x1);
-		float32 y1 = MIN(parentBox.y0 + element->y + element->height, parentBox.y1);
-		return {x0, y0, x1, y1};
-	}
-	else {
-		float32 x0 = parentBox.x0 + element->x;
-		float32 y0 = parentBox.y0 + element->y;
-		float32 x1 = parentBox.x0 + element->x + element->width;
-		float32 y1 = parentBox.y0 + element->y + element->height;
-		return {x0, y0, x1, y1};
-	}
-}
+//---------------------------
 
 bool HasQuad(UIElement* e) {
 	return (e->background.a) || (e->borderWidth && e->borderColor.a) || (e == ui.focused);
@@ -218,21 +199,80 @@ bool IsAncestorHidden(UIElement* e) {
 	return false;
 }
 
-bool IsInBottomRight(UIElement* element, Point2 screenPos, Point2i cursorPos) {
-	Point2 p1 = {screenPos.x + element->width, screenPos.y + element->height};
-	return p1.x - MIN(4, element->radius) <= cursorPos.x && p1.y - MIN(4, element->radius) <= cursorPos.y;
+bool DoesAncestorHidesOverflow(UIElement* e) {
+	while (e) {
+		if (e->flags & UI_HIDE_OVERFLOW) return true;
+		e = e->parent;
+	}
+	return false;
 }
 
-UIElement* GetElementByPosition(Point2i cursorPos) {
+// Screen Position/Hit-BOx
+//---------------------------
+
+Point2 GetInterpolatedPos(UIElement* element) {
+	Point2 p0 = element->prevPos;
+	Point2 p1 = element->pos;
+	float32 t = element->transition;
+	return (1 - t)*p0 + t*p1;
+}
+
+Point2 GetCanvasPosition(UIElement* element) {
+	UIElement* parent = element->parent;
+	if (parent == NULL) return element->pos;
+
+	Point2 parentPos = GetCanvasPosition(parent);
+	Point2 pos = element->flags & UI_TRANSITION
+		? GetInterpolatedPos(element)
+		: element->pos;
+	Point2 scroll = parent->scroll;
+
+	return parentPos + pos - scroll;
+}
+
+Point2 GetScreenPosition(UIElement* element) {
+	Point2 canvasPos = GetCanvasPosition(element);
+	return ui.zoomScale*(canvasPos - ui.zoomOffset);
+}
+
+Box2 GetCanvasHitBox(UIElement* element) {
+	UIElement* parent = element->parent;
+	if (parent == NULL)
+		return {element->x, element->y, element->x + element->width, element->y + element->height};
+
+	Point2 parentPos = GetCanvasPosition(parent);
+	Point2 relative = element->flags & UI_TRANSITION
+		? GetInterpolatedPos(element)
+		: element->pos;
+	Point2 scroll = parent->scroll;
+	Point2 pos = parentPos + relative - scroll;
+
+	if (DoesAncestorHidesOverflow(parent)) {
+		Box2 parentBox = GetCanvasHitBox(parent);
+		float32 x0 = MAX(parentBox.x0, pos.x);
+		float32 y0 = MAX(parentBox.y0, pos.y);
+		float32 x1 = MIN(parentBox.x1, pos.x + element->width);
+		float32 y1 = MIN(parentBox.y1, pos.y + element->height);
+		return {x0, y0, x1, y1};
+	}
+	else return {
+		pos.x,
+		pos.y,
+		pos.x + element->width,
+		pos.y + element->height
+	};
+}
+
+UIElement* GetElementByCanvasPosition(Point2 canvasPos) {
 	UIElement* element = ui.rootElement;
 	while (element->last) element = element->last;
 
 	while (element) {
-		if ((IsInteractable(element) || HasImage(element)) 
+		if ((IsInteractable(element) || IsXScrollable(element) || IsYScrollable(element)) 
 				&& !IsAncestorHidden(element)) {
 
-			Box2 box = GetScreenHitBox(element);
-			if (box.x0 <= cursorPos.x && cursorPos.x <= box.x1 && box.y0 <= cursorPos.y && cursorPos.y <= box.y1)
+			Box2 box = GetCanvasHitBox(element);
+			if (box.x0 <= canvasPos.x && canvasPos.x <= box.x1 && box.y0 <= canvasPos.y && canvasPos.y <= box.y1)
 				break;
 		}
 
@@ -246,6 +286,21 @@ UIElement* GetElementByPosition(Point2i cursorPos) {
 	return element;
 }
 
+bool IsInBottomRight(UIElement* element, Point2 canvasPos, Point2 cursorPos) {
+	float32 width = element->width;
+	float32 height = element->height;
+	float32 margin = MAX(4, element->radius);
+	Point2 p1 = {canvasPos.x + width, canvasPos.y + height};
+	return p1.x - margin <= cursorPos.x && p1.y - margin <= cursorPos.y;
+}
+
+Point2 ScreenPositionToCanvasPosition(Point2i p) {
+	Point2 pos = {(float32)p.x, (float32)p.y};
+	return (1.f/ui.zoomScale)*pos + ui.zoomOffset;
+}
+
+//-------------
+
 void SetPosition(UIElement* element, float32 x, float32 y) {
 	if (!element->parent) {
 		element->pos = {x,y};
@@ -255,13 +310,13 @@ void SetPosition(UIElement* element, float32 x, float32 y) {
 
 		if (element->flags & UI_X_MOVABLE) {
 			if (x < 0) element->x = 0;
-			else if (x+element->width > parent->width) element->x = parent->width-element->width;
+			else if (x + element->width > parent->width) element->x = parent->width-element->width;
 			else element->x = x;
 		}
 
 		if (element->flags & UI_Y_MOVABLE) {
 			if (y < 0) element->y = 0;
-			else if (y+element->height > parent->height) element->y = parent->height-element->height;
+			else if (y + element->height > parent->height) element->y = parent->height-element->height;
 			else element->y = y;
 		}
 	}
@@ -576,24 +631,10 @@ UIStyle GetCurrentStyle(UIElement* element) {
 		style.borderColor = COLOR_RED;
 	}
 
+	style.borderWidth *= ui.zoomScale;
+	style.radius *= ui.zoomScale;
+
 	return style;
-}
-
-Point2 GetInterpolatedPos(UIElement* e) {
-	return (1 - e->transition)*e->prevPos + e->transition*e->pos;
-}
-
-Point2 GetScreenPosition(UIElement* element) {
-	UIElement* parent = element->parent;
-	if (parent == NULL) return {element->x, element->y};
-
-	Point2 parentPos = GetScreenPosition(parent);
-	Point2 pos = element->flags & UI_TRANSITION
-		? GetInterpolatedPos(element)
-		: element->pos;
-	Point2 scroll = parent->scroll;
-
-	return {parentPos.x + pos.x - scroll.x, parentPos.y + pos.y - scroll.y};
 }
 
 void RenderElement(UIElement* element) {
@@ -665,13 +706,13 @@ void RenderElement(UIElement* element) {
 	Point2 pos = GetScreenPosition(element);
 	if (HasQuad(element)) {
 		UIStyle style = GetCurrentStyle(element);
-		GfxDrawQuad(pos, element->dim, style.background, style.radius, style.borderWidth, style.borderColor,
+		GfxDrawQuad(pos, ui.zoomScale*element->dim, style.background, style.radius, style.borderWidth, style.borderColor,
 			element->flags & UI_GRADIENT ? style.color2 : style.background);
 	}
 	if (HasText(element)) {
 		UIText text = element->text;
 		bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-		RenderText(pos, text.font, text.color, text.list, shouldWrap, pos.x + element->width);
+		RenderText(pos, text.font, text.color, text.list, shouldWrap, pos.x + element->width, ui.zoomScale);
 		
 		if (ui.selected == element) {
 			if (ui.head.node != ui.tail.node || ui.head.index != ui.tail.index) {
@@ -699,10 +740,10 @@ void RenderElement(UIElement* element) {
 		}
 	}
 	if (element->icon) {
-		RenderGlyph(pos, &ui.iconsFont, COLOR_BLACK, element->icon);
+		RenderGlyph(pos, &ui.iconsFont, COLOR_BLACK, element->icon, ui.zoomScale);
 	}
 	if (HasImage(element)) {
-		GfxDrawImage(pos, element->dim, element->image.atlas, element->image.crop);
+		GfxDrawImage(pos, ui.zoomScale*element->dim, element->image.atlas, element->image.crop);
 	}
 
 	// children
@@ -725,6 +766,7 @@ void UIInit(Arena* persist, Arena* scratch, AtlasBitmap* atlas) {
 	ui.text.buffer = ArenaAlloc(persist, 512);
 	ui.text.ptr = ui.text.buffer;
 	ui.iconsFont = LoadAndBakeIconsFont(scratch, atlas, 24);
+	ui.zoomScale = 1;
 }
 
 UIElement* UICreateWindowElement(Color background) {
@@ -773,9 +815,15 @@ UIElement* UIAddText(UIElement* parent, UIText text) {
 
 UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	UIElement* textElement = UICreateElement(parent);
-	StringCopy(text.string, ui.text.ptr);
-	text.list = CreateStringList({ui.text.ptr, text.string.length});
-	ui.text.ptr += text.string.length;
+	// TODO: maybe a different flag?
+	if ( (text.flags & TEXT_EDITABLE) == TEXT_EDITABLE) {
+		StringCopy(text.string, ui.text.ptr);
+		text.list = CreateStringList({ui.text.ptr, text.string.length});
+		ui.text.ptr += text.string.length;
+	}
+	else {
+		text.list = CreateStringList(text.string);
+	}
 	textElement->x = xmargin;
 	textElement->text = text;
 	textElement->flags = UI_MIN_CONTENT;
@@ -788,11 +836,16 @@ UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	return textElement;
 }
 
-void UIAddMoreText(UIElement* element, String string) {
+void UIAddMoreText(UIElement* element, String string, bool copy) {
 	StringNode* node = CreateStringNode();
-	StringCopy(string, ui.text.ptr);
-	node->string = {ui.text.ptr, string.length};
-	ui.text.ptr += string.length;
+	if (copy) {
+		StringCopy(string, ui.text.ptr);
+		node->string = {ui.text.ptr, string.length};
+		ui.text.ptr += string.length;
+	}
+	else {
+		node->string = string;
+	}
 	StringListAppend(&element->text.list, node);
 }
 
@@ -838,7 +891,7 @@ void UIProcessEvent(OSEvent event) {
 		}
 	} break;
 	case Event_MouseMove: {
-		Point2i cursorPos = event.mouse.cursorPos;
+		Point2 cursorPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
 		UIElement* element = ui.hovered;
 
 		if (ui.isResizing) {
@@ -857,7 +910,7 @@ void UIProcessEvent(OSEvent event) {
 
 		if (ui.isGrabbing) {
 			if (cursorPos.x != ui.grabPos.x || cursorPos.y != ui.grabPos.y) {
-				float32 newx= ui.originalPos.x + cursorPos.x - ui.grabPos.x;
+				float32 newx = ui.originalPos.x + cursorPos.x - ui.grabPos.x;
 				float32 newy = ui.originalPos.y + cursorPos.y - ui.grabPos.y;
 				SetPosition(element, newx, newy);
 				if (element->onMove) element->onMove(element);
@@ -865,19 +918,22 @@ void UIProcessEvent(OSEvent event) {
 			return;
 		}
 
-		ui.hovered = GetElementByPosition(cursorPos);
+		ui.hovered = GetElementByCanvasPosition(cursorPos);
 		element = ui.hovered;
-		if (element == NULL) return;
-		Point2 screenPos = GetScreenPosition(element);
+		if (element == NULL) {
+			OSSetCursorIcon(CUR_ARROW);
+			return;
+		}
+		Point2 canvasPos = GetCanvasPosition(element);
 
 		if (ui.isSelecting) {
+			// TODO: handle zoom
 			if (element == ui.selected) {
 				ui.selectionCount = 0;
-
 				UIText text = ui.selected->text;
 				bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
-				float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
-				float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
+				float32 relx = cursorPos.x - canvasPos.x + element->scroll.x;
+				float32 rely = cursorPos.y - canvasPos.y + element->scroll.y - text.font->height;
 				
 				ui.head = GetCharPos(text.font, text.list, relx, rely, shouldWrap, element->width);
 			}
@@ -886,7 +942,7 @@ void UIProcessEvent(OSEvent event) {
 		}
 
 		if (element->flags & UI_CURSOR) OSSetCursorIcon(element->cursor);
-		else if (IsInBottomRight(element, screenPos, cursorPos) && (element->flags & UI_RESIZABLE)) OSSetCursorIcon(CUR_RESIZE);
+		else if (IsInBottomRight(element, canvasPos, cursorPos) && (element->flags & UI_RESIZABLE)) OSSetCursorIcon(CUR_RESIZE);
 		else if ((element->flags & UI_MOVABLE) == UI_MOVABLE) OSSetCursorIcon(CUR_MOVE);
 		else if (element->flags & UI_X_MOVABLE) OSSetCursorIcon(CUR_MOVESIDE);
 		else if (element->flags & UI_Y_MOVABLE) OSSetCursorIcon(CUR_MOVEUPDN);
@@ -896,9 +952,11 @@ void UIProcessEvent(OSEvent event) {
 	} break;
 
 	case Event_MouseLeftButtonDown: {
-		Point2i cursorPos = event.mouse.cursorPos;
+		Point2 cursorPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
 		UIElement* element = ui.hovered;
-		Point2 screenPos = GetScreenPosition(element);
+		if (!element) return;
+
+		Point2 canvasPos = GetCanvasPosition(element);
 
 		if (element->flags & UI_SHUFFLABLE) {
 			LINKEDLIST_MOVE_TO_LAST(element->parent, element);
@@ -908,10 +966,11 @@ void UIProcessEvent(OSEvent event) {
 			element->onClick(element);
 		}
 
-		if (HasText(element)) {
+		if (HasEditableText(element)) {
+			// TODO: handle zoom
 			UIText text = element->text;
-			float32 relx = cursorPos.x - screenPos.x + element->scroll.x;
-			float32 rely = cursorPos.y - screenPos.y + element->scroll.y - text.font->height;
+			float32 relx = cursorPos.x - canvasPos.x + element->scroll.x;
+			float32 rely = cursorPos.y - canvasPos.y + element->scroll.y - text.font->height;
 			bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
 			ui.head = GetCharPos(text.font, text.list, relx, rely, shouldWrap, element->width);
 			ui.tail = ui.head;
@@ -921,7 +980,7 @@ void UIProcessEvent(OSEvent event) {
 		}
 		else {
 			ui.selected = NULL;
-			if (IsInBottomRight(element, screenPos, cursorPos) 
+			if (IsInBottomRight(element, canvasPos, cursorPos) 
 				&& (element->flags & UI_RESIZABLE)) {
 
 				ui.isResizing = true;
@@ -929,7 +988,7 @@ void UIProcessEvent(OSEvent event) {
 			}
 			else if (element->flags & UI_MOVABLE) {
 				ui.isGrabbing = true;
-				ui.grabPos = {(float32)cursorPos.x, (float32)cursorPos.y};
+				ui.grabPos = cursorPos;
 				ui.originalPos = element->pos;
 			}
 		}
@@ -960,6 +1019,16 @@ void UIProcessEvent(OSEvent event) {
 				UIElement* ythumb = yscrollBar->first;
 				ythumb->y = ((yscrollBar->height - ythumb->height)*scrollable->scroll.y)/(contentDim.height - scrollable->height); 
 			}
+		}
+
+		// zoom in/out
+		if (event.mouse.ctrlIsDown) {
+			Point2 canvasPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
+			Point2 cursor = {(float32)event.mouse.cursorPos.x, (float32)event.mouse.cursorPos.y};
+			float32 oldScale = ui.zoomScale;
+			ui.zoomScale *= 1 + event.mouse.wheelDelta/480.0f;
+			ui.zoomOffset = (1/oldScale - 1/ui.zoomScale)*cursor + ui.zoomOffset;
+			canvasPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
 		}
 	} break;
 
@@ -1228,7 +1297,7 @@ void UIUpdate() {
 		else {
 			ui.selectionCount = 6;
 			UIElement* parent = ui.selected->parent;
-			Point2 selectedPos = GetScreenPosition(parent);												
+			Point2 selectedPos = GetCanvasPosition(parent);												
 
 			UIText text = ui.selected->text;
 			bool shouldWrap = (text.flags & TEXT_WRAPPING) == TEXT_WRAPPING;
@@ -1244,7 +1313,7 @@ void UIUpdate() {
 			bool isStartOfLine = IsStartOfLine(metrics, text.font,
 											   ui.head, shouldWrap, ui.selected->width);
 
-			Point2i cursorPos = OSGetCursorPosition();
+			Point2 cursorPos = ScreenPositionToCanvasPosition(OSGetCursorPosition());
 
 			// left
 			if (cursorPos.x < selectedPos.x && !StringListIsStart(ui.head)) {

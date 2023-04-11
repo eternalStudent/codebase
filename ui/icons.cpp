@@ -34,7 +34,7 @@ enum : byte {
 	Icon_count
 };
 
-
+// TODO: load icons-font from resource
 BakedFont LoadAndBakeIconsFont(Arena* arena, AtlasBitmap* atlas, float32 height) {
 	File iconsFile = OSOpenFile(L"fontello.ttf");
 	FontInfo iconsInfo = TTLoadFont(OSReadAll(iconsFile, arena).data);

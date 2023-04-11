@@ -71,6 +71,10 @@ union Box2 {
 	struct {float32 x0, y0, x1, y1;};
 };
 
+inline Box2 operator*(float32 a, Box2 b) {
+	return {a*b.x0, a*b.y0, a*b.x1, a*b.y1};
+}
+
 union Box2i {
 	struct {Point2i p0, p1;};
 	struct {int32 x0, y0, x1, y1;};

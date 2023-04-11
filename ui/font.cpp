@@ -53,7 +53,7 @@ TextureId GenerateFontAtlas(AtlasBitmap* atlas) {
 }
 
 // NOTE: adopted from stbtt_GetBakedQuad
-float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b) {
+float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b, float32 zoom) {
 	float32 ipw = 1.0f/512.0f; // TODO: shouldn't be hard-coded, maybe move to graphics layer?
 	float32 iph = 1.0f/512.0f;
 
@@ -73,7 +73,7 @@ float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b) {
 		bakedchar.y1 * iph
 	};
 	
-	GfxDrawGlyph(pos, {width, height}, crop, color);
+	GfxDrawGlyph(pos, zoom*Dimensions2{width, height}, crop, color);
 	return bakedchar.xadvance;
 }
 
@@ -101,7 +101,7 @@ float32 GetWordWidth(BakedFont* font, String string, ssize i) {
 }
 
 void RenderText(Point2 pos, BakedFont* font, Color color, String string,
-				bool shouldWrap, float32 wrapX) {
+				bool shouldWrap, float32 wrapX, float32 zoom) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 initialX = pos.x;
@@ -123,7 +123,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, String string,
 			pos.x = initialX;
 		}
 		if (font->firstChar <= b && b <= font->lastChar) {
-			pos.x += RenderGlyph(pos, font, color, b);
+			pos.x += RenderGlyph(pos, font, color, b, zoom);
 		}
 		prevCharWasWhiteSpace = whiteSpace;
 	}
@@ -234,6 +234,7 @@ TextMetrics GetTextMetrics(BakedFont* font, String string,
 	return GetTextMetrics(font, string, string.length, shouldWrap, wrapX);
 }
 
+// Handle zoom!!
 void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string,
 						 ssize start, ssize end, 
 						 bool shouldWrap, float32 wrapX) {
@@ -352,7 +353,7 @@ float32 GetWordWidth(BakedFont* font, StringListPos pos) {
 }
 
 void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
-				bool shouldWrap, float32 wrapX) {
+				bool shouldWrap, float32 wrapX, float32 zoom) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 initialX = pos.x;
@@ -376,7 +377,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 				pos.x = initialX;
 			}
 			if (font->firstChar <= b && b <= font->lastChar) {
-				pos.x += RenderGlyph(pos, font, color, b);
+				pos.x += RenderGlyph(pos, font, color, b, zoom);
 			}
 			prevCharWasWhiteSpace = whiteSpace;
 		}

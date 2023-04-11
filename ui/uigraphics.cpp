@@ -10,6 +10,7 @@ struct {
 	GLuint quadProgram;
 	GLuint textProgram;
 	GLuint imageProgram;
+	GLuint shapeProgram;
 	GLuint currentProgram;
 	float32* vertices;
 	int32 quadCount;
@@ -36,6 +37,7 @@ void GfxInit(Arena* persist) {
 	gfx.quadProgram = CreateQuadProgram();
 	gfx.textProgram = CreateTextProgram();
 	gfx.imageProgram = CreateImageProgram();
+	gfx.shapeProgram = CreateShapeProgram();
 
 	gfx.currentProgram = gfx.quadProgram;
 	glUseProgram(gfx.currentProgram);
@@ -52,6 +54,7 @@ void GfxSetFontAtlas(GLuint texture) {
 void GfxBeginDrawing() {
 	gfx.dim = OSGetWindowDimensions();
 	glClearColor(gfx.backgorundColor.r, gfx.backgorundColor.g, gfx.backgorundColor.b, gfx.backgorundColor.a);
+	glScissor(0, 0, gfx.dim.width, gfx.dim.height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, gfx.dim.width, gfx.dim.height);
 	gfx.currentProgram = 0;
@@ -90,6 +93,15 @@ void GfxFlushVertices() {
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8*sizeof(float32), (void*)(2*sizeof(float32)) );
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 8*sizeof(float32), (void*)(4*sizeof(float32)) );
+	}
+
+	if (gfx.currentProgram == gfx.shapeProgram) {
+		glBufferData(GL_ARRAY_BUFFER, gfx.quadCount*6*6*sizeof(float32), gfx.vertices, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 6*sizeof(float32), NULL);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 6*sizeof(float32), (void*)(2*sizeof(float32)) );
 	}
 
 	glDrawArrays(GL_TRIANGLES, 0, gfx.quadCount*6);
@@ -201,6 +213,49 @@ void GfxDrawImage(Point2 pos, Dimensions2 dim, GLuint texture, Box2 crop) {
 
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glDeleteVertexArrays(1, &verticesHandle);
+}
+
+void GfxDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick, Color color) {
+	if (gfx.currentProgram != gfx.shapeProgram) {
+		GfxFlushVertices();
+		gfx.currentProgram = gfx.shapeProgram;
+		PixelSpaceYIsDown(gfx.shapeProgram);
+	}
+	glUseProgram(gfx.shapeProgram);
+#define SEGMENTS	32
+	Point2 prev = p0;
+    Point2 current = {};
+	for (int32 i = 0; i < SEGMENTS; i++) {
+	    float32 t = (i+1) / (float32)SEGMENTS;
+	    current = Cerp(t, p0, p1, p2, p3);
+
+		Point2 delta = {current.x - prev.x, current.y - prev.y};
+		float32 length = sqrt(delta.x*delta.x + delta.y*delta.y);
+		
+		float32 size = (0.5f*thick)/length;
+		Point2 radius = {-size*delta.y, size*delta.x};
+		
+		Point2 p[4] = {
+			{prev.x - radius.x, prev.y - radius.y},
+			{prev.x + radius.x, prev.y + radius.y},
+			{current.x - radius.x, current.y - radius.y},
+			{current.x + radius.x, current.y + radius.y}
+		};
+		
+		float32 vertices[] = {
+			p[0].x, p[0].y, color.r, color.g, color.b, color.a,
+			p[1].x, p[1].y, color.r, color.g, color.b, color.a,
+			p[2].x, p[2].y, color.r, color.g, color.b, color.a,
+		
+			p[3].x, p[3].y, color.r, color.g, color.b, color.a,
+			p[2].x, p[2].y, color.r, color.g, color.b, color.a,
+			p[1].x, p[1].y, color.r, color.g, color.b, color.a
+		};
+		memcpy(gfx.vertices + 6*6*gfx.quadCount, vertices, sizeof(vertices));
+		gfx.quadCount++;
+		prev = current;
+	}
+#undef SEGMENTS
 }
 
 void GfxEndDrawing() {

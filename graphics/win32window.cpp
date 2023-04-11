@@ -134,10 +134,10 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		case WM_KEYDOWN: {
 			WORD vkCode = LOWORD(wParam);
 			WORD keyFlags = HIWORD(lParam);
-    		WORD scanCode = LOBYTE(keyFlags);
-    		BOOL isExtendedKey = (keyFlags & KF_EXTENDED) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
-    		if (isExtendedKey)
-        		scanCode = MAKEWORD(scanCode, 0xE0);
+			WORD scanCode = LOBYTE(keyFlags);
+			BOOL isExtendedKey = (keyFlags & KF_EXTENDED) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
+			if (isExtendedKey)
+				scanCode = MAKEWORD(scanCode, 0xE0);
 
 			OSEvent event;
 			event.type = Event_KeyboardPress;
@@ -232,23 +232,31 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		case WM_MOUSEWHEEL: {
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
+			POINT p = {x, y};
+			ScreenToClient(handle, &p);
+			WORD flags = LOWORD(wParam);
 
 			OSEvent event;
 			event.type = Event_MouseVerticalWheel;
 			event.time = GetMessageTime();
-			event.mouse.cursorPos = {x, y};
+			event.mouse.cursorPos = {p.x, p.y};
 			event.mouse.wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+			event.mouse.ctrlIsDown = (flags & MK_CONTROL) == MK_CONTROL;
 			Win32EnqueueEvent(event);
 		} break;
 		case WM_MOUSEHWHEEL: {
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
+			POINT p = {x, y};
+			ScreenToClient(handle, &p);
+			WORD flags = LOWORD(wParam);
 
 			OSEvent event;
 			event.type = Event_MouseHorizontalWheel;
 			event.time = GetMessageTime();
-			event.mouse.cursorPos = {x, y};
+			event.mouse.cursorPos = {p.x, p.y};
 			event.mouse.wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+			event.mouse.ctrlIsDown = (flags & MK_CONTROL) == MK_CONTROL;
 			Win32EnqueueEvent(event);
 		} break;
 	}

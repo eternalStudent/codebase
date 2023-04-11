@@ -3,7 +3,9 @@
 
 enum : uint32 {
 	Event_none,
+
 	Event_WindowResize,
+
 	Event_MouseMove,
 	Event_MouseLeftButtonDown,
 	Event_MouseLeftButtonUp,
@@ -11,6 +13,7 @@ enum : uint32 {
 	Event_MouseTripleClick,
 	Event_MouseVerticalWheel,
 	Event_MouseHorizontalWheel,
+
 	Event_KeyboardPress,
 	Event_KeyboardChar,
 
@@ -24,6 +27,7 @@ struct WindowEvent {
 struct MouseEvent {
 	Point2i cursorPos;
 	int32 wheelDelta;
+	bool ctrlIsDown;
 };
 
 struct KeyboardEvent {
