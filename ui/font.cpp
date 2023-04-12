@@ -59,11 +59,11 @@ float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b, float32 zo
 
 	BakedChar bakedchar = font->chardata[b - font->firstChar];
 	
-	float32 round_y = floor(pos.y + bakedchar.yoff + font->height + 0.5f);
-	float32 round_x = floor(pos.x + bakedchar.xoff + 0.5f);
+	float32 round_y = floor(pos.y + zoom*(bakedchar.yoff + font->height) + 0.5f);
+	float32 round_x = floor(pos.x + zoom*bakedchar.xoff + 0.5f);
 	
-	float32 width = (float32)(bakedchar.x1 - bakedchar.x0);
-	float32 height = (float32)(bakedchar.y1 - bakedchar.y0);
+	float32 width = (float32)(zoom*(bakedchar.x1 - bakedchar.x0));
+	float32 height = (float32)(zoom*(bakedchar.y1 - bakedchar.y0));
 	pos = {round_x, round_y};
 	
 	Box2 crop = {
@@ -73,8 +73,8 @@ float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b, float32 zo
 		bakedchar.y1 * iph
 	};
 	
-	GfxDrawGlyph(pos, zoom*Dimensions2{width, height}, crop, color);
-	return bakedchar.xadvance;
+	GfxDrawGlyph(pos, {width, height}, crop, color);
+	return zoom*bakedchar.xadvance;
 }
 
 float32 GetCharWidth(BakedFont* font, byte b) {
@@ -111,12 +111,12 @@ void RenderText(Point2 pos, BakedFont* font, Color color, String string,
 		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= pos.x + wordWidth) {
-				pos.y += font->height;
+				pos.y += zoom*font->height;
 				pos.x = initialX;
 			}
 		}
 		if (b == 9) {
-			pos.x += 4*font->chardata[32 - font->firstChar].xadvance;
+			pos.x += 4*zoom*font->chardata[32 - font->firstChar].xadvance;
 		}
 		if (b == 10) {
 			pos.y += font->height;
@@ -191,6 +191,7 @@ bool IsStartOfLine(TextMetrics metrics, BakedFont* font, String string,
 	return wrapX <= metrics.x + wordWidth;
 }
 
+// TODO: Handle zoom!!
 TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, String string,
 							ssize i, bool shouldWrap, float32 wrapX) {
 
@@ -215,6 +216,7 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, String string,
 	return metrics;
 }
 
+// TODO: Handle zoom!!
 TextMetrics GetTextMetrics(BakedFont* font, String string, ssize end, 
 						   bool shouldWrap, float32 wrapX) {
 	
@@ -228,13 +230,14 @@ TextMetrics GetTextMetrics(BakedFont* font, String string, ssize end,
 	return metrics;
 }
 
+// TODO: Handle zoom!!
 TextMetrics GetTextMetrics(BakedFont* font, String string, 
 						   bool shouldWrap, float32 wrapX) {
 
 	return GetTextMetrics(font, string, string.length, shouldWrap, wrapX);
 }
 
-// Handle zoom!!
+// TODO: Handle zoom!!
 void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string,
 						 ssize start, ssize end, 
 						 bool shouldWrap, float32 wrapX) {
@@ -338,6 +341,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 // StringList
 //------------
 
+// TODO: Handle zoom!!
 float32 GetWordWidth(BakedFont* font, StringListPos pos) {
 	float32 width = 0;
 	for (StringNode* node = pos.node; node != NULL; node = node->next) {
@@ -365,15 +369,15 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 				float32 wordWidth = GetWordWidth(font, {node, i});
 				if (wrapX <= pos.x + wordWidth) {
-					pos.y += font->height;
+					pos.y += zoom*font->height;
 					pos.x = initialX;
 				}
 			}
 			if (b == 9) {
-				pos.x += 4*font->chardata[32 - font->firstChar].xadvance;
+				pos.x += 4*zoom*font->chardata[32 - font->firstChar].xadvance;
 			}
 			if (b == 10) {
-				pos.y += font->height;
+				pos.y += zoom*font->height;
 				pos.x = initialX;
 			}
 			if (font->firstChar <= b && b <= font->lastChar) {
@@ -384,6 +388,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 	}
 }
 
+// TODO: Handle zoom!!
 StringListPos GetCharPos(BakedFont* font, StringList list, 
 						 float32 cursorx, float32 cursory,
 						 bool shouldWrap, float32 wrapX) {
@@ -424,6 +429,7 @@ StringListPos GetCharPos(BakedFont* font, StringList list,
 	return {list.last, list.last->string.length};
 }
 
+// TODO: Handle zoom!!
 bool IsStartOfLine(TextMetrics metrics, BakedFont* font,
 				   StringListPos start, bool shouldWrap, float32 wrapX) {
 
@@ -438,6 +444,7 @@ bool IsStartOfLine(TextMetrics metrics, BakedFont* font,
 	return wrapX <= metrics.x + wordWidth;
 }
 
+// TODO: Handle zoom!!
 TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, StringListPos pos,
 							bool shouldWrap, float32 wrapX) {
 
@@ -462,6 +469,7 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, StringListPos 
 	return metrics;
 }
 
+// TODO: Handle zoom!!
 TextMetrics GetTextMetrics(BakedFont* font, StringList list, StringListPos end, 
 						   bool shouldWrap, float32 wrapX) {
 	
@@ -487,6 +495,7 @@ TextMetrics GetTextMetrics(BakedFont* font, StringList list,
 	return GetTextMetrics(font, list, {list.last, list.last->string.length}, shouldWrap, wrapX);
 }
 
+// TODO: Handle zoom!!
 void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList list,
 						 StringListPos start, StringListPos end, 
 						 bool shouldWrap, float32 wrapX) {
