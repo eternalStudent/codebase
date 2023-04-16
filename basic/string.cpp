@@ -327,7 +327,7 @@ struct StringListPos {
 };
 
 #define SL_START(list)  StringListPos{list.first, 0}
-#define SL_END(list)  	StringListPos{list.last, list.last->string.length}
+#define SL_END(list)  	StringListPos{list.last, list.last ? list.last->string.length : 0}
 
 bool StringListIsStart(StringListPos pos) {
 	return pos.node == NULL || pos.node->prev == NULL && pos.index == 0;

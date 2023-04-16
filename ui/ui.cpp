@@ -1,6 +1,5 @@
 /*
  * TODO:
- * Canvas
  * ctrl+left/right
  * multi/single line text
  * drop-down, menu-bar, list-box, combo-box
@@ -164,7 +163,7 @@ bool HasQuad(UIElement* e) {
 }
 
 bool HasText(UIElement* e) {
-	return e->text.list.length;
+	return e->text.list.length || e->text.flags;
 }
 
 bool HasImage(UIElement* e) {
@@ -544,7 +543,7 @@ void InsertText(String newString) {
 		ui.head.node = node;
 		ui.head.index = 0;
 	}
-	if (ui.head.index == ui.head.node->string.length) {
+	else if (ui.head.index == ui.head.node->string.length) {
 		if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) {
 			ui.head.node->string.length += newString.length;
 		}
@@ -809,9 +808,31 @@ UIElement* UICreateElement(
 	return element;
 }
 
+void UIDestroyElement(UIElement* element) {
+	if (ui.hovered == element) ui.hovered = NULL;
+	if (ui.selected == element) ui.selected = NULL;
+	if (ui.focused == element) ui.focused = NULL;
+
+	LINKEDLIST_FOREACH(&element->text.list, StringNode, child) DestroyStringNode(child);
+	LINKEDLIST_REMOVE(element->parent, element);
+	LINKEDLIST_FOREACH(element, UIElement, child) UIDestroyElement(child);
+
+	FixedSizeFree(&ui.allocator, element);
+}
+
 UIElement* UIAddText(UIElement* parent, UIText text) {
 	UIElement* textElement = UICreateElement(parent);
-	text.list = CreateStringList(text.string);
+	if (text.string.length) {
+		// TODO: maybe a different flag?
+		if ( (text.flags & TEXT_EDITABLE) == TEXT_EDITABLE) {
+			StringCopy(text.string, ui.text.ptr);
+			text.list = CreateStringList({ui.text.ptr, text.string.length});
+			ui.text.ptr += text.string.length;
+		}
+		else {
+			text.list = CreateStringList(text.string);
+		}
+	}
 	textElement->text = text;
 	textElement->flags = UI_MIN_CONTENT | UI_MIDDLE | UI_CENTER;
 	return textElement;
@@ -819,14 +840,16 @@ UIElement* UIAddText(UIElement* parent, UIText text) {
 
 UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	UIElement* textElement = UICreateElement(parent);
-	// TODO: maybe a different flag?
-	if ( (text.flags & TEXT_EDITABLE) == TEXT_EDITABLE) {
-		StringCopy(text.string, ui.text.ptr);
-		text.list = CreateStringList({ui.text.ptr, text.string.length});
-		ui.text.ptr += text.string.length;
-	}
-	else {
-		text.list = CreateStringList(text.string);
+	if (text.string.length) {
+		// TODO: maybe a different flag?
+		if ( (text.flags & TEXT_EDITABLE) == TEXT_EDITABLE) {
+			StringCopy(text.string, ui.text.ptr);
+			text.list = CreateStringList({ui.text.ptr, text.string.length});
+			ui.text.ptr += text.string.length;
+		}
+		else {
+			text.list = CreateStringList(text.string);
+		}
 	}
 	textElement->x = xmargin;
 	textElement->text = text;
@@ -838,19 +861,6 @@ UIElement* UIAddText(UIElement* parent, UIText text, float32 xmargin) {
 	}
 
 	return textElement;
-}
-
-void UIAddMoreText(UIElement* element, String string, bool copy) {
-	StringNode* node = CreateStringNode();
-	if (copy) {
-		StringCopy(string, ui.text.ptr);
-		node->string = {ui.text.ptr, string.length};
-		ui.text.ptr += string.length;
-	}
-	else {
-		node->string = string;
-	}
-	StringListAppend(&element->text.list, node);
 }
 
 UIElement* UIAddImage(UIElement* parent, Point2 pos, Dimensions2 dim, TextureId atlas, Box2 crop) {
