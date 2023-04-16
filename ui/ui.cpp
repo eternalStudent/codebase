@@ -16,13 +16,13 @@
 #define UI_Y_MOVABLE		 (1ull << 1)
 #define UI_MOVABLE			 (UI_X_MOVABLE | UI_Y_MOVABLE)
 #define UI_RESIZABLE		 (1ull << 2)
-#define UI_SHUFFLABLE		 (1ull << 3)
+#define UI_SHUFFLEABLE		 (1ull << 3)
 #define UI_CLICKABLE		 (1ull << 4)
 #define UI_HIDE_OVERFLOW	 (1ull << 5)
 #define UI_XSCROLLABLE		((1ull << 6) | UI_HIDE_OVERFLOW)
 #define UI_YSCROLLABLE		((1ull << 7) | UI_HIDE_OVERFLOW)
 #define UI_XYSCROLLABLE		 (UI_XSCROLLABLE | UI_YSCROLLABLE)
-#define UI_INFINITE_SCROLL	((1ull << 8) | UI_XYSCROLLABLE)
+#define UI_CANVAS			 (1ull << 8)
 
 #define UI_CENTER			 (1ull << 10)
 #define UI_MIDDLE			 (1ull << 11)
@@ -268,6 +268,10 @@ UIElement* GetElementByCanvasPosition(Point2 canvasPos) {
 	while (element->last) element = element->last;
 
 	while (element) {
+		// NOTE: canvas has no dimensions
+		if (element->flags & UI_CANVAS)
+			break;
+
 		if ((IsInteractable(element) || IsXScrollable(element) || IsYScrollable(element)) 
 				&& !IsAncestorHidden(element)) {
 
@@ -302,7 +306,7 @@ Point2 ScreenPositionToCanvasPosition(Point2i p) {
 //-------------
 
 void SetPosition(UIElement* element, float32 x, float32 y) {
-	if (!element->parent) {
+	if (!element->parent || (element->parent->flags & UI_CANVAS) ) {
 		element->pos = {x,y};
 	}
 	else {
@@ -895,7 +899,7 @@ void UIProcessEvent(OSEvent event) {
 		UIElement* element = ui.hovered;
 
 		if (ui.isResizing) {
-			Point2 relativeCursorPos = {cursorPos.x - element->parent->x, cursorPos.y - element->parent->y};
+			Point2 relativeCursorPos = cursorPos - element->parent->pos;
 			float32 x0 = MIN(ui.originalPos.x, relativeCursorPos.x);
 			float32 y0 = MIN(ui.originalPos.y, relativeCursorPos.y);
 			float32 x1 = MAX(ui.originalPos.x, relativeCursorPos.x);
@@ -958,7 +962,7 @@ void UIProcessEvent(OSEvent event) {
 
 		Point2 canvasPos = GetCanvasPosition(element);
 
-		if (element->flags & UI_SHUFFLABLE) {
+		if (element->flags & UI_SHUFFLEABLE) {
 			LINKEDLIST_MOVE_TO_LAST(element->parent, element);
 		}
 
@@ -1009,11 +1013,10 @@ void UIProcessEvent(OSEvent event) {
 		if (scrollable) {
 			Dimensions2 contentDim = GetContentDim(scrollable);
 			scrollable->scroll.y -= event.mouse.wheelDelta;
-			if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
-				if (scrollable->scroll.y < 0) scrollable->scroll.y = 0;
-				if (scrollable->scroll.y > contentDim.height - scrollable->height)
-					scrollable->scroll.y = MAX(contentDim.height - scrollable->height, 0);
-			}
+			if (scrollable->scroll.y < 0) scrollable->scroll.y = 0;
+			if (scrollable->scroll.y > contentDim.height - scrollable->height)
+				scrollable->scroll.y = MAX(contentDim.height - scrollable->height, 0);
+
 			UIElement* yscrollBar = scrollable->yscrollBar;
 			if (yscrollBar) {
 				UIElement* ythumb = yscrollBar->first;
@@ -1021,14 +1024,19 @@ void UIProcessEvent(OSEvent event) {
 			}
 		}
 
-		// zoom in/out
-		if (event.mouse.ctrlIsDown) {
-			Point2 canvasPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
-			Point2 cursor = {(float32)event.mouse.cursorPos.x, (float32)event.mouse.cursorPos.y};
-			float32 oldScale = ui.zoomScale;
-			ui.zoomScale *= 1 + event.mouse.wheelDelta/480.0f;
-			ui.zoomOffset = (1/oldScale - 1/ui.zoomScale)*cursor + ui.zoomOffset;
-			canvasPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
+		else {
+			// zoom in/out
+			if (event.mouse.ctrlIsDown) {
+				Point2 canvasPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
+				Point2 cursor = {(float32)event.mouse.cursorPos.x, (float32)event.mouse.cursorPos.y};
+				float32 oldScale = ui.zoomScale;
+				ui.zoomScale *= 1 + event.mouse.wheelDelta/480.0f;
+				ui.zoomOffset = (1/oldScale - 1/ui.zoomScale)*cursor + ui.zoomOffset;
+				canvasPos = ScreenPositionToCanvasPosition(event.mouse.cursorPos);
+			}
+			else {
+				ui.zoomOffset.y -= event.mouse.wheelDelta;
+			}
 		}
 	} break;
 
@@ -1039,16 +1047,19 @@ void UIProcessEvent(OSEvent event) {
 		if (scrollable) {
 			Dimensions2 contentDim = GetContentDim(scrollable);
 			scrollable->scroll.x += event.mouse.wheelDelta;
-			if ((scrollable->flags & UI_INFINITE_SCROLL) != UI_INFINITE_SCROLL) {
-				if (scrollable->scroll.x < 0) scrollable->scroll.x = 0;
-				if (scrollable->scroll.x > contentDim.width - scrollable->width)
-					scrollable->scroll.x = MAX(contentDim.width - scrollable->width, 0);
-			}
+			if (scrollable->scroll.x < 0) scrollable->scroll.x = 0;
+			if (scrollable->scroll.x > contentDim.width - scrollable->width)
+				scrollable->scroll.x = MAX(contentDim.width - scrollable->width, 0);
+
 			UIElement* xscrollBar = scrollable->xscrollBar;
 			if (xscrollBar) {
 				UIElement* xthumb = xscrollBar->first;
 				xthumb->x = ((xscrollBar->width - xthumb->width)*scrollable->scroll.x)/(contentDim.width - scrollable->width); 
 			}
+		}
+
+		else {
+			ui.zoomOffset.x += event.mouse.wheelDelta;
 		}
 	} break;
 
@@ -1093,7 +1104,7 @@ void UIProcessEvent(OSEvent event) {
 			}
 			else if (ui.focused) {
 				if (ui.focused->onClick) ui.focused->onClick(ui.focused);
-				if (ui.focused->flags & UI_SHUFFLABLE)
+				if (ui.focused->flags & UI_SHUFFLEABLE)
 					LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
 			}
 		} break;
@@ -1103,7 +1114,7 @@ void UIProcessEvent(OSEvent event) {
 			}
 			else if (ui.focused) {
 				if (ui.focused->onClick) ui.focused->onClick(ui.focused);
-				if (ui.focused->flags & UI_SHUFFLABLE)
+				if (ui.focused->flags & UI_SHUFFLEABLE)
 					LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
 				if (HasEditableText(ui.focused)) {
 					ui.selected = ui.focused;
@@ -1456,7 +1467,7 @@ UIElement* UICreateTab(UIElement* tabControl, Dimensions2 headerDim, UIStyle act
 	}
 
 	UIElement* tab = UICreateElement(tabControl, {x, 2}, {headerDim.width, headerDim.height + active.radius}, nonactive, 
-		UI_CLICKABLE | UI_SHUFFLABLE);
+		UI_CLICKABLE | UI_SHUFFLEABLE);
 	UIAddText(tab, header);
 	UIEnableHoverStyle(tab, hover);
 	UIEnableActiveStyle(tab, active);

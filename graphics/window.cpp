@@ -9,6 +9,8 @@ enum : uint32 {
 	Event_MouseMove,
 	Event_MouseLeftButtonDown,
 	Event_MouseLeftButtonUp,
+	Event_MouseRightButtonDown,
+	Event_MouseRightButtonUp,
 	Event_MouseDoubleClick,
 	Event_MouseTripleClick,
 	Event_MouseVerticalWheel,
@@ -174,8 +176,3 @@ enum : uint32 {
 #  define OSCopyToClipboard 		LinuxCopyToClipboard
 #  define OSRequestClipboardData	LinuxRequestClipboardData
 #endif
-
-bool OSIsCharTyped(byte c) {
-	String typed = OSGetTypedText();
-	return typed.length == 1 && typed.data[0] == c;
-}

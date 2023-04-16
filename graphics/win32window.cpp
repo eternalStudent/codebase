@@ -17,13 +17,7 @@ struct {
 	Dimensions2i dim;
 	BOOL destroyed;
 
-	CHAR typed[4];
-	int32 strlength;
-
-	BYTE mouseLeftButtonIsDown;
-	BYTE mouseRightButtonIsDown;
 	int32 clickCount;
-	int32 prevClickCount;
 	RECT clickRect;
 	LONG timeLastClicked;
 
@@ -41,18 +35,6 @@ HWND Win32GetWindowHandle() {
 
 Dimensions2i Win32GetWindowDimensions() {
 	return window.dim;
-}
-
-BOOL Win32IsMouseLeftButtonDown() {
-	return window.mouseLeftButtonIsDown == 1;
-}
-
-String Win32GetTypedText() {
-	return {(byte*)window.typed, (ssize)window.strlength};
-}
-
-void Win32ResetTypedText() {
-	window.strlength = 0;
 }
 
 BOOL Win32IsKeyDown(int vkCode) {
@@ -155,10 +137,6 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			// NOTE: yeah... only ASCII plz...
 			if (wParam == 13) wParam = 10;
 			if (32 <= wParam && wParam <= 127 || 9 <= wParam && wParam <= 10) {
-				window.typed[window.strlength] = (CHAR)wParam;
-				window.strlength++;
-			
-
 				OSEvent event;
 				event.type = Event_KeyboardChar;
 				event.time = GetMessageTime();
@@ -179,7 +157,6 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			Win32EnqueueEvent(event);
 		} break;
 		case WM_LBUTTONDOWN : {
-			window.mouseLeftButtonIsDown = 1;
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
 			LONG time = GetMessageTime();
@@ -210,8 +187,6 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			
 		} break;
 		case WM_LBUTTONUP : {
-			window.mouseLeftButtonIsDown = 0;
-
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
 			LONG time = GetMessageTime();
@@ -223,11 +198,28 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			Win32EnqueueEvent(event);
 		} break;
 		case WM_RBUTTONDOWN : {
-			window.mouseRightButtonIsDown = 1;
 			window.clickCount = 0;
+
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+			LONG time = GetMessageTime();
+
+			OSEvent event;
+			event.type = Event_MouseRightButtonDown;
+			event.time = time;
+			event.mouse.cursorPos = {x, y};
+			Win32EnqueueEvent(event);
 		} break;
 		case WM_RBUTTONUP : {
-			window.mouseRightButtonIsDown = 0;
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+			LONG time = GetMessageTime();
+
+			OSEvent event;
+			event.type = Event_MouseRightButtonUp;
+			event.time = time;
+			event.mouse.cursorPos = {x, y};
+			Win32EnqueueEvent(event);
 		} break;
 		case WM_MOUSEWHEEL: {
 			LONG x = GET_X_LPARAM(lParam);
@@ -433,7 +425,6 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 }
 
 void Win32ProcessWindowEvents() {
-	window.strlength = 0;
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 	{
