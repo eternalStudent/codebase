@@ -17,6 +17,8 @@
 #  define ASSERT(expression)
 #endif
 
+#define HAS_FLAGS(all, flags) (((all) & (flags)) == (flags))
+
 #ifndef LOG
 #  define LOG(text) 			do{}while(0)
 #  define FAIL(text)			0

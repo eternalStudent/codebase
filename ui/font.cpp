@@ -119,7 +119,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, String string,
 			pos.x += 4*zoom*font->chardata[32 - font->firstChar].xadvance;
 		}
 		if (b == 10) {
-			pos.y += font->height;
+			pos.y += zoom*font->height;
 			pos.x = initialX;
 		}
 		if (font->firstChar <= b && b <= font->lastChar) {
@@ -191,7 +191,6 @@ bool IsStartOfLine(TextMetrics metrics, BakedFont* font, String string,
 	return wrapX <= metrics.x + wordWidth;
 }
 
-// TODO: Handle zoom!!
 TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, String string,
 							ssize i, bool shouldWrap, float32 wrapX) {
 
@@ -216,7 +215,6 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, String string,
 	return metrics;
 }
 
-// TODO: Handle zoom!!
 TextMetrics GetTextMetrics(BakedFont* font, String string, ssize end, 
 						   bool shouldWrap, float32 wrapX) {
 	
@@ -230,7 +228,6 @@ TextMetrics GetTextMetrics(BakedFont* font, String string, ssize end,
 	return metrics;
 }
 
-// TODO: Handle zoom!!
 TextMetrics GetTextMetrics(BakedFont* font, String string, 
 						   bool shouldWrap, float32 wrapX) {
 
@@ -388,7 +385,6 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 	}
 }
 
-// TODO: Handle zoom!!
 StringListPos GetCharPos(BakedFont* font, StringList list, 
 						 float32 cursorx, float32 cursory,
 						 bool shouldWrap, float32 wrapX) {
@@ -426,10 +422,9 @@ StringListPos GetCharPos(BakedFont* font, StringList list,
 		}
 	}
 
-	return {list.last, list.last->string.length};
+	return SL_END(list);
 }
 
-// TODO: Handle zoom!!
 bool IsStartOfLine(TextMetrics metrics, BakedFont* font,
 				   StringListPos start, bool shouldWrap, float32 wrapX) {
 
@@ -444,7 +439,6 @@ bool IsStartOfLine(TextMetrics metrics, BakedFont* font,
 	return wrapX <= metrics.x + wordWidth;
 }
 
-// TODO: Handle zoom!!
 TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, StringListPos pos,
 							bool shouldWrap, float32 wrapX) {
 
@@ -469,14 +463,14 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, StringListPos 
 	return metrics;
 }
 
-// TODO: Handle zoom!!
 TextMetrics GetTextMetrics(BakedFont* font, StringList list, StringListPos end, 
 						   bool shouldWrap, float32 wrapX) {
 	
 	TextMetrics metrics = {};
+	metrics.y = font->height;
+
 	if (list.length == 0) return metrics;
 
-	metrics.y = font->height;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		ssize endIndex = node == end.node ? end.index : node->string.length;
 		for (ssize i = 0; i < endIndex; i++) {
@@ -495,10 +489,9 @@ TextMetrics GetTextMetrics(BakedFont* font, StringList list,
 	return GetTextMetrics(font, list, {list.last, list.last->string.length}, shouldWrap, wrapX);
 }
 
-// TODO: Handle zoom!!
 void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList list,
 						 StringListPos start, StringListPos end, 
-						 bool shouldWrap, float32 wrapX) {
+						 bool shouldWrap, float32 wrapX, float32 zoom) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 x = 0;
@@ -506,6 +499,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 	int32 state = 0;
 	float32 startx = 0;
 	Point2 selection;
+	float32 height = zoom*font->height;
 
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
@@ -520,7 +514,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					float32 wordWidth = GetWordWidth(font, {node, i});
 					if (wrapX <= x + wordWidth) {
 						x = 0;
-						y += font->height;
+						y += height;
 					}
 				}
 				if (node == start.node && i == start.index) {
@@ -533,7 +527,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 				x += GetCharWidth(font, b);
 				if (b == 10) {
 					x = 0;
-					y += font->height;
+					y += height;
 				}
 			}
 
@@ -543,13 +537,14 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					float32 wordWidth = GetWordWidth(font, {node, i});
 					if (wrapX <= x + wordWidth) {
 
-						selection.x = round(pos.x + startx);
+						selection.x = round(pos.x + zoom*startx);
 						selection.y = round(pos.y + y + 2);
-						GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+						Dimensions2 dim = {zoom*(x - startx), height + 2};
+						GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
 						startx = 0;
 
 						x = 0;
-						y += font->height;
+						y += height;
 						state++;
 						i--;
 						continue;
@@ -558,13 +553,14 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 				x += GetCharWidth(font, b);
 				if (b == 10) {
 
-					selection.x = round(pos.x + startx);
+					selection.x = round(pos.x + zoom*startx);
 					selection.y = round(pos.y + y + 2);
-					GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+					Dimensions2 dim = {zoom*(x - startx), height + 2};
+					GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
 					startx = 0;
 					
 					x = 0;
-					y += font->height;
+					y += height;
 					state++;
 					continue;
 				}
@@ -578,10 +574,11 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 
 						selection.x = round(pos.x);
 						selection.y = round(pos.y + y + 2);
-						GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
+						Dimensions2 dim = {zoom*x, height + 2};
+						GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
 
 						x = 0;
-						y += font->height;
+						y += height;
 					}
 				}
 				x += GetCharWidth(font, b);
@@ -589,10 +586,11 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 
 					selection.x = round(pos.x);
 					selection.y = round(pos.y + y + 2);
-					GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
+					Dimensions2 dim = {zoom*x, height + 2};
+					GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
 
 					x = 0;
-					y += font->height;
+					y += height;
 				}
 			}
 
@@ -601,7 +599,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 		if (end.node == node) break;
 	}
 
-	selection.x = round(pos.x + startx);
+	selection.x = round(pos.x + zoom*startx);
 	selection.y = round(pos.y + y + 2);
-	GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+	GfxDrawQuad(selection, {zoom*(x - startx), height + 2}, color, 0, 0, {}, color);
 }

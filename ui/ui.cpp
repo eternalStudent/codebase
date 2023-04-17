@@ -171,23 +171,23 @@ bool HasImage(UIElement* e) {
 }
 
 bool HasSelectableText(UIElement* e) {
-	return HasText(e) && ( (e->text.flags & TEXT_SELECTABLE) == TEXT_SELECTABLE);
+	return HasText(e) && HAS_FLAGS(e->text.flags, TEXT_SELECTABLE);
 }
 
 bool HasEditableText(UIElement* e) {
-	return HasText(e) && ( (e->text.flags & TEXT_EDITABLE) == TEXT_EDITABLE);
+	return HasText(e) && HAS_FLAGS(e->text.flags, TEXT_EDITABLE);
 }
 
 bool IsInteractable(UIElement* e) {
-	return (e->flags & (UI_CLICKABLE | UI_MOVABLE) ) || e->onClick || HasSelectableText(e);
+	return HAS_FLAGS(e->flags, UI_CLICKABLE | UI_MOVABLE) || e->onClick || HasSelectableText(e);
 }
 
 bool IsXScrollable(UIElement* e) {
-	return (e->flags & UI_XSCROLLABLE) == UI_XSCROLLABLE;
+	return HAS_FLAGS(e->flags, UI_XSCROLLABLE);
 }
 
 bool IsYScrollable(UIElement* e) {
-	return (e->flags & UI_YSCROLLABLE) == UI_YSCROLLABLE;
+	return HAS_FLAGS(e->flags, UI_YSCROLLABLE);
 }
 
 bool IsAncestorHidden(UIElement* e) {
@@ -683,10 +683,16 @@ void RenderElement(UIElement* element) {
 		x = MAX((parent->width - element->width)/2.0f, 0);
 	if (element->flags & UI_MIDDLE) 
 		y = MAX((parent->height - element->height)/2.0f, 0);
-	if ((element->flags & UI_HORIZONTAL_STACK) && element->prev)
-		x = element->prev->x + element->prev->width + element->margin;
-	if ((element->flags & UI_VERTICAL_STACK) && element->prev)
-		y = element->prev->y + element->prev->height + element->margin;
+	if ((element->flags & UI_HORIZONTAL_STACK) && element->prev) {
+		x = element->prev->x 
+			+ ( (element->prev->flags & UI_HIDDEN) ? 0 : element->prev->width) 
+			+ element->margin;
+	}
+	if ((element->flags & UI_VERTICAL_STACK) && element->prev) {
+		y = element->prev->y 
+			+ ( (element->prev->flags & UI_HIDDEN) ? 0 : element->prev->height) 
+			+ element->margin;
+	}
 
 	if (element->flags & UI_TRANSITION) {
 		if (x != element->x || y != element->y) {
@@ -729,17 +735,18 @@ void RenderElement(UIElement* element) {
 					end = ui.tail;
 				}
 				RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.list,
-						 			start, end, shouldWrap, element->width);
+						 			start, end, shouldWrap, element->width, ui.zoomScale);
 			}
 
 			TextMetrics metrics = GetTextMetrics(text.font, text.list, ui.head, shouldWrap, element->width);
-			float32 caretx = round(pos.x + metrics.x);
-			float32 carety = round(pos.y + metrics.y - text.font->height + 2);
+			float32 caretx = round(pos.x + ui.zoomScale*metrics.x);
+			float32 carety = round(pos.y + ui.zoomScale*(metrics.y - text.font->height) + 2);
 			if (metrics.lastCharIsNewLine) {
 				caretx = round(pos.x);
-				carety = round(pos.y + metrics.y + 2);
+				carety = round(pos.y + ui.zoomScale*(metrics.y)) + 2;
 			}
-			GfxDrawQuad({caretx, carety}, {1, text.font->height + 2}, COLOR_BLACK, 0, 0, {}, COLOR_BLACK);
+			Dimensions2 dim = {1, ui.zoomScale*text.font->height + 2};
+			GfxDrawQuad({caretx, carety}, dim, COLOR_BLACK, 0, 0, {}, COLOR_BLACK);
 		}
 	}
 	if (element->icon) {
