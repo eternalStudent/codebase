@@ -246,52 +246,6 @@ float64 ParseFloat64(String str) {
 	return result;
 }
 
-// String Builder
-//----------------
-
-struct StringBuilder {
-	byte* buffer;
-	byte* ptr;
-
-	StringBuilder operator()(String string) {
-		StringBuilder concat = *this;
-		concat.ptr += StringCopy(string, concat.ptr);
-		return concat;
-	}
-
-	StringBuilder operator()(byte ch) {
-		StringBuilder concat = *this;
-		*(concat.ptr) = ch;
-		concat.ptr++;
-		return concat;
-	}
-
-	StringBuilder operator()(char ch) {
-		StringBuilder concat = *this;
-		*(concat.ptr) = (byte)ch;
-		concat.ptr++;
-		return concat;
-	}
-
-	StringBuilder operator()(int64 i) {
-		StringBuilder concat = *this;
-		concat.ptr += SignedToDecimal(i, concat.ptr);
-		return concat;
-	}
-
-	StringBuilder operator()(uint32 i, char f = 'd') {
-		StringBuilder concat = *this;
-		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);
-		if (f == 'b') concat.ptr += Uint32ToBinary(i, concat.ptr);
-		if (f == 'x') concat.ptr += Uint32ToHex(i, concat.ptr);
-		return concat;
-	}
-
-	String operator()() {
-		return {this->buffer, this->ptr - this->buffer};
-	}
-};
-
 // StringList
 //------------
 
@@ -392,6 +346,43 @@ void StringListPosDec(StringListPos* pos) {
 	}
 }
 
+// NOTE: not the most efficient
+bool StringListEquals(StringList a, StringList b) {
+	if (a.length != b.length) return false;
+
+	StringListPos pos0 = SL_START(a);
+	StringListPos pos1 = SL_START(b);	
+	for (ssize i = 0; i < a.length; i++) {
+		if (pos0.node->string.data[pos0.index] != pos1.node->string.data[pos1.index])
+			return false;
+
+		StringListPosInc(&pos0);
+		StringListPosInc(&pos1);
+	}
+	return true;
+}
+
+// NOTE: not the most efficient
+bool StringListStartsWith(StringList all, StringList start) {
+	if (start.length == 0) return true;
+	if (all.length < start.length) return false;
+
+	StringListPos pos0 = SL_START(all);
+	StringListPos pos1 = SL_START(start);	
+	for (ssize i = 0; i < start.length; i++) {
+		if (pos0.node->string.data[pos0.index] != pos1.node->string.data[pos1.index])
+			return false;
+		
+		StringListPosInc(&pos0);
+		StringListPosInc(&pos1);
+	}
+	return true;
+}
+
+bool StringListPosEquals(StringListPos a, StringListPos b) {
+	return a.node == b.node && a.index == b.index;
+}
+
 // NOTE: returns true if and only if a < b
 bool StringListPosCompare(StringListPos a, StringListPos b) {
 	if (a.node == b.node)
@@ -415,6 +406,10 @@ ssize StringListCopy(StringListPos start, StringListPos end, byte* buffer) {
 		if (node == end.node) break;
 	}
 	return ptr - buffer;
+}
+
+ssize StringListCopy(StringList list, byte* buffer) {
+	return StringListCopy(SL_START(list), SL_END(list), buffer);
 }
 
 StringListPos StringListGetFirstPosOf(StringListPos start, StringListPos end, byte b) {
@@ -480,3 +475,249 @@ void StringListFindWord(StringList list, StringListPos pos, StringListPos* start
 	}
 	*end = SL_END(list);
 }
+
+// Edit StringList
+//-------------------
+
+typedef StringNode* StringNodeAlloc();
+typedef void StringNodeFree(StringNode*);
+
+StringListPos StringListDelete(StringList* list, StringListPos tail, StringListPos head, 
+		StringNodeAlloc* alloc, StringNodeFree* free, byte** buffer) {
+
+	if (tail.node == head.node && tail.index == head.index) {
+		if (StringListIsStart(head)) {
+			return head;
+		}
+		if (head.index == head.node->string.length) {
+			if (head.node->string.data + head.node->string.length == *buffer) 
+				(*buffer)--;
+			if (head.node->string.length == 1) {
+				StringNode* next = head.node->next;
+				LINKEDLIST_REMOVE(list, head.node);
+				free(head.node);
+				head.node = next;
+				head.index = 1;
+			}
+			else {
+				head.node->string.length--;
+			}
+		}
+		else if (head.index == 0) {
+			head.node = head.node->prev;
+			head.index = head.node->string.length;
+
+			if (head.node->string.data + head.node->string.length == *buffer) 
+				(*buffer)--;
+			if (head.node->string.length == 1) {
+				StringNode* next = head.node->next;
+				LINKEDLIST_REMOVE(list, head.node);
+				free(head.node);
+				head.node = next;
+				head.index = 1;
+			}
+			else {
+				head.node->string.length--;
+			}
+		}
+		else {
+			ssize length1 = head.index - 1;
+			ssize length2 = head.node->string.length - length1 - 1;
+
+			if (length1 == 0) {
+				head.node->string.data++;
+				head.node->string.length--;
+			}
+			else {
+				head.node->string.length = length1;
+				StringNode* node2 = alloc();
+				LINKEDLIST_ADD_AFTER(list, head.node, node2);
+				node2->string.data = head.node->string.data + head.index;
+				node2->string.length = length2;
+			}
+		}
+		list->totalLength--;
+		StringListPosDec(&head);
+	}
+	else {
+		StringListPos start, end;
+		if (StringListPosCompare(tail, head)) {
+			start = tail;
+			end = head;
+		}
+		else {
+			start = head;
+			end = tail;
+		}
+		StringNode* next;
+		for (StringNode* node = start.node; node != NULL; node = next) {
+			next = node->next;
+			String string = node->string;
+			ssize startIndex = node == start.node ? start.index : 0;
+			ssize endIndex = node == end.node ? end.index : string.length;
+
+			if (endIndex == string.length && string.data + endIndex == *buffer) {
+				*buffer -= endIndex - startIndex;
+			}
+
+			if (startIndex == 0 && endIndex == string.length) {
+				LINKEDLIST_REMOVE(list, node);
+				free(node);
+			}
+			else if (startIndex == 0) {
+				node->string.data += endIndex;
+				node->string.length -= endIndex;
+			}
+			else if (endIndex == string.length) {
+				node->string.length = startIndex;
+			}
+			else {
+				node->string.length = startIndex;
+				StringNode* node1 = alloc();
+				node1->string.data = string.data + endIndex;
+				node1->string.length = string.length - endIndex;
+				LINKEDLIST_ADD_AFTER(list, node, node1);
+			}
+
+			list->totalLength -= endIndex - startIndex;
+			if (node == end.node) break;
+		}
+
+		head = start;
+	}
+	
+	return head;
+}
+
+StringListPos StringListInsert(StringList* list, String newString, 
+		StringListPos tail, StringListPos head, 
+		StringNodeAlloc* alloc, StringNodeFree* free, byte** buffer) {
+
+	if (!newString.length) 
+		return head;
+
+	StringCopy(newString, *buffer);
+	if (tail.node != head.node || tail.index != head.index) {
+		// TODO: if the selected length is smaller or equal to newString length, insert it in place.
+		head = StringListDelete(list, tail, head, alloc, free, buffer);
+	}
+	if (head.node == NULL) {
+		StringNode* node = alloc();
+		LINKEDLIST_ADD(list, node);
+		node->string.data = *buffer;
+		node->string.length = newString.length;
+		head.node = node;
+		head.index = 0;
+	}
+	else if (head.index == head.node->string.length) {
+		if (head.node->string.data + head.node->string.length == *buffer) {
+			head.node->string.length += newString.length;
+		}
+	 	else {
+	 		StringNode* node = alloc();
+	 		LINKEDLIST_ADD_AFTER(list, head.node, node);
+	 		node->string.data = *buffer;
+	 		node->string.length = newString.length;
+	 		head.node = node;
+	 		head.index = 0;
+	 	}
+	}
+	else if (StringListIsStart(head)) {
+		StringNode* node = alloc();
+	 	LINKEDLIST_ADD_TO_START(list, node);
+		node->string.data = *buffer;
+		node->string.length = newString.length;
+		head.node = node;
+		head.index = 0;
+	}
+	else if (head.index == 0) {
+		head.node = head.node->prev;
+		head.index = head.node->string.length;
+
+		String string = head.node->string;
+		if (string.data + string.length == *buffer) {
+			head.node->string.length += newString.length;
+		}
+		else {
+			StringNode* node = alloc();
+			LINKEDLIST_ADD_AFTER(list, head.node, node);
+			node->string.data = *buffer;
+			node->string.length = newString.length;
+			head.node = node;
+			head.node = 0;
+		}
+	}
+	else {
+		String string = head.node->string;
+		ssize length1 = head.index;
+		ssize length2 = string.length - length1;
+		head.node->string.length = length1;
+		StringNode* node1 = alloc();
+		LINKEDLIST_ADD_AFTER(list, head.node, node1);
+		node1->string.data = head.node->string.data + head.node->string.length;
+		node1->string.length = length2;
+		StringNode* node2 = alloc();
+		LINKEDLIST_ADD_AFTER(list, head.node, node2);
+		node2->string.data = *buffer;
+		node2->string.length = newString.length;
+		head.node = node2;
+		head.index = 0;
+	}
+
+	*buffer += newString.length;
+	list->totalLength += newString.length;
+	head.index += newString.length;
+	return head;
+}
+
+// String Builder
+//----------------
+
+struct StringBuilder {
+	byte* buffer;
+	byte* ptr;
+
+	StringBuilder operator()(String string) {
+		StringBuilder concat = *this;
+		concat.ptr += StringCopy(string, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(StringList list) {
+		StringBuilder concat = *this;
+		concat.ptr += StringListCopy(list, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(byte ch) {
+		StringBuilder concat = *this;
+		*(concat.ptr) = ch;
+		concat.ptr++;
+		return concat;
+	}
+
+	StringBuilder operator()(char ch) {
+		StringBuilder concat = *this;
+		*(concat.ptr) = (byte)ch;
+		concat.ptr++;
+		return concat;
+	}
+
+	StringBuilder operator()(int64 i) {
+		StringBuilder concat = *this;
+		concat.ptr += SignedToDecimal(i, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(uint32 i, char f = 'd') {
+		StringBuilder concat = *this;
+		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);
+		if (f == 'b') concat.ptr += Uint32ToBinary(i, concat.ptr);
+		if (f == 'x') concat.ptr += Uint32ToHex(i, concat.ptr);
+		return concat;
+	}
+
+	String operator()() {
+		return {this->buffer, this->ptr - this->buffer};
+	}
+};

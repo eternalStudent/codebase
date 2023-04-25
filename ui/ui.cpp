@@ -423,185 +423,17 @@ void UpdateSelectedElementScrollPosition() {
 
 void DeleteSelectedText() {
 	StringList* list = &ui.selected->text.list;
-	if (!StringListPosCompare(ui.tail, ui.head)) {
-		StringListPos tmp = ui.tail;
-		ui.tail = ui.head;
-		ui.head = tmp;
-	}
-	if (StringListIsStart(ui.head)) {
-		return;
-	}
-
-	if (ui.tail.node == ui.head.node && ui.tail.index == ui.head.index) {
-		if (ui.head.index == ui.head.node->string.length) {
-			if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) 
-				ui.text.ptr--;
-			if (ui.head.node->string.length == 1) {
-				StringNode* next = ui.head.node->next;
-				LINKEDLIST_REMOVE(list, ui.head.node);
-				DestroyStringNode(ui.head.node);
-				ui.head.node = next;
-				ui.head.index = 1;
-			}
-			else {
-				ui.head.node->string.length--;
-			}
-		}
-		else if (ui.head.index == 0) {
-			ui.head.node = ui.head.node->prev;
-			ui.head.index = ui.head.node->string.length;
-
-			if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) 
-				ui.text.ptr--;
-			if (ui.head.node->string.length == 1) {
-				StringNode* next = ui.head.node->next;
-				LINKEDLIST_REMOVE(list, ui.head.node);
-				DestroyStringNode(ui.head.node);
-				ui.head.node = next;
-				ui.head.index = 1;
-			}
-			else {
-				ui.head.node->string.length--;
-			}
-		}
-		else {
-			ssize length1 = ui.head.index - 1;
-			ssize length2 = ui.head.node->string.length - length1 - 1;
-
-			if (length1 == 0) {
-				ui.head.node->string.data++;
-				ui.head.node->string.length--;
-			}
-			else {
-				ui.head.node->string.length = length1;
-				StringNode* node2 = CreateStringNode();
-				LINKEDLIST_ADD_AFTER(list, ui.head.node, node2);
-				node2->string.data = ui.head.node->string.data + ui.head.index;
-				node2->string.length = length2;
-			}
-		}
-		list->totalLength--;
-		StringListPosDec(&ui.head);
-
-		ui.tail = ui.head;
-	}
-	else {
-		StringNode* next;
-		for (StringNode* node = ui.tail.node; node != NULL; node = next) {
-			next = node->next;
-			String string = node->string;
-			ssize start = node == ui.tail.node ? ui.tail.index : 0;
-			ssize end = node == ui.head.node ? ui.head.index : string.length;
-
-			if (end == string.length && string.data + end == ui.text.ptr) {
-				ui.text.ptr -= end - start;
-			}
-
-			if (start == 0 && end == string.length) {
-				LINKEDLIST_REMOVE(list, node);
-				DestroyStringNode(node);
-			}
-			else if (start == 0) {
-				node->string.data += end;
-				node->string.length -= end;
-			}
-			else if (end == string.length) {
-				node->string.length = start;
-			}
-			else {
-				node->string.length = start;
-				StringNode* node1 = CreateStringNode();
-				node1->string.data = string.data + end;
-				node1->string.length = string.length - end;
-				LINKEDLIST_ADD_AFTER(list, node, node1);
-			}
-
-			list->totalLength -= end - start;
-			if (node == ui.head.node) break;
-		}
-
-		ui.head = ui.tail;
-	}
+	ui.head = StringListDelete(list, ui.tail, ui.head, 
+		CreateStringNode, DestroyStringNode, &ui.text.ptr);
+	ui.tail = ui.head; 
 	UpdateSelectedElementScrollPosition();
 }
 
 void InsertText(String newString) {
-	if (!newString.length) 
-		return;
-	StringCopy(newString, ui.text.ptr);
 	StringList* list = &ui.selected->text.list;
-	if (ui.tail.node != ui.head.node || ui.tail.index != ui.head.index) {
-		// TODO: if the selected length is smaller or equal to newString length, insert it in place.
-		DeleteSelectedText();
-		ASSERT(ui.tail.node == ui.head.node && ui.tail.index == ui.head.index);
-	}
-	if (ui.head.node == NULL) {
-		StringNode* node = CreateStringNode();
-		LINKEDLIST_ADD(list, node);
-		node->string.data = ui.text.ptr;
-		node->string.length = newString.length;
-		ui.head.node = node;
-		ui.head.index = 0;
-	}
-	else if (ui.head.index == ui.head.node->string.length) {
-		if (ui.head.node->string.data + ui.head.node->string.length == ui.text.ptr) {
-			ui.head.node->string.length += newString.length;
-		}
-	 	else {
-	 		StringNode* node = CreateStringNode();
-	 		LINKEDLIST_ADD_AFTER(list, ui.head.node, node);
-	 		node->string.data = ui.text.ptr;
-	 		node->string.length = newString.length;
-	 		ui.head.node = node;
-	 		ui.head.index = 0;
-	 	}
-	}
-	else if (StringListIsStart(ui.head)) {
-		StringNode* node = CreateStringNode();
-	 	LINKEDLIST_ADD_TO_START(list, node);
-		node->string.data = ui.text.ptr;
-		node->string.length = newString.length;
-		ui.head.node = node;
-		ui.head.index = 0;
-	}
-	else if (ui.head.index == 0) {
-		ui.head.node = ui.head.node->prev;
-		ui.head.index = ui.head.node->string.length;
-
-		String string = ui.head.node->string;
-		if (string.data + string.length == ui.text.ptr) {
-			ui.head.node->string.length += newString.length;
-		}
-		else {
-			StringNode* node = CreateStringNode();
-			LINKEDLIST_ADD_AFTER(list, ui.head.node, node);
-			node->string.data = ui.text.ptr;
-			node->string.length = newString.length;
-			ui.head.node = node;
-			ui.head.node = 0;
-		}
-	}
-	else {
-		String string = ui.head.node->string;
-		ssize length1 = ui.head.index;
-		ssize length2 = string.length - length1;
-		ui.head.node->string.length = length1;
-		StringNode* node1 = CreateStringNode();
-		LINKEDLIST_ADD_AFTER(list, ui.head.node, node1);
-		node1->string.data = ui.head.node->string.data + ui.head.node->string.length;
-		node1->string.length = length2;
-		StringNode* node2 = CreateStringNode();
-		LINKEDLIST_ADD_AFTER(list, ui.head.node, node2);
-		node2->string.data = ui.text.ptr;
-		node2->string.length = newString.length;
-		ui.head.node = node2;
-		ui.head.index = 0;
-	}
-
-	ui.text.ptr += newString.length;
-	list->totalLength += newString.length;
-	ui.head.index += newString.length;
-	ui.tail = ui.head;
+	ui.head = StringListInsert(list, newString, ui.tail, ui.head, 
+		CreateStringNode, DestroyStringNode, &ui.text.ptr);
+	ui.tail = ui.head; 
 	UpdateSelectedElementScrollPosition();
 }
 
@@ -641,8 +473,6 @@ UIStyle GetCurrentStyle(UIElement* element) {
 }
 
 void RenderElement(UIElement* element) {
-	if (element->flags & UI_HIDDEN) return;
-
 	UIElement* parent = element->parent;
 
 	// update width and height
@@ -712,6 +542,8 @@ void RenderElement(UIElement* element) {
 
 	// draw
 	//-------
+	if (element->flags & UI_HIDDEN) return;
+
 	Point2 pos = GetScreenPosition(element);
 	if (HasQuad(element)) {
 		UIStyle style = GetCurrentStyle(element);
@@ -724,29 +556,9 @@ void RenderElement(UIElement* element) {
 		RenderText(pos, text.font, text.color, text.list, shouldWrap, pos.x + element->width, ui.zoomScale);
 		
 		if (ui.selected == element) {
-			if (ui.head.node != ui.tail.node || ui.head.index != ui.tail.index) {
-				StringListPos start, end;
-				if (StringListPosCompare(ui.tail, ui.head)) {
-					start = ui.tail;
-					end = ui.head;
-				}
-				else {
-					start = ui.head;
-					end = ui.tail;
-				}
-				RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.list,
-						 			start, end, shouldWrap, element->width, ui.zoomScale);
-			}
-
-			TextMetrics metrics = GetTextMetrics(text.font, text.list, ui.head, shouldWrap, element->width);
-			float32 caretx = round(pos.x + ui.zoomScale*metrics.x);
-			float32 carety = round(pos.y + ui.zoomScale*(metrics.y - text.font->height) + 2);
-			if (metrics.lastCharIsNewLine) {
-				caretx = round(pos.x);
-				carety = round(pos.y + ui.zoomScale*(metrics.y)) + 2;
-			}
-			Dimensions2 dim = {1, ui.zoomScale*text.font->height + 2};
-			GfxDrawQuad({caretx, carety}, dim, COLOR_BLACK, 0, 0, {}, COLOR_BLACK);
+			RenderTextSelection(pos, text.font, {0, 0, 1, 0.5f}, text.list,
+						 		ui.tail, ui.head, shouldWrap, element->width, ui.zoomScale,
+						 		text.color);	
 		}
 	}
 	if (element->icon) {
@@ -813,6 +625,10 @@ UIElement* UICreateElement(
 	element->flags = flags;
 
 	return element;
+}
+
+void UIDestroyStringList(StringList* list) {
+	LINKEDLIST_FOREACH(list, StringNode, child) DestroyStringNode(child);
 }
 
 void UIDestroyElement(UIElement* element) {
@@ -1129,7 +945,8 @@ void UIProcessEvent(OSEvent event) {
 			if (ui.selected) {
 				// do nothing
 			}
-			else if (ui.focused) {
+			
+			if (ui.focused) {
 				if (ui.focused->onClick) ui.focused->onClick(ui.focused);
 				if (ui.focused->flags & UI_SHUFFLEABLE)
 					LINKEDLIST_MOVE_TO_LAST(ui.focused->parent, ui.focused);
@@ -1255,24 +1072,24 @@ void UIProcessEvent(OSEvent event) {
 			}
 		} break;
 		case KEY_X: {
-			if (ui.selected && event.keyboard.ctrlIsDown) {
+			if (ui.selected && HasEditableText(ui.selected) && event.keyboard.ctrlIsDown) {
 				CopySelectedTextToClipboard();
 				if (HasEditableText(ui.selected))
 					DeleteSelectedText();
 			}
 		} break;
 		case KEY_V: {
-			if (ui.selected && (HasEditableText(ui.selected))) {
+			if (ui.selected && HasEditableText(ui.selected) && event.keyboard.ctrlIsDown) {
 				OSRequestClipboardData(InsertText);
 			}
 		} break;
 		case KEY_BACKSPACE: {
-			if (ui.selected && (HasEditableText(ui.selected))) {
+			if (ui.selected && HasEditableText(ui.selected)) {
 				DeleteSelectedText();
 			}
 		} break;
 		case KEY_DELETE: {
-			if (ui.selected && (HasEditableText(ui.selected))) {
+			if (ui.selected && HasEditableText(ui.selected)) {
 				if (ui.tail.node == ui.head.node && ui.tail.index == ui.head.index) {
 					if (StringListIsEnd(ui.head)) break;
 					StringListPosInc(&ui.head);
@@ -1629,4 +1446,13 @@ UIElement* UICreateTextBox(UIElement* parent, Point2 pos, Dimensions2 dim, UITex
 	textElement->width = innerWidth;
 
 	return textBox;
+}
+
+UIElement* UIAddOption(UIElement* options, float32 x, float32 width, UIStyle style, 
+		UIText text, float32 margin, void (*onClick)(UIElement*)) {
+
+	UIElement* option = UICreateElement(options, {x}, {width}, style, UI_MIN_CONTENT | UI_VERTICAL_STACK);
+	UIAddText(option, text, margin);
+	option->onClick = onClick;
+	return option;
 }

@@ -426,8 +426,7 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 
 void Win32ProcessWindowEvents() {
 	MSG message;
-	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
-	{
+	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE)) {
 		TranslateMessage(&message);
 		DispatchMessageA(&message);
 	}

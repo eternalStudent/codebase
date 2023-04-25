@@ -100,18 +100,19 @@ float32 GetWordWidth(BakedFont* font, String string, ssize i) {
 	return width;
 }
 
-void RenderText(Point2 pos, BakedFont* font, Color color, String string,
+Point2 RenderText(Point2 pos, BakedFont* font, Color color, String string,
 				bool shouldWrap, float32 wrapX, float32 zoom) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 initialX = pos.x;
+	float32 height = zoom*font->height;
 	for (ssize i = 0; i < string.length; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
 		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= pos.x + wordWidth) {
-				pos.y += zoom*font->height;
+				pos.y += height;
 				pos.x = initialX;
 			}
 		}
@@ -119,7 +120,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, String string,
 			pos.x += 4*zoom*font->chardata[32 - font->firstChar].xadvance;
 		}
 		if (b == 10) {
-			pos.y += zoom*font->height;
+			pos.y += height;
 			pos.x = initialX;
 		}
 		if (font->firstChar <= b && b <= font->lastChar) {
@@ -127,6 +128,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, String string,
 		}
 		prevCharWasWhiteSpace = whiteSpace;
 	}
+	return pos;
 }
 
 ssize GetCharIndex(BakedFont* font, String string, 
@@ -353,11 +355,12 @@ float32 GetWordWidth(BakedFont* font, StringListPos pos) {
 	return width;
 }
 
-void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
+Point2 RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 				bool shouldWrap, float32 wrapX, float32 zoom) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 initialX = pos.x;
+	float32 height = zoom*font->height;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
 		for (ssize i = 0; i < string.length; i++) {
@@ -366,7 +369,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 				float32 wordWidth = GetWordWidth(font, {node, i});
 				if (wrapX <= pos.x + wordWidth) {
-					pos.y += zoom*font->height;
+					pos.y += height;
 					pos.x = initialX;
 				}
 			}
@@ -374,7 +377,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 				pos.x += 4*zoom*font->chardata[32 - font->firstChar].xadvance;
 			}
 			if (b == 10) {
-				pos.y += zoom*font->height;
+				pos.y += font->height;
 				pos.x = initialX;
 			}
 			if (font->firstChar <= b && b <= font->lastChar) {
@@ -383,6 +386,7 @@ void RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 			prevCharWasWhiteSpace = whiteSpace;
 		}
 	}
+	return pos;
 }
 
 StringListPos GetCharPos(BakedFont* font, StringList list, 
@@ -490,16 +494,28 @@ TextMetrics GetTextMetrics(BakedFont* font, StringList list,
 }
 
 void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList list,
-						 StringListPos start, StringListPos end, 
-						 bool shouldWrap, float32 wrapX, float32 zoom) {
+						 StringListPos tail, StringListPos head, 
+						 bool shouldWrap, float32 wrapX, float32 zoom,
+						 Color caretColor) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 x = 0;
 	float32 y = 0;
 	int32 state = 0;
-	float32 startx = 0;
+	float32 startx = x;
 	Point2 selection;
 	float32 height = zoom*font->height;
+
+	StringListPos start, end;
+	bool onEnd = StringListPosCompare(tail, head);
+	if (onEnd) {
+		start = tail;
+		end = head;
+	}
+	else {
+		start = head;
+		end = tail;
+	}
 
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
@@ -520,6 +536,14 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 				if (node == start.node && i == start.index) {
 					state++;
 					startx = x;
+
+					if (!onEnd) {
+						selection.x = round(pos.x + zoom*startx);
+						selection.y = round(pos.y + y + 2);
+						Dimensions2 dim = {1, height + 2};
+						GfxDrawQuad(selection, dim, caretColor, 0, 0, {}, caretColor);
+					}
+
 					i--;
 					continue;
 				}
@@ -599,7 +623,15 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 		if (end.node == node) break;
 	}
 
-	selection.x = round(pos.x + zoom*startx);
 	selection.y = round(pos.y + y + 2);
-	GfxDrawQuad(selection, {zoom*(x - startx), height + 2}, color, 0, 0, {}, color);
+	bool eq = StringListPosEquals(tail, head);
+	if (!eq) {
+		selection.x = round(pos.x + zoom*startx);
+		GfxDrawQuad(selection, {zoom*(x - startx), height + 2}, color, 0, 0, {}, color);
+	}
+
+	if (onEnd || eq) {
+		selection.x = round(pos.x + zoom*x);
+		GfxDrawQuad(selection, {1, height + 2}, caretColor, 0, 0, {}, caretColor);
+	}
 }
