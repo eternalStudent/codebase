@@ -215,6 +215,40 @@ void GfxDrawImage(Point2 pos, Dimensions2 dim, GLuint texture, Box2 crop) {
 	glDeleteVertexArrays(1, &verticesHandle);
 }
 
+void GfxDrawLine(Point2 p0, Point2 p1, float32 thick, Color color) {
+	if (gfx.currentProgram != gfx.shapeProgram) {
+		GfxFlushVertices();
+		gfx.currentProgram = gfx.shapeProgram;
+		PixelSpaceYIsDown(gfx.shapeProgram);
+	}
+	glUseProgram(gfx.shapeProgram);
+
+	Point2 delta = p1 - p0;
+	float32 length = sqrt(delta.x*delta.x + delta.y*delta.y);
+		
+	float32 size = (0.5f*thick)/length;
+	Point2 radius = {-size*delta.y, size*delta.x};
+		
+	Point2 p[4] = {
+		p0 - radius,
+		p0 + radius,
+		p1 - radius,
+		p1 + radius
+	};
+		
+	float32 vertices[] = {
+		p[0].x, p[0].y, color.r, color.g, color.b, color.a,
+		p[1].x, p[1].y, color.r, color.g, color.b, color.a,
+		p[2].x, p[2].y, color.r, color.g, color.b, color.a,
+	
+		p[3].x, p[3].y, color.r, color.g, color.b, color.a,
+		p[2].x, p[2].y, color.r, color.g, color.b, color.a,
+		p[1].x, p[1].y, color.r, color.g, color.b, color.a
+	};
+	memcpy(gfx.vertices + 6*6*gfx.quadCount, vertices, sizeof(vertices));
+	gfx.quadCount++;
+}
+
 void GfxDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick, Color color) {
 	if (gfx.currentProgram != gfx.shapeProgram) {
 		GfxFlushVertices();

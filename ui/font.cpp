@@ -4,10 +4,10 @@ struct BakedChar {
 };
 
 struct BakedFont {
-	BakedChar chardata[96];
 	float32 height;
 	int32 firstChar;
 	int32 lastChar;
+	BakedChar chardata[96];
 };
 
 // TODO: change byte* to byte[0]?

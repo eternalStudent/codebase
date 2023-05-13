@@ -1768,7 +1768,7 @@ void MakeGlyphBitmapSubpixel(Arena* arena, const FontInfo* info, byte* output,
 	int32 num_verts = GetGlyphShape(arena, info, glyph, &vertices);
 	Image gbm;
 
-	GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y, shift_x, shift_y, &ix0,&iy0,0,0);
+	GetGlyphBitmapBoxSubpixel(info, glyph, scale_x, scale_y, shift_x, shift_y, &ix0, &iy0, 0, 0);
 	gbm.data = output;
 	gbm.width = out_w;
 	gbm.height = out_h;
@@ -1781,14 +1781,14 @@ void MakeGlyphBitmapSubpixel(Arena* arena, const FontInfo* info, byte* output,
 void MakeGlyphBitmap(Arena* arena, const FontInfo* info, byte* output, 
 							int32 out_w, int32 out_h, int32 out_stride, 
 							float32 scale_x, float32 scale_y, int32 glyph) {
-	MakeGlyphBitmapSubpixel(arena, info, output, out_w, out_h, out_stride, scale_x, scale_y, 0.0f,0.0f, glyph);
+	MakeGlyphBitmapSubpixel(arena, info, output, out_w, out_h, out_stride, scale_x, scale_y, 0.0f, 0.0f, glyph);
 }
 
 BakedFont TTBakeFont(Arena* arena, FontInfo fontInfo, AtlasBitmap* atlas, float32 height, int32 first_char = 32, int32 num_chars = 96) {
 	float32 scale = ScaleForPixelHeight(&fontInfo, height);
 
 	BakedFont font;
-	for (int32 i=0; i < num_chars; ++i) {
+	for (int32 i = 0; i < num_chars; ++i) {
 		int32 advance, lsb, x0, y0, x1, y1, gw, gh;
 		int32 g = FindGlyphIndex(&fontInfo, first_char + i);
 		GetGlyphHMetrics(&fontInfo, g, &advance, &lsb);
@@ -1825,7 +1825,7 @@ BakedFont TTBakeFont(Arena* arena, FontInfo fontInfo, AtlasBitmap* atlas, float3
 	float32 scale = ScaleForPixelHeight(&fontInfo, height);
 
 	BakedFont font;
-	for (int32 i=0; i < num_chars; ++i) {
+	for (int32 i = 0; i < num_chars; ++i) {
 		int32 advance, lsb, x0, y0, x1, y1, gw, gh;
 		int32 g = FindGlyphIndex(&fontInfo, chars[i]);
 		GetGlyphHMetrics(&fontInfo, g, &advance, &lsb);
