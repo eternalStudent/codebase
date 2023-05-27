@@ -677,6 +677,13 @@ struct StringBuilder {
 	byte* buffer;
 	byte* ptr;
 
+	StringBuilder operator()(void* data, ssize length) {
+		StringBuilder concat = *this;
+		memcpy(concat.ptr, data, length);
+		concat.ptr += length;
+		return concat;
+	}
+
 	StringBuilder operator()(String string) {
 		StringBuilder concat = *this;
 		concat.ptr += StringCopy(string, concat.ptr);
@@ -709,6 +716,7 @@ struct StringBuilder {
 		return concat;
 	}
 
+	// TODO: uint64
 	StringBuilder operator()(uint32 i, char f = 'd') {
 		StringBuilder concat = *this;
 		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);

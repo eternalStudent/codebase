@@ -9,6 +9,11 @@
 											else{(list)->last=(n);}\
 											(m)->next=(n);}while(0)
 
+#define LINKEDLIST_ADD_BEFORE(list, m, n) 	do{(n)->next=(m);(n)->prev=(m)->prev;\
+											if ((m)->prev){(m)->prev->next=(n);}\
+											else{(list)->first=(n);}\
+											(m)->prev=(n);}while(0)
+
 #define LINKEDLIST_ADD_TO_START(list, n)	do{(n)->next=(list)->first;\
 											if ((list)->first){(list)->first->prev=(n);}\
 											else {(list)->last=(n);}\

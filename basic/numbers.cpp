@@ -16,6 +16,10 @@ typedef ptrdiff_t ssize;
 #define MIN_INT32 0x80000000
 #define MIN_INT64 0x8000000000000000
 
+#define MAX_UINT16 0xffff
+#define MAX_UINT32 0xffffffff
+#define MAX_UINT64 0xffffffffffffffff
+
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
