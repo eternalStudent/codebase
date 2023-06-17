@@ -2,23 +2,39 @@ inline bool IsWhiteSpace(byte b) {
 	return (9 <= b && b <= 13 || b == 32);
 }
 
+inline bool IsDigit(byte ch) {
+	return '0' <= ch && ch <= '9';
+}
+
+inline bool IsHexDigit(byte ch) {
+	return IsDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F');
+}
+
+inline bool IsAlpha(byte ch) {
+	return ('a' <= ch && ch <= 'z') || ('A' <= ch && ch <= 'Z') || (ch == '_');
+}
+
+inline bool IsAlphaNumeric(byte ch) {
+	return IsAlpha(ch) || IsDigit(ch);
+}
+
 // Null-Terminated
 //-----------------
 
-int32 Uint32ToBinary(uint32 number, byte* str) {
-	int32 index = HighBit(number, 0);
+int32 UnsignedToBinary(uint64 number, byte* str) {
+	int32 index = HighBit64(number, 0);
 	int32 numberOfDigits = index + 1;
 
 	str[numberOfDigits] = 0;
 	while (index + 1) {
-		str[numberOfDigits - index - 1] = (number & (1 << index)) ? '1' : '0';
+		str[numberOfDigits - index - 1] = (number & (1ull << index)) ? '1' : '0';
 		index--;
 	}
 	return numberOfDigits;
 }
 
-int32 Uint32ToHex(uint32 number, byte* str) {
-	int32 index = HighBit(number, 0) / 4;
+int32 UnsignedToHex(uint64 number, byte* str) {
+	int32 index = HighBit64(number, 0) / 4;
 	int32 numberOfDigits = index + 1;
 
 	str[numberOfDigits] = 0;
@@ -115,9 +131,16 @@ ssize StringCopy(String source, byte* dest) {
 
 bool StringEquals(String str1, String str2) {
 	if (str1.length != str2.length) return false;
-	for (ssize i = 0; i < str1.length; i++)
-		if (str1.data[i] != str2.data[i]) return false;
-	return true;
+	return memcmp(str1.data, str2.data, str1.length) == 0;
+}
+
+// if <0 str1 is lexically earlier
+ssize StringCompare(String str1, String str2) {
+	int32 cmp = memcmp(str1.data, str2.data, MIN(str1.length, str2.length));
+	if (str1.length == str2.length || cmp != 0) return cmp;
+
+	// one is a prefix of the other
+	return str1.length - str2.length;
 }
 
 ssize StringSplit(String text, String separator, String* buffer) {
@@ -203,15 +226,34 @@ void StringFindWord(String string, ssize index, ssize* start, ssize* end) {
 	*end = string.length;
 }
 
-int64 ParseInt64(String str) {
-	int64 result = 0;
-	ssize start = str.data[0] == '-' ? 1 : 0;
-	for (ssize i = start; i < str.length; i++) {
+uint64 ParseUInt64(String str) {
+	uint64 result = 0;
+	for (ssize i = 0; i < str.length; i++) {
 		char c = str.data[i];
 		result *= 10;
 		result += c-'0';
 	}
-	if (start == 1) result = -result;
+	return result;
+}
+
+int64 ParseInt64(String str) {
+	return str.data[0] == '-' 
+		? - (int64)ParseUInt64({str.data+1, str.length-1})
+		: (int64)ParseUInt64(str); 
+}
+
+uint64 ParseHex64(String str) {
+	uint64 result = 0;
+	for (ssize i = 0; i < str.length; i++) {
+		char c = str.data[i];
+		result <<= 4;
+		if (IsDigit(c))
+			result += c-'0';
+		else if ('a' <= c && c <= 'f')
+			result += c - 'a' + 10;
+		else if ('A' <= c && c <= 'F')
+			result += c - 'A' + 10;
+	}
 	return result;
 }
 
@@ -282,6 +324,7 @@ struct StringListPos {
 
 #define SL_START(list)  StringListPos{list.first, 0}
 #define SL_END(list)  	StringListPos{list.last, list.last ? list.last->string.length : 0}
+#define SL_AT(pos)		((pos).node->string.data[(pos).index])
 
 bool StringListIsStart(StringListPos pos) {
 	return pos.node == NULL || pos.node->prev == NULL && pos.index == 0;
@@ -353,7 +396,7 @@ bool StringListEquals(StringList a, StringList b) {
 	StringListPos pos0 = SL_START(a);
 	StringListPos pos1 = SL_START(b);	
 	for (ssize i = 0; i < a.length; i++) {
-		if (pos0.node->string.data[pos0.index] != pos1.node->string.data[pos1.index])
+		if (SL_AT(pos0) != SL_AT(pos1))
 			return false;
 
 		StringListPosInc(&pos0);
@@ -370,7 +413,7 @@ bool StringListStartsWith(StringList all, StringList start) {
 	StringListPos pos0 = SL_START(all);
 	StringListPos pos1 = SL_START(start);	
 	for (ssize i = 0; i < start.length; i++) {
-		if (pos0.node->string.data[pos0.index] != pos1.node->string.data[pos1.index])
+		if (SL_AT(pos0) != SL_AT(pos1))
 			return false;
 		
 		StringListPosInc(&pos0);
@@ -494,10 +537,17 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 				(*buffer)--;
 			if (head.node->string.length == 1) {
 				StringNode* next = head.node->next;
+				StringNode* prev = head.node->prev;
 				LINKEDLIST_REMOVE(list, head.node);
 				free(head.node);
-				head.node = next;
-				head.index = 1;
+				if (next || !prev) {
+					head.node = next;
+					head.index = 1;
+				}
+				else {
+					head.node = prev;
+					head.index = prev->string.length + 1;
+				}
 			}
 			else {
 				head.node->string.length--;
@@ -644,7 +694,7 @@ StringListPos StringListInsert(StringList* list, String newString,
 			node->string.data = *buffer;
 			node->string.length = newString.length;
 			head.node = node;
-			head.node = 0;
+			head.index = 0;
 		}
 	}
 	else {
@@ -672,6 +722,8 @@ StringListPos StringListInsert(StringList* list, String newString,
 
 // String Builder
 //----------------
+
+typedef ssize Stringify(void* data, byte* buffer);
 
 struct StringBuilder {
 	byte* buffer;
@@ -710,18 +762,51 @@ struct StringBuilder {
 		return concat;
 	}
 
+	StringBuilder operator()(int16 i) {
+		StringBuilder concat = *this;
+		concat.ptr += SignedToDecimal(i, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(int32 i) {
+		StringBuilder concat = *this;
+		concat.ptr += SignedToDecimal(i, concat.ptr);
+		return concat;
+	}
+
 	StringBuilder operator()(int64 i) {
 		StringBuilder concat = *this;
 		concat.ptr += SignedToDecimal(i, concat.ptr);
 		return concat;
 	}
 
-	// TODO: uint64
+	StringBuilder operator()(uint16 i, char f = 'd') {
+		StringBuilder concat = *this;
+		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);
+		if (f == 'b') concat.ptr += UnsignedToBinary(i, concat.ptr);
+		if (f == 'x') concat.ptr += UnsignedToHex(i, concat.ptr);
+		return concat;
+	}
+
 	StringBuilder operator()(uint32 i, char f = 'd') {
 		StringBuilder concat = *this;
 		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);
-		if (f == 'b') concat.ptr += Uint32ToBinary(i, concat.ptr);
-		if (f == 'x') concat.ptr += Uint32ToHex(i, concat.ptr);
+		if (f == 'b') concat.ptr += UnsignedToBinary(i, concat.ptr);
+		if (f == 'x') concat.ptr += UnsignedToHex(i, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(uint64 i, char f = 'd') {
+		StringBuilder concat = *this;
+		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);
+		if (f == 'b') concat.ptr += UnsignedToBinary(i, concat.ptr);
+		if (f == 'x') concat.ptr += UnsignedToHex(i, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(void* data, Stringify* stringify) {
+		StringBuilder concat = *this;
+		concat.ptr += stringify(data, concat.ptr);
 		return concat;
 	}
 

@@ -130,3 +130,17 @@ float64 Pow10(int32 n) {
 	m = n/2;
 	return Pow10(m)*Pow10(n-m);
 }
+
+uint64 power(uint32 base, uint32 exponent) {
+	uint64 result = 1;
+
+	while (exponent > 0) {
+		if (exponent & 1) {
+			result *= base;
+		}
+		base *= base;
+		exponent >>= 1;
+	}
+
+	return result;
+}
