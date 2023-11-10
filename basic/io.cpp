@@ -1,4 +1,4 @@
-#if defined(_WIN32)
+#if defined(_OS_WINDOWS)
 #  include "win32io.cpp"
 #  define File          		HANDLE
 #  define FILE_ERROR 			INVALID_HANDLE_VALUE 
@@ -9,16 +9,14 @@
 #  define OSGetFileSize 		Win32GetFileSize
 #  define OSCloseFile   		CloseHandle
 #  define OSGetDefaultFontFile	Win32GetDefaultFontFile
+#  define OSCreateChildProcess  Win32CreateChildProcess
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)
 #  define STDOUT 				GetStdHandle(STD_OUTPUT_HANDLE)
-#endif
-
-#if defined(__gnu_linux__)
+#elif defined(_OS_UNIX)
 #  include <fcntl.h>
 #  include <sys/stat.h>
 #  include <errno.h>
 #  include <limits.h>
-#  include <fontconfig/fontconfig.h>
 #  include "linuxio.cpp"
 #  define File          		int
 #  define FILE_ERROR 			-1
@@ -33,7 +31,7 @@
 #  define STDOUT 				1
 #endif
 
-bool OSReadAll(File file, byte* buffer, int64 length) {
+bool OSReadAll(File file, byte* buffer, ssize length) {
 	if (file == FILE_ERROR)
 		return false;
 
@@ -77,7 +75,7 @@ String OSReadAll(File file, Arena* arena) {
 	return {buffer, (ssize)size};
 }
 
-bool OSWriteAll(File file, byte* buffer, int64 length) {
+bool OSWriteAll(File file, byte* buffer, ssize length) {
 	if (file == FILE_ERROR)
 		return false;
 

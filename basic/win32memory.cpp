@@ -6,8 +6,8 @@ LPVOID Win32Reserve(SIZE_T size) {
 	return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_READWRITE);
 }
 
-LPVOID Win32Commit(LPVOID data, SIZE_T size) {
-	return VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE);
+BOOL Win32Commit(LPVOID data, SIZE_T size) {
+	return VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE) != NULL;
 }
 
 BOOL Win32Free(LPVOID data, SIZE_T size) {

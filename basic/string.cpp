@@ -21,9 +21,9 @@ inline bool IsAlphaNumeric(byte ch) {
 // Null-Terminated
 //-----------------
 
-int32 UnsignedToBinary(uint64 number, byte* str) {
-	int32 index = HighBit64(number, 0);
-	int32 numberOfDigits = index + 1;
+ssize UnsignedToBinary(uint64 number, byte* str) {
+	int64 index = HighBit(number, 0);
+	ssize numberOfDigits = index + 1;
 
 	str[numberOfDigits] = 0;
 	while (index + 1) {
@@ -33,9 +33,9 @@ int32 UnsignedToBinary(uint64 number, byte* str) {
 	return numberOfDigits;
 }
 
-int32 UnsignedToHex(uint64 number, byte* str) {
-	int32 index = HighBit64(number, 0) / 4;
-	int32 numberOfDigits = index + 1;
+ssize UnsignedToHex(uint64 number, byte* str) {
+	int64 index = HighBit(number, 0) / 4;
+	ssize numberOfDigits = index + 1;
 
 	str[numberOfDigits] = 0;
 	while (index + 1) {
@@ -46,20 +46,21 @@ int32 UnsignedToHex(uint64 number, byte* str) {
 	return numberOfDigits;
 }
 
-int32 UnsignedToDecimal(uint64 number, byte* str) {
-	int32 numberOfDigits = Log10(number);
-	int32 index = numberOfDigits - 1;
+ssize UnsignedToDecimal(uint64 number, byte* str) {
+	ssize numberOfDigits = log10(number);
+	ssize index = numberOfDigits;
 
-	str[numberOfDigits] = 0;
+	str[index] = 0;
 	do {
+		index--;
 		str[index] = '0' + (number % 10);
 		number /= 10;
-		index--;
-	} while (number);
+	} while (index);
+
 	return numberOfDigits;
 }
 
-int32 SignedToDecimal(int64 number, byte* str) {
+ssize SignedToDecimal(int64 number, byte* str) {
 	if (number < 0) {
 		*str = '-';
 		return UnsignedToDecimal((uint32)(-number), str + 1) + 1;
@@ -67,36 +68,50 @@ int32 SignedToDecimal(int64 number, byte* str) {
 	return UnsignedToDecimal((uint32)number, str);
 }
 
-// very naive implementation
-int32 Float32ToDecimal(float32 number, int32 precision, byte* str) {
-	int32 count = 0;
-
-	// output sign
-	if (number < 0) {
-		*str = '-';
-		number = -number;
-		str++;
-		count++;
-	}
+ssize FloatToDecimal(float32 number, int64 precision, byte* str) {
 
 	// output integer part
-	uint32 integer = (uint32)number; //potential overflowing in the general case
-	number -= integer;
-	int32 integerCount = UnsignedToDecimal(integer, str);
-	count += integerCount;
+	int64 integer = (int64)number;
+	number -= (float32)integer;
+	ssize count = SignedToDecimal(integer, str);
+	if (!precision) return count;
 
 	// output fraction part
-	if (!precision) return count;
-	str[integerCount] = '.';
-	str += integerCount + 1;
-	count++;
+	str += count;
+	*str = '.';
+	str++;
+	count += precision + 1;
 	while (precision) {
 		number *= 10.0f;
-		int32 digit = (uint32)number;
-		*str = '0' + (char)digit;
-		number -= digit;
+		int64 digit = (int64)number;
+		*str = (byte)('0' + digit);
+		number -= (float32)digit;
 		str++;
-		count++;
+		precision--;
+	}
+	*str = 0;
+	return count;
+}
+
+ssize FloatToDecimal(float64 number, int64 precision, byte* str) {
+
+	// output integer part
+	int64 integer = (int64)number;
+	number -= (float64)integer;
+	ssize count = SignedToDecimal(integer, str);
+	if (!precision) return count;
+
+	// output fraction part
+	str += count;
+	*str = '.';
+	str++;
+	count += precision + 1;
+	while (precision) {
+		number *= 10.0f;
+		int64 digit = (int64)number;
+		*str = (byte)('0' + digit);
+		number -= (float64)digit;
+		str++;
 		precision--;
 	}
 	*str = 0;
@@ -105,7 +120,7 @@ int32 Float32ToDecimal(float32 number, int32 precision, byte* str) {
 
 #define COPY(source, dest) (memcpy(dest, source, sizeof(source)-1), sizeof(source)-1)
 
-inline int32 BoolToAnsi(bool b, byte* str){
+inline ssize BoolToAnsi(bool b, byte* str){
 	if (b) {
 		return COPY("true", str);
 	}
@@ -261,6 +276,7 @@ float64 ParseFloat64(String str) {
 	float64 result = 0.0;
 	ssize start = str.data[0] == '-' ? 1 : 0;
 	bool radix = false;
+	float64 term = 1.0;
 	for (ssize i = start; i < str.length; i++) {
 		char c = str.data[i];
 		char digit = c-'0';
@@ -273,11 +289,12 @@ float64 ParseFloat64(String str) {
 			ssize j = str.data[i+1] == '+' ? i+2 : i+1;
 			exp.data = &str.data[j];
 			exp.length = str.length - j;
-			result *= Pow10((int32)ParseInt64(exp));
+			result *= pow10((int32)ParseInt64(exp));
 			break;
 		}
 		if (radix) {
-			result += digit/10.0;
+			term *= 10.0;
+			result += digit/term;
 		}
 		else {
 			result *= 10.0;
@@ -401,6 +418,25 @@ bool StringListEquals(StringList a, StringList b) {
 
 		StringListPosInc(&pos0);
 		StringListPosInc(&pos1);
+	}
+	return true;
+}
+
+// NOTE: not the most efficient
+bool StringListEquals(StringList a, String b) {
+	if (a.length != b.length) return false;
+
+	if (a.first == a.last) 
+		return StringEquals(a.first->string, b);
+
+	StringListPos pos0 = SL_START(a);
+	byte* pos1 = b.data;	
+	for (ssize i = 0; i < a.length; i++) {
+		if (SL_AT(pos0) != *pos1)
+			return false;
+
+		StringListPosInc(&pos0);
+		pos1++;
 	}
 	return true;
 }

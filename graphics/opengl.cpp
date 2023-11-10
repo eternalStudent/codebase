@@ -20,8 +20,7 @@ GLuint CreateProgram(GLchar* vertexSource, GLchar* fragmentSource) {
 	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-		LOG("fail to compile vertex shader");
-		LOG(infoLog);
+		LOG("fail to compile vertex shader: %s", infoLog);
 	}
 
 	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -31,8 +30,7 @@ GLuint CreateProgram(GLchar* vertexSource, GLchar* fragmentSource) {
 	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
 	if (!success) {
 		glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-		LOG("fail to compile fragment shader");
-		LOG(infoLog);
+		LOG("fail to compile fragment shader: %s", infoLog);
 	}
 
 	GLuint program = glCreateProgram();
@@ -42,8 +40,7 @@ GLuint CreateProgram(GLchar* vertexSource, GLchar* fragmentSource) {
 	glGetProgramiv(program, GL_LINK_STATUS, &success);
 	if (!success) {
 		glGetProgramInfoLog(program, 512, NULL, infoLog);
-		LOG("fail to link program");
-		LOG(infoLog);
+		LOG("fail to link program: %s:", infoLog);
 	}
 	glDeleteShader(vertexShader);
 	glDeleteShader(fragmentShader);
@@ -231,7 +228,7 @@ GLuint OpenGLGenerateTexture(Image image, GLint filter) {
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	static GLenum formats[] = {GL_RED, GL_RG, GL_RGB, GL_RGBA};
-	static GLenum internalFormats[] = {GL_RED, GL_RG, GL_SRGB, GL_SRGB_ALPHA};
+	static GLenum internalFormats[] = {GL_RED, GL_RG, GL_SRGB, GL_SRGB8_ALPHA8};
 	glTexImage2D(
 		GL_TEXTURE_2D, 
 		0, 

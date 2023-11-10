@@ -1,77 +1,32 @@
-typedef unsigned char byte;
-
 #include <stdint.h>
 #include <stddef.h>
-
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-typedef ptrdiff_t ssize;
-
-#define MAX_INT16 0x7fff
-#define MAX_INT32 0x7fffffff
-#define MAX_INT64 0x7fffffffffffffff
-
-#define MIN_INT16 0x8000
-#define MIN_INT32 0x80000000
-#define MIN_INT64 0x8000000000000000
-
-#define MAX_UINT16 0xffff
-#define MAX_UINT32 0xffffffff
-#define MAX_UINT64 0xffffffffffffffff
-
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-typedef float float32;
-typedef double float64;
 
 #define MIN(x,y) ((x)<(y)?(x):(y))
 #define MAX(x,y) ((x)<(y)?(y):(x))
 #define ABS(x)   ((x)<0? -(x):(x))
 #define SGN(x)	 ((0<(x))-((x)<0))
 
-inline int32 Min(int32 a, int32 b) {
+// Unsigned
+//----------
+
+typedef unsigned char byte;
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
+
+#define MAX_UINT16 0xffffu
+#define MAX_UINT32 0xffffffffu
+#define MAX_UINT64 0xffffffffffffffffull
+
+inline uint64 min(uint64 a, uint64 b) {
 	return a < b ? a : b;
 }
 
-inline int32 Max(int32 a, int32 b) {
+inline uint64 max(uint64 a, uint64 b) {
 	return a < b ? b : a;
 }
 
-inline int32 Abs(int32 i) {
-	return i < 0 ? -i : i;
-}
-
-inline int32 Sign(int32 i) {
-	return (0 < i) - (i < 0);
-}
-
-inline float32 Min(float32 x, float32 y) {
-	return x < y ? x : y;
-}
-
-inline float32 Max(float32 x, float32 y) {
-	return x < y ? y : x;
-}
-
-inline float32 Abs(float32 x) {
-	return x < 0 ? -x : x;
-}
-
-inline int32 Sign(float32 x) {
-	return (0 < x) - (x < 0);
-}
-
-inline float32 Exp2(int32 exp) {
-	uint32 exp_part = (uint32)(exp+127);
-	union {uint32 u; float32 f;} data;
-	data.u = exp_part << 23;
-	return data.f;
-}
-
-int32 Log10(uint64 n) {
+uint64 log10(uint64 n) {
 	if (n < 10000000000) {
 		// 1..10
 		return n < 100000
@@ -106,7 +61,140 @@ int32 Log10(uint64 n) {
 	}
 }
 
-float64 Pow10(int32 n) {
+uint64 power(uint32 base, uint32 exponent) {
+	uint64 result = 1;
+	uint64 base64 = base;
+
+	while (exponent > 0) {
+		if (exponent & 1) {
+			result *= base64;
+		}
+		base64 *= base64;
+		exponent >>= 1;
+	}
+
+	return result;
+}
+
+// Signed
+//--------
+
+typedef int16_t int16;
+typedef int32_t int32;
+typedef int64_t int64;
+typedef ptrdiff_t ssize;
+
+#define MIN_INT16 (-0x7fff - 1)
+#define MIN_INT32 (-0x7fffffff - 1)
+#define MIN_INT64 0x8000000000000000ll
+
+#define MAX_INT16 0x7fff
+#define MAX_INT32 0x7fffffff
+#define MAX_INT64 0x7fffffffffffffffll
+
+inline int64 min(int64 a, int64 b) {
+	return a < b ? a : b;
+}
+
+inline int64 max(int64 a, int64 b) {
+	return a < b ? b : a;
+}
+
+inline int64 sign(int64 i) {
+	return (0 < i) - (i < 0);
+}
+
+// float32
+//------------
+
+typedef float float32;
+
+inline int64 itrunc(float32 x) {
+	return (int64)x;
+}
+
+inline float32 min(float32 x, float32 y) {
+	return x < y ? x : y;
+}
+
+inline float32 max(float32 x, float32 y) {
+	return x < y ? y : x;
+}
+
+#ifndef _MATH_ALREADY_DEFINED_
+
+inline float32 abs(float32 x) {
+	return x < 0 ? -x : x;
+}
+
+#endif
+
+inline int64 sign(float32 x) {
+	return (0 < x) - (x < 0);
+}
+
+inline float32 exp2(int32 exp) {
+	uint32 exp_part = (uint32)(exp+127);
+	union {uint32 u; float32 f;} data;
+	data.u = exp_part << 23;
+	return data.f;
+}
+
+#ifndef _MATH_ALREADY_DEFINED_
+
+inline float32 sqrt(float32 value) {
+	return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(value)));
+} 
+
+inline float32 floor(float32 value) {
+	return _mm_cvtss_f32(_mm_floor_ss(_mm_setzero_ps(), _mm_set_ss(value)));
+}
+
+inline float32 ceil(float32 value) {
+	return _mm_cvtss_f32(_mm_ceil_ss(_mm_setzero_ps(), _mm_set_ss(value)));
+}
+
+inline float32 fmadd(float32 a, float32 b, float32 c) {
+	return _mm_cvtss_f32(_mm_fmadd_ss(_mm_set_ss(a), _mm_set_ss(b), _mm_set_ss(c)));
+}
+
+inline float32 round(float32 value) {
+	return _mm_cvtss_f32(_mm_round_ss(_mm_setzero_ps(), _mm_set_ss(value),
+						_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC ));
+}
+
+#endif
+
+// float64
+//------------
+
+typedef double float64;
+
+inline int64 itrunc(float64 x) {
+	return (int64)x;
+}
+
+inline float64 min(float64 x, float64 y) {
+	return x < y ? x : y;
+}
+
+inline float64 max(float64 x, float64 y) {
+	return x < y ? y : x;
+}
+
+#ifndef _MATH_ALREADY_DEFINED_
+
+inline float64 abs(float64 x) {
+	return x < 0 ? -x : x;
+}
+
+#endif
+
+inline int64 sign(float64 x) {
+	return (0 < x) - (x < 0);
+}
+
+float64 pow10(int64 n) {
 	static float64 tab[] = {
 		1.0e0, 1.0e1, 1.0e2, 1.0e3, 1.0e4, 1.0e5, 1.0e6, 1.0e7, 1.0e8, 1.0e9,
 		1.0e10,1.0e11,1.0e12,1.0e13,1.0e14,1.0e15,1.0e16,1.0e17,1.0e18,1.0e19,
@@ -116,31 +204,17 @@ float64 Pow10(int32 n) {
 		1.0e50,1.0e51,1.0e52,1.0e53,1.0e54,1.0e55,1.0e56,1.0e57,1.0e58,1.0e59,
 		1.0e60,1.0e61,1.0e62,1.0e63,1.0e64,1.0e65,1.0e66,1.0e67,1.0e68,1.0e69,
 	};
-	int32 m;
+	int64 m;
 
 	if (n < 0) {
 		n = -n;
-		if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
+		if (n < (int64)(sizeof(tab)/sizeof(tab[0])))
 			return 1/tab[n];
 		m = n/2;
-		return Pow10(-m)*Pow10(m-n);
+		return pow10(-m)*pow10(m-n);
 	}
-	if (n < (int32)(sizeof(tab)/sizeof(tab[0])))
+	if (n < (int64)(sizeof(tab)/sizeof(tab[0])))
 		return tab[n];
 	m = n/2;
-	return Pow10(m)*Pow10(n-m);
-}
-
-uint64 power(uint32 base, uint32 exponent) {
-	uint64 result = 1;
-
-	while (exponent > 0) {
-		if (exponent & 1) {
-			result *= base;
-		}
-		base *= base;
-		exponent >>= 1;
-	}
-
-	return result;
+	return pow10(m)*pow10(n-m);
 }

@@ -15,7 +15,7 @@ int LinuxOpenFile(const char* filePath) {
 int LinuxCreateFile(const char* filePath) {
     int fd = open(
         filePath, 
-        O_CREAT|O_RDWR
+        O_CREAT, O_RDWR
     ); 
     if (fd == -1) {
         LOG("failed to open file");
@@ -45,6 +45,8 @@ off_t LinuxGetFileSize(int fd) {
     return st.st_size;
 }
 
+#if defined(__gnu_linux__)
+#include <fontconfig/fontconfig.h>
 int LinuxGetDefaultFontFile() {
     FcPattern* pattern = FcNameParse((const FcChar8*)"monospace");
     FcBool success = FcConfigSubstitute(0,pattern,FcMatchPattern);
@@ -69,3 +71,4 @@ int LinuxGetDefaultFontFile() {
 
     return LinuxOpenFile((const char*)filename);
 }
+#endif

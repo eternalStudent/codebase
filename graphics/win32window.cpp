@@ -100,13 +100,16 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		case WM_SIZE: {
 			UINT width = LOWORD(lParam);
 			UINT height = HIWORD(lParam);
-			window.dim = {(int32)width, (int32)height};
+			Dimensions2i dim = {(int32)width, (int32)height};
 
 			OSEvent event;
 			event.type = Event_WindowResize;
 			event.time = GetMessageTime();
-			event.window.dim = window.dim;
+			event.window.dim = dim;
+			event.window.prevDim = window.dim;
 			Win32EnqueueEvent(event);
+
+			window.dim = dim;
 		} break;
 		case WM_ACTIVATE: {
 			window.clickCount = 0;
@@ -253,7 +256,7 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		} break;
 	}
 
-	return DefWindowProc(handle, message, wParam, lParam);
+	return DefWindowProcW(handle, message, wParam, lParam);
 }
 
 String LoadAsset(int i) {
@@ -345,13 +348,17 @@ void Win32SetWindowIcon(Image image) {
 	SendMessage(window.handle, WM_SETICON, ICON_SMALL, (LPARAM)icon);
 }
 
-WNDCLASSA CreateWindowClass() {
-	WNDCLASSA windowClass = {};
+BOOL Win32SetWindowTitle(LPCWSTR title) {
+	return SetWindowTextW(window.handle, title);
+}
+
+WNDCLASSW CreateWindowClass() {
+	WNDCLASSW windowClass = {};
 	windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 	windowClass.lpfnWndProc = MainWindowCallback;
 	windowClass.hInstance = GetModuleHandle(NULL);
-	windowClass.lpszClassName = "WindowClass";
-	RegisterClassA(&windowClass);
+	windowClass.lpszClassName = L"WindowClass";
+	RegisterClassW(&windowClass);
 
 	return windowClass;
 }
@@ -371,8 +378,8 @@ void LoadCursors() {
 	window.cursors[CUR_TEXT] = LoadCursorA(NULL, IDC_IBEAM);
 }
 
-void Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
-	WNDCLASSA windowClass = CreateWindowClass();
+void Win32CreateWindow(LPCWSTR title, LONG width, LONG height) {
+	WNDCLASSW windowClass = CreateWindowClass();
 	window = {};
 	LoadCursors();
 
@@ -383,7 +390,7 @@ void Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 		LOG("failed to adjust window size");
 
 	window.dim = {width, height};
-	window.handle = CreateWindowExA(0,
+	window.handle = CreateWindowExW(0,
 		windowClass.lpszClassName, 
 		title,
 		style,
@@ -394,8 +401,8 @@ void Win32CreateWindow(LPCSTR title, LONG width, LONG height) {
 		0, 0, windowClass.hInstance, 0);
 }
 
-void Win32CreateWindowFullScreen(LPCSTR title) {
-	WNDCLASSA windowClass = CreateWindowClass();
+void Win32CreateWindowFullScreen(LPCWSTR title) {
+	WNDCLASSW windowClass = CreateWindowClass();
 	window = {};
 	LoadCursors();
 	
@@ -409,7 +416,7 @@ void Win32CreateWindowFullScreen(LPCSTR title) {
 	LONG height = monitorRect.bottom - monitorRect.top;
 
 	window.dim = {width, height};
-	window.handle = CreateWindowExA(0,
+	window.handle = CreateWindowExW(0,
 		windowClass.lpszClassName, 
 		title,
 		WS_VISIBLE,
@@ -439,6 +446,23 @@ void Win32SetCursorIcon(int32 icon) {
 void Win32SetWindowCursorIcon(int32 icon) {
 	window.iconSet = TRUE;
 	window.icon = icon;
+}
+
+HANDLE Win32OpenFileDialog(WCHAR* path, DWORD maxPathLength) {
+	OPENFILENAMEW dialog = {};
+	dialog.lStructSize = sizeof(OPENFILENAME);
+	path[0] = 0;
+	dialog.lpstrFile = path;
+	dialog.nMaxFile = maxPathLength;
+	dialog.hwndOwner = window.handle;
+	dialog.Flags = OFN_FILEMUSTEXIST;
+	dialog.Flags |= OFN_NOCHANGEDIR;
+	BOOL success = GetOpenFileNameW(&dialog);
+	if (!success) {
+		LOG("failed to get save file name");
+		return INVALID_HANDLE_VALUE ;
+	}
+	return Win32OpenFile(path);
 }
 
 HANDLE Win32OpenFileDialog() {

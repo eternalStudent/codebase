@@ -6,7 +6,7 @@ void* LinuxReserve(size_t size) {
 	return mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 }
 
-void* LinuxCommit(void* data, size_t size) {
+int LinuxCommit(void* data, size_t size) {
 	return mprotect(data, size, PROT_READ | PROT_WRITE);
 }
 

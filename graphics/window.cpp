@@ -24,6 +24,7 @@ enum : uint32 {
 
 struct WindowEvent {
 	Dimensions2i dim;
+	Dimensions2i prevDim;
 };
 
 struct MouseEvent {
@@ -99,7 +100,7 @@ enum : uint32 {
 #define KEY_Y 					0x59
 #define KEY_Z 					0x5A
 
-#if defined(_WIN32)
+#if defined(_OS_WINDOWS)
 #  include <Windowsx.h>
 #  include "win32window.cpp"
 
@@ -112,6 +113,7 @@ enum : uint32 {
 #  define OSEnterFullScreen 		Win32EnterFullScreen
 #  define OSSetWindowIcon			Win32SetWindowIcon
 #  define OSSetWindowToNoneResizable Win32SetWindowToNoneResizable
+#  define OSSetWindowTitle			Win32SetWindowTitle
 
 #  define OSGetWindowDimensions 	Win32GetWindowDimensions
 #  define OSWindowDestroyed 		Win32WindowDestroyed
@@ -132,7 +134,7 @@ enum : uint32 {
 #  define OSPollEvent				Win32PollEvent
 #endif
 
-#if defined(__gnu_linux__)
+#if defined(_OS_LINUX)
 #  include <X11/Xlib.h>
 #  include <X11/Xutil.h>
 #  include <X11/Xatom.h>

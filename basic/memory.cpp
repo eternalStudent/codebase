@@ -1,4 +1,4 @@
-#if defined(_WIN32)
+#if defined(_OS_WINDOWS)
 #  include "win32memory.cpp"
 #  define OSAllocate			Win32Allocate
 #  define OSReserve				Win32Reserve
@@ -7,7 +7,7 @@
 #  define OSFree				Win32Free
 #endif
 
-#if defined(__gnu_linux__)
+#if defined(_OS_UNIX)
 #  include <sys/mman.h>
 #  include "linuxmemory.cpp"
 #  define OSAllocate			LinuxAllocate
@@ -25,6 +25,10 @@ Arena CreateArena(int64 capacity) {
 	Arena arena;
  	ArenaInit(&arena, buffer, capacity);
  	return arena;
+}
+
+void DestroyArena(Arena* arena) {
+	OSFree(arena->buffer, arena->capacity);
 }
 
 FixedSize CreateFixedSize(int32 capacity, int32 size) {

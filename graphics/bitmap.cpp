@@ -7,7 +7,7 @@
 // extract an arbitrarily-aligned N-bit value (N=bits)
 // from v, and then make it 8-bits long and fractionally
 // extend it to full full range.
-int32 shiftsigned(uint32 v, int32 shift, int32 bits) {
+int64 shiftsigned(uint64 v, int64 shift, int64 bits) {
     static uint32 mul_table[9] = {
        0,
        0xff/*0b11111111*/, 0x55/*0b01010101*/, 0x49/*0b01001001*/, 0x11/*0b00010001*/,
@@ -222,7 +222,7 @@ Image BMPLoadImage(Arena* arena, byte* data) {
         }
     }
     else {
-        int32 rshift = 0, gshift = 0, bshift = 0, ashift = 0, rcount = 0, gcount = 0, bcount = 0, acount = 0;
+        int64 rshift = 0, gshift = 0, bshift = 0, ashift = 0, rcount = 0, gcount = 0, bcount = 0, acount = 0;
         int32 z = 0;
         int32 easy = 0;
         Skip(&data, info.offset - info.extra_read - info.hsz);
@@ -267,7 +267,7 @@ Image BMPLoadImage(Arena* arena, byte* data) {
                     image.data[z++] = BYTECAST(shiftsigned(v & info.mr, rshift, rcount));
                     image.data[z++] = BYTECAST(shiftsigned(v & info.mg, gshift, gcount));
                     image.data[z++] = BYTECAST(shiftsigned(v & info.mb, bshift, bcount));
-                    a = (info.ma ? shiftsigned(v & info.ma, ashift, acount) : 255);
+                    a = (uint32)(info.ma ? shiftsigned(v & info.ma, ashift, acount) : 255);
                     info.all_a |= a;
                     if (image.channels == 4) image.data[z++] = BYTECAST(a);
                 }
