@@ -59,8 +59,8 @@ float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b, float32 zo
 
 	BakedChar bakedchar = font->chardata[b - font->firstChar];
 	
-	float32 round_y = floor(pos.y + zoom*(bakedchar.yoff + font->height) + 0.5f);
-	float32 round_x = floor(pos.x + zoom*bakedchar.xoff + 0.5f);
+	float32 round_y = round(pos.y + zoom*(bakedchar.yoff + font->height));
+	float32 round_x = round(pos.x + zoom*bakedchar.xoff);
 	
 	float32 width = (float32)(zoom*(bakedchar.x1 - bakedchar.x0));
 	float32 height = (float32)(zoom*(bakedchar.y1 - bakedchar.y0));

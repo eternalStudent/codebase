@@ -9,21 +9,14 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #  define _OS_WINDOWS 1
-#  include <Windows.h>
 #elif defined(__ANDROID__)
 #  define _OS_ANDROID 1
 #  define _OS_UNIX 1
 #  define _MATH_ALREADY_DEFINED_ 1
 #  define _NO_ROTATE_ 1
-#  include <unistd.h>
-#  include <jni.h>
-#  include <android/log.h>
-#  include <android/asset_manager.h>
-#  include <android_native_app_glue.h>
 #elif defined(__linux__)
 #  define _OS_LINUX 1
 #  define _OS_UNIX 1
-#  include <unistd.h>
 #endif
 
 #include <memory.h>
@@ -33,6 +26,18 @@
 #include "bits.cpp"
 #include "linkedlist.cpp"
 #include "string.cpp"
+
+#if defined(_OS_WINDOWS)
+#  include <Windows.h>
+#elif defined(_OS_ANDROID)
+#  include <unistd.h>
+#  include <jni.h>
+#  include <android/log.h>
+#  include <android/asset_manager.h>
+#  include <android_native_app_glue.h>
+#elif defined(_OS_LINUX)
+#  include <unistd.h>
+#endif
 
 
 #if defined(DEBUG)

@@ -467,29 +467,15 @@ HANDLE Win32OpenFileDialog(WCHAR* path, DWORD maxPathLength) {
 
 HANDLE Win32OpenFileDialog() {
 	WCHAR path[MAX_PATH];
-	OPENFILENAMEW dialog = {};
-	dialog.lStructSize = sizeof(OPENFILENAME);
-	path[0] = 0;
-	dialog.lpstrFile = path;
-	dialog.nMaxFile = MAX_PATH;
-	dialog.hwndOwner = window.handle;
-	dialog.Flags = OFN_FILEMUSTEXIST;
-	dialog.Flags |= OFN_NOCHANGEDIR;
-	BOOL success = GetOpenFileNameW(&dialog);
-	if (!success) {
-		LOG("failed to get save file name");
-		return INVALID_HANDLE_VALUE ;
-	}
-	return Win32OpenFile(path);
+	return Win32OpenFileDialog(path, MAX_PATH);
 }
 
-HANDLE Win32SaveFileDialog() {
-	WCHAR path[MAX_PATH];
+HANDLE Win32SaveFileDialog(WCHAR* path, DWORD maxPathLength) {
 	OPENFILENAMEW dialog = {};
 	dialog.lStructSize = sizeof(OPENFILENAME);
 	path[0] = 0;
 	dialog.lpstrFile = path;
-	dialog.nMaxFile = MAX_PATH;
+	dialog.nMaxFile = maxPathLength;
 	dialog.hwndOwner = window.handle;
 	dialog.Flags = OFN_OVERWRITEPROMPT;
 	dialog.Flags |= OFN_NOCHANGEDIR;
@@ -499,6 +485,11 @@ HANDLE Win32SaveFileDialog() {
 		return INVALID_HANDLE_VALUE ;
 	}
 	return Win32CreateFile(path);
+}
+
+HANDLE Win32SaveFileDialog() {
+	WCHAR path[MAX_PATH];
+	return Win32SaveFileDialog(path, MAX_PATH);
 }
 
 Point2i Win32GetCursorPosition() {
