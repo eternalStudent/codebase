@@ -289,16 +289,20 @@ int32 parse_uncompressed_block(Arena* arena, ZBuf* a) {
       a->code_buffer >>= 8;
       a->num_bits -= 8;
    }
-   if (a->num_bits < 0) return FAIL("zlib corrupt");
+   if (a->num_bits < 0) 
+      return FAIL("zlib corrupt");
    // now fill header the normal way
    while (k < 4)
       header[k++] = zget8(a);
    len  = header[1] * 256 + header[0];
    nlen = header[3] * 256 + header[2];
-   if (nlen != (len ^ 0xffff)) return FAIL("zlib corrupt");
-   if (a->zbuffer + len > a->zbuffer_end) return FAIL("read past buffer");
+   if (nlen != (len ^ 0xffff)) 
+      return FAIL("zlib corrupt");
+   if (a->zbuffer + len > a->zbuffer_end) 
+      return FAIL("read past buffer");
    if (a->zout + len > a->zout_end)
-      if (!zexpand(arena, a, a->zout, len)) return 0;
+      if (!zexpand(arena, a, a->zout, len)) 
+         return 0;
    memcpy(a->zout, a->zbuffer, len);
    a->zbuffer += len;
    a->zout += len;
@@ -336,27 +340,33 @@ static const byte zdefault_distance[32] = {
 int32 parse_zlib(Arena* arena, ZBuf* a, int32 parse_header) {
    int32 final, type;
    if (parse_header)
-      if (!parse_zlib_header(a)) return 0;
+      if (!parse_zlib_header(a)) 
+         return 0;
    a->num_bits = 0;
    a->code_buffer = 0;
    do {
       final = zreceive(a,1);
       type = zreceive(a,2);
       if (type == 0) {
-         if (!parse_uncompressed_block(arena, a)) return 0;
+         if (!parse_uncompressed_block(arena, a)) 
+            return 0;
       } else if (type == 3) {
          return 0;
       }
       else {
          if (type == 1) {
             // use fixed code lengths
-            if (!zbuild_huffman(&a->z_length  , zdefault_length  , ZNSYMS)) return 0;
-            if (!zbuild_huffman(&a->z_distance, zdefault_distance,  32)) return 0;
+            if (!zbuild_huffman(&a->z_length  , zdefault_length  , ZNSYMS)) 
+               return 0;
+            if (!zbuild_huffman(&a->z_distance, zdefault_distance,  32)) 
+               return 0;
          }
          else {
-            if (!compute_huffman_codes(a)) return 0;
+            if (!compute_huffman_codes(a)) 
+               return 0;
          }
-         if (!parse_huffman_block(arena, a)) return 0;
+         if (!parse_huffman_block(arena, a))
+          return 0;
       }
    } while (!final);
    return 1;

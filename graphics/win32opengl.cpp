@@ -37,7 +37,9 @@ typedef void WINAPI type_glDeleteVertexArrays(GLsizei n, const GLuint* arrays);
 typedef void WINAPI type_glDrawBuffers(GLsizei n, const GLenum* bufs);
 
 typedef GLint WINAPI type_glGetUniformLocation(GLuint program, const GLchar* name);
+typedef void WINAPI type_glUniform1fv(GLint location, GLsizei count, const GLfloat *value);
 typedef void WINAPI type_glUniform4fv(GLint location, GLsizei count, const GLfloat* value);
+typedef void WINAPI type_glUniformMatrix3fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
 typedef void WINAPI type_glUniformMatrix4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
 typedef void WINAPI type_glUniform1i(GLint location, GLint v0);
 typedef void WINAPI type_glUniform1f(GLint location, GLfloat v0);
@@ -47,6 +49,15 @@ typedef void WINAPI type_glUniform4f(GLint location, GLfloat v0, GLfloat v1, GLf
 
 typedef void (APIENTRY *DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
 typedef void WINAPI type_glDebugMessageCallback(DEBUGPROC callback, const void* userParam);
+
+typedef void WINAPI type_glBlendColor(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
+typedef void WINAPI type_glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
+typedef void WINAPI type_glGenFramebuffers(GLsizei n, GLuint *framebuffers);
+typedef void WINAPI type_glBindFramebuffer(GLenum target, GLuint framebuffer);
+typedef void WINAPI type_glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+typedef GLenum WINAPI type_glCheckFramebufferStatus(GLenum target);
+typedef void WINAPI type_glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
+typedef void WINAPI type_glTexImage3D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels);
 
 #define Win32DefineOpenGLFunction(Name) static type_##Name * Name
 
@@ -82,7 +93,9 @@ Win32DefineOpenGLFunction(glDeleteVertexArrays);
 Win32DefineOpenGLFunction(glDrawBuffers);
 
 Win32DefineOpenGLFunction(glGetUniformLocation);
+Win32DefineOpenGLFunction(glUniform1fv);
 Win32DefineOpenGLFunction(glUniform4fv);
+Win32DefineOpenGLFunction(glUniformMatrix3fv);
 Win32DefineOpenGLFunction(glUniformMatrix4fv);
 Win32DefineOpenGLFunction(glUniform1i);
 Win32DefineOpenGLFunction(glUniform1f);
@@ -91,6 +104,14 @@ Win32DefineOpenGLFunction(glUniform3f);
 Win32DefineOpenGLFunction(glUniform4f);
 
 Win32DefineOpenGLFunction(glDebugMessageCallback);
+Win32DefineOpenGLFunction(glBlendColor);
+Win32DefineOpenGLFunction(glDebugMessageControl);
+Win32DefineOpenGLFunction(glGenFramebuffers);
+Win32DefineOpenGLFunction(glBindFramebuffer);
+Win32DefineOpenGLFunction(glFramebufferTexture2D);
+Win32DefineOpenGLFunction(glCheckFramebufferStatus);
+Win32DefineOpenGLFunction(glBlitFramebuffer);
+Win32DefineOpenGLFunction(glTexImage3D);
 
 typedef BOOL WINAPI type_wglSwapIntervalEXT(int interval);
 typedef HGLRC WINAPI type_wglCreateContextAttribsARB(HDC hDC, HGLRC hShareContext, const int* attribList);
@@ -130,11 +151,13 @@ BOOL Win32CreateRenderingContext(HDC dc) {
 		// as <deprecated> by that version of the API, while a
 		// non - forward - compatible context must support all functionality in
 		// that version, deprecated or not.
-		WGL_CONTEXT_FLAGS_ARB, /*WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB*/ 0,
+		WGL_CONTEXT_FLAGS_ARB, 
+		/*WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB*/ WGL_CONTEXT_DEBUG_BIT_ARB,
 		
 		// If the WGL_CONTEXT_CORE_PROFILE_BIT_ARB bit is set in the attribute value, 
 		// then a context implementing the <core> profile of OpenGL is returned
-		WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+		WGL_CONTEXT_PROFILE_MASK_ARB, 
+		WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
 		0,
 	};
 	HGLRC modern = wglCreateModernContext(dc, 0, Win32OpenGLAttribs);
@@ -212,13 +235,25 @@ BOOL Win32OpenGLInit() {
 	Win32GetOpenGLFunction(glDrawBuffers);
 
 	Win32GetOpenGLFunction(glGetUniformLocation);
+	Win32GetOpenGLFunction(glUniform1fv);
 	Win32GetOpenGLFunction(glUniform4fv);
+	Win32GetOpenGLFunction(glUniformMatrix3fv);
 	Win32GetOpenGLFunction(glUniformMatrix4fv);
 	Win32GetOpenGLFunction(glUniform1i);
 	Win32GetOpenGLFunction(glUniform1f);
 	Win32GetOpenGLFunction(glUniform2f);
 	Win32GetOpenGLFunction(glUniform3f);
 	Win32GetOpenGLFunction(glUniform4f);
+
+	Win32GetOpenGLFunction(glDebugMessageCallback);
+	Win32GetOpenGLFunction(glBlendColor);
+	Win32GetOpenGLFunction(glDebugMessageControl);
+	Win32GetOpenGLFunction(glGenFramebuffers);
+	Win32GetOpenGLFunction(glBindFramebuffer);
+	Win32GetOpenGLFunction(glFramebufferTexture2D);
+	Win32GetOpenGLFunction(glCheckFramebufferStatus);
+	Win32GetOpenGLFunction(glBlitFramebuffer);
+	Win32GetOpenGLFunction(glTexImage3D);
 
 	type_wglSwapIntervalEXT* wglSwapInteravl = (type_wglSwapIntervalEXT*)wglGetProcAddress("wglSwapIntervalEXT");
 	if (wglSwapInteravl) wglSwapInteravl(1);
@@ -240,10 +275,14 @@ BOOL Win32OpenGLSwapBuffers() {
 	return ok;
 }
 
+#define GL_CONSTANT_COLOR               0x8001
+
 #define GL_CLAMP_TO_EDGE 				0x812F
 
+#define GL_FRAMEBUFFER_UNDEFINED        0x8219
 #define GL_RG 							0x8227
 #define GL_DEBUG_OUTPUT_SYNCHRONOUS 	0x8242
+#define GL_DEBUG_SEVERITY_NOTIFICATION  0x826B
 
 #define GL_TEXTURE0 					0x84C0
 #define GL_TEXTURE1 					0x84C1
@@ -253,11 +292,6 @@ BOOL Win32OpenGLSwapBuffers() {
 #define GL_TEXTURE5 					0x84C5
 #define GL_TEXTURE6 					0x84C6
 #define GL_TEXTURE7 					0x84C7
-
-#define GL_SRGB 						0x8C40
-#define GL_SRGB8						0x8C41
-#define GL_SRGB_ALPHA					0x8C42
-#define GL_SRGB8_ALPHA8					0x8C43
 
 #define GL_ARRAY_BUFFER 				0x8892
 #define GL_ELEMENT_ARRAY_BUFFER 		0x8893
@@ -277,6 +311,26 @@ BOOL Win32OpenGLSwapBuffers() {
 #define GL_LINK_STATUS					0x8B82
 #define GL_VALIDATE_STATUS				0x8B83
 
-#define GL_FRAMEBUFFER_SRGB 			0x8DB9
+#define GL_TEXTURE_2D_ARRAY             0x8C1A
+#define GL_SRGB 						0x8C40
+#define GL_SRGB8						0x8C41
+#define GL_SRGB_ALPHA					0x8C42
+#define GL_SRGB8_ALPHA8					0x8C43
+#define GL_READ_FRAMEBUFFER             0x8CA8
+#define GL_DRAW_FRAMEBUFFER             0x8CA9
+#define GL_FRAMEBUFFER_COMPLETE                      0x8CD5
+#define GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT         0x8CD6
+#define GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT 0x8CD7
+#define GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER        0x8CDB
+#define GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER        0x8CDC
+#define GL_FRAMEBUFFER_UNSUPPORTED                   0x8CDD
 
+#define GL_FRAMEBUFFER                  0x8D40
+#define GL_FRAMEBUFFER_SRGB 			0x8DB9
+#define GL_COLOR_ATTACHMENT0            0x8CE0
+
+
+#define GL_DEBUG_SEVERITY_HIGH          0x9146
+#define GL_DEBUG_SEVERITY_MEDIUM        0x9147
+#define GL_DEBUG_SEVERITY_LOW           0x9148
 #define GL_DEBUG_OUTPUT 				0x92E0

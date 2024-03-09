@@ -471,9 +471,11 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
    png->idata = NULL;
    png->out = NULL;
 
-   if (!check_png_header(data)) return 0;
+   if (!check_png_header(data)) 
+      return 0;
 
-   if (scan == SCAN_type) return 1;
+   if (scan == SCAN_type) 
+      return 1;
 
    while (true) {
       PNGChunk c = get_chunk_header(data);
@@ -484,41 +486,63 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
             break;
          case PNG_TYPE('I','H','D','R'): {
             int32 comp,filter;
-            if (!first) return FAIL("multiple IHDR Corrupt PNG");
+            if (!first) 
+               return FAIL("multiple IHDR Corrupt PNG");
             first = 0;
-            if (c.length != 13) return FAIL("bad IHDR len Corrupt PNG");
+            if (c.length != 13) 
+               return FAIL("bad IHDR len Corrupt PNG");
             png->img_x = ReadUint32BigEndian(data);
             png->img_y = ReadUint32BigEndian(data);
-            if (png->img_y > MAX_DIMENSIONS) return FAIL("too large Very large image (corrupt?)");
-            if (png->img_x > MAX_DIMENSIONS) return FAIL("too large Very large image (corrupt?)");
+            if (png->img_y > MAX_DIMENSIONS) 
+               return FAIL("too large Very large image (corrupt?)");
+            if (png->img_x > MAX_DIMENSIONS) 
+               return FAIL("too large Very large image (corrupt?)");
             png->depth = ReadByte(data);  if (png->depth != 1 && png->depth != 2 && png->depth != 4 && png->depth != 8 && png->depth != 16)  return FAIL("1/2/4/8/16-bit only PNG not supported: 1/2/4/8/16-bit only");
-            color = ReadByte(data);  if (color > 6)         return FAIL("bad ctype Corrupt PNG");
-            if (color == 3 && png->depth == 16)                  return FAIL("bad ctype Corrupt PNG");
-            if (color == 3) pal_img_n = 3; else if (color & 1) return FAIL("bad ctype Corrupt PNG");
-            comp  = ReadByte(data);  if (comp) return FAIL("bad comp method Corrupt PNG");
-            filter= ReadByte(data);  if (filter) return FAIL("bad filter method Corrupt PNG");
-            interlace = ReadByte(data); if (interlace>1) return FAIL("bad interlace method Corrupt PNG");
-            if (!png->img_x || !png->img_y) return FAIL("0-pixel image Corrupt PNG");
+            color = ReadByte(data);  
+            if (color > 6)         
+               return FAIL("bad ctype Corrupt PNG");
+            if (color == 3 && png->depth == 16)                  
+               return FAIL("bad ctype Corrupt PNG");
+            if (color == 3) pal_img_n = 3; 
+            else if (color & 1) 
+               return FAIL("bad ctype Corrupt PNG");
+            comp  = ReadByte(data);  
+            if (comp) 
+               return FAIL("bad comp method Corrupt PNG");
+            filter= ReadByte(data);  
+            if (filter) 
+               return FAIL("bad filter method Corrupt PNG");
+            interlace = ReadByte(data); 
+            if (interlace>1) 
+               return FAIL("bad interlace method Corrupt PNG");
+            if (!png->img_x || !png->img_y) 
+               return FAIL("0-pixel image Corrupt PNG");
             if (!pal_img_n) {
                png->img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
-               if ((1 << 30) / png->img_x / png->img_n < png->img_y) return FAIL("too large Image too large to decode");
-               if (scan == SCAN_header) return 1;
+               if ((1 << 30) / png->img_x / png->img_n < png->img_y) 
+                  return FAIL("too large Image too large to decode");
+               if (scan == SCAN_header) 
+                  return 1;
             }
             else {
                // if paletted, then pal_n is our final components, and
                // img_n is # components to decompress/filter.
                png->img_n = 1;
-               if ((1 << 30) / png->img_x / 4 < png->img_y) return FAIL("too large Corrupt PNG");
+               if ((1 << 30) / png->img_x / 4 < png->img_y) 
+                  return FAIL("too large Corrupt PNG");
                // if SCAN_header, have to scan to see if we have a tRNS
             }
             break;
          }
 
          case PNG_TYPE('P','L','T','E'):  {
-            if (first) return FAIL("first not IHDR Corrupt PNG");
-            if (c.length > 256*3) return FAIL("invalid PLTE Corrupt PNG");
+            if (first) 
+               return FAIL("first not IHDR Corrupt PNG");
+            if (c.length > 256*3) 
+               return FAIL("invalid PLTE Corrupt PNG");
             pal_len = c.length / 3;
-            if (pal_len * 3 != c.length) return FAIL("invalid PLTE Corrupt PNG");
+            if (pal_len * 3 != c.length) 
+               return FAIL("invalid PLTE Corrupt PNG");
             for (i = 0; i < pal_len; ++i) {
                palette[i*4 + 0] = ReadByte(data);
                palette[i*4 + 1] = ReadByte(data);
@@ -529,19 +553,25 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
          }
 
          case PNG_TYPE('t','R','N','S'): {
-            if (first) return FAIL("first not IHDR Corrupt PNG");
-            if (png->idata) return FAIL("tRNS after IDAT Corrupt PNG");
+            if (first) 
+               return FAIL("first not IHDR Corrupt PNG");
+            if (png->idata) 
+               return FAIL("tRNS after IDAT Corrupt PNG");
             if (pal_img_n) {
                if (scan == SCAN_header) { png->img_n = 4; return 1; }
-               if (pal_len == 0) return FAIL("tRNS before PLTE Corrupt PNG");
-               if (c.length > pal_len) return FAIL("bad tRNS len Corrupt PNG");
+               if (pal_len == 0) 
+                  return FAIL("tRNS before PLTE Corrupt PNG");
+               if (c.length > pal_len) 
+                  return FAIL("bad tRNS len Corrupt PNG");
                pal_img_n = 4;
                for (i = 0; i < c.length; ++i)
                   palette[i*4+3] = ReadByte(data);
             }
             else {
-               if (!(png->img_n & 1)) return FAIL("tRNS with alpha Corrupt PNG");
-               if (c.length != (uint32) png->img_n*2) return FAIL("bad tRNS len Corrupt PNG");
+               if (!(png->img_n & 1)) 
+                  return FAIL("tRNS with alpha Corrupt PNG");
+               if (c.length != (uint32) png->img_n*2) 
+                  return FAIL("bad tRNS len Corrupt PNG");
                has_trans = 1;
                if (png->depth == 16) {
                   for (k = 0; k < png->img_n; ++k) tc16[k] = ReadUint16BigEndian(data); // copy the values as-is
@@ -554,10 +584,13 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
          }
 
          case PNG_TYPE('I','D','A','T'): {
-            if (first) return FAIL("first not IHDR Corrupt PNG");
-            if (pal_img_n && !pal_len) return FAIL("no PLTE Corrupt PNG");
+            if (first) 
+               return FAIL("first not IHDR Corrupt PNG");
+            if (pal_img_n && !pal_len) 
+               return FAIL("no PLTE Corrupt PNG");
             if (scan == SCAN_header) { png->img_n = pal_img_n; return 1; }
-            if ((int32)(ioff + c.length) < (int32)ioff) return 0;
+            if ((int32)(ioff + c.length) < (int32)ioff) 
+               return 0;
             if (ioff + c.length > idata_limit) {
                uint32 idata_limit_old = idata_limit;
                byte *p;
@@ -575,14 +608,18 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
 
          case PNG_TYPE('I','E','N','D'): {
             uint32 raw_len, bpl;
-            if (first) return FAIL("first not IHDR Corrupt PNG");
-            if (scan != SCAN_load) return 1;
-            if (png->idata == NULL) return FAIL("no IDAT Corrupt PNG");
+            if (first) 
+               return FAIL("first not IHDR Corrupt PNG");
+            if (scan != SCAN_load) 
+               return 1;
+            if (png->idata == NULL) 
+               return FAIL("no IDAT Corrupt PNG");
             // initial guess for decoded data size to avoid unnecessary reallocs
             bpl = (png->img_x * png->depth + 7) / 8; // bytes per line, per component
             raw_len = bpl * png->img_y * png->img_n + png->img_y; // filter mode per row
             png->expanded = (byte *) zlib_decode_malloc_guesssize_headerflag(arena, png->idata, ioff, raw_len, (int32*) &raw_len, !is_iphone);
-            if (png->expanded == NULL) return 0; // zlib should set error
+            if (png->expanded == NULL) 
+               return 0; // zlib should set error
             png->idata = NULL;
             if ((4 == png->img_n + 1 && 4 != 3 && !pal_img_n) || has_trans)
                png->img_out_n = png->img_n + 1;
@@ -591,10 +628,12 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
             if (!create_png_image(arena, png, png->expanded, raw_len, png->img_out_n, png->depth, color, interlace)) return 0;
             if (has_trans) {
                if (png->depth == 16) {
-                  if (!compute_transparency16(png, tc16, png->img_out_n)) return 0;
+                  if (!compute_transparency16(png, tc16, png->img_out_n)) 
+                     return 0;
                }
                else {
-                  if (!compute_transparency(png, tc, png->img_out_n)) return 0;
+                  if (!compute_transparency(png, tc, png->img_out_n)) 
+                     return 0;
                }
             }
             if (is_iphone && de_iphone_flag && png->img_out_n > 2)
@@ -618,7 +657,8 @@ int32 parse_png_file(Arena* arena, byte** data, PNG* png, int32 scan) {
 
          default:
             // if critical, fail
-            if (first) return FAIL("first not IHDR Corrupt PNG");
+            if (first) 
+               return FAIL("first not IHDR Corrupt PNG");
             if ((c.type & (1 << 29)) == 0) {
                return FAIL("PNG not supported: unknown PNG chunk type");
             }

@@ -1,4 +1,5 @@
 #if defined(_OS_WINDOWS)
+#  include "Shlwapi.h"
 #  include "win32io.cpp"
 #  define File          		HANDLE
 #  define FILE_ERROR 			INVALID_HANDLE_VALUE 
@@ -8,6 +9,7 @@
 #  define OSWriteFile			Win32WriteFile
 #  define OSGetFileSize 		Win32GetFileSize
 #  define OSCloseFile   		CloseHandle
+#  define OSFileExists			Win32FileExists
 #  define OSGetDefaultFontFile	Win32GetDefaultFontFile
 #  define OSCreateChildProcess  Win32CreateChildProcess
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)

@@ -44,12 +44,12 @@ uint32 RandomBinomial(uint32 minValue, uint32 maxValue) {
 	int32 range = maxValue - minValue;
 	for (int32 i = 0; i < range/32; i++) {
 		uint32 num = RandomNext();
-		sum += BitCount(num);
+		sum += (uint32)BitCount(num);
 	}
 	uint32 extra = range%32;
 	if (extra) {
 		uint32 num = RandomNext() >> (32-extra);
-		sum += BitCount(num);
+		sum += (uint32)BitCount(num);
 	}
 
 	return sum + minValue;

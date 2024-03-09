@@ -82,6 +82,7 @@ enum : uint32 {
 #define KEY_DELETE				0x2E
 #define KEY_GREATER				0x3E
 #define KEY_A 					0x41
+#define KEY_B 					0x42
 #define KEY_C 					0x43
 #define KEY_D 					0x44
 #define KEY_E 					0x45

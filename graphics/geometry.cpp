@@ -79,3 +79,9 @@ union Box2i {
 	struct {Point2i p0, p1;};
 	struct {int32 x0, y0, x1, y1;};
 };
+
+union Point3 {
+	struct {float32 x, y, z;};
+	struct {Point2 xy; float32 z;};
+	float32 e[3];
+};

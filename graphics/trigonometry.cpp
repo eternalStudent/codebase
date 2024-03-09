@@ -1,3 +1,9 @@
+float32 PI() {
+	union {uint32 u; float32 f;} temp;
+	temp.u = 0x40490fdb;
+	return temp.f;
+}
+
 float32 _sin(float32 x) {
 	float32 x2 = x*x;
 	union {uint32 u; float32 f;} data1, data2, data3, data4;

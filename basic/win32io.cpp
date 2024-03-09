@@ -59,6 +59,10 @@ HANDLE Win32GetDefaultFontFile() {
 	return Win32OpenFile(filePath);
 }
 
+BOOL Win32FileExists(LPCWSTR pszPath) {
+	return PathFileExistsW(pszPath);
+}
+
 HANDLE Win32CreateChildProcess(LPWSTR cmd) {
 	HANDLE readHandle = NULL;
 	HANDLE writeHandle = NULL;

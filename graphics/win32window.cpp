@@ -144,6 +144,8 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 				event.type = Event_KeyboardChar;
 				event.time = GetMessageTime();
 				event.keyboard.character = (byte)wParam;
+				event.keyboard.ctrlIsDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+				event.keyboard.shiftIsDown = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 				Win32EnqueueEvent(event);
 			}
 		} break;
@@ -352,13 +354,16 @@ BOOL Win32SetWindowTitle(LPCWSTR title) {
 	return SetWindowTextW(window.handle, title);
 }
 
-WNDCLASSW CreateWindowClass() {
-	WNDCLASSW windowClass = {};
+WNDCLASSEXW CreateWindowClass() {
+	WNDCLASSEXW windowClass = {};
+	windowClass.cbSize = sizeof(WNDCLASSEXW);
 	windowClass.style = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;
 	windowClass.lpfnWndProc = MainWindowCallback;
 	windowClass.hInstance = GetModuleHandle(NULL);
 	windowClass.lpszClassName = L"WindowClass";
-	RegisterClassW(&windowClass);
+	ATOM atom = RegisterClassExW(&windowClass);
+	ASSERT(atom);
+	(void)atom;
 
 	return windowClass;
 }
@@ -369,17 +374,17 @@ BOOL Win32WindowDestroyed() {
 
 void LoadCursors() {
 	window.cursors[CUR_NONE] = NULL;
-	window.cursors[CUR_ARROW] = LoadCursorA(NULL, IDC_ARROW);
-	window.cursors[CUR_MOVE] = LoadCursorA(NULL, IDC_SIZEALL);	
-	window.cursors[CUR_RESIZE] = LoadCursorA(NULL, IDC_SIZENWSE);
-	window.cursors[CUR_HAND] = LoadCursorA(NULL, IDC_HAND);
-	window.cursors[CUR_MOVESIDE] = LoadCursorA(NULL, IDC_SIZEWE);
-	window.cursors[CUR_MOVEUPDN] = LoadCursorA(NULL, IDC_SIZENS);
-	window.cursors[CUR_TEXT] = LoadCursorA(NULL, IDC_IBEAM);
+	window.cursors[CUR_ARROW] = LoadCursor(NULL, IDC_ARROW);
+	window.cursors[CUR_MOVE] = LoadCursor(NULL, IDC_SIZEALL);	
+	window.cursors[CUR_RESIZE] = LoadCursor(NULL, IDC_SIZENWSE);
+	window.cursors[CUR_HAND] = LoadCursor(NULL, IDC_HAND);
+	window.cursors[CUR_MOVESIDE] = LoadCursor(NULL, IDC_SIZEWE);
+	window.cursors[CUR_MOVEUPDN] = LoadCursor(NULL, IDC_SIZENS);
+	window.cursors[CUR_TEXT] = LoadCursor(NULL, IDC_IBEAM);
 }
 
 void Win32CreateWindow(LPCWSTR title, LONG width, LONG height) {
-	WNDCLASSW windowClass = CreateWindowClass();
+	WNDCLASSEXW windowClass = CreateWindowClass();
 	window = {};
 	LoadCursors();
 
@@ -390,7 +395,8 @@ void Win32CreateWindow(LPCWSTR title, LONG width, LONG height) {
 		LOG("failed to adjust window size");
 
 	window.dim = {width, height};
-	window.handle = CreateWindowExW(0,
+	window.handle = CreateWindowExW(
+		WS_EX_APPWINDOW,
 		windowClass.lpszClassName, 
 		title,
 		style,
@@ -399,10 +405,12 @@ void Win32CreateWindow(LPCWSTR title, LONG width, LONG height) {
 		rect.right - rect.left,
 		rect.bottom - rect.top,
 		0, 0, windowClass.hInstance, 0);
+
+	ASSERT(window.handle);
 }
 
 void Win32CreateWindowFullScreen(LPCWSTR title) {
-	WNDCLASSW windowClass = CreateWindowClass();
+	WNDCLASSEXW windowClass = CreateWindowClass();
 	window = {};
 	LoadCursors();
 	
@@ -459,7 +467,7 @@ HANDLE Win32OpenFileDialog(WCHAR* path, DWORD maxPathLength) {
 	dialog.Flags |= OFN_NOCHANGEDIR;
 	BOOL success = GetOpenFileNameW(&dialog);
 	if (!success) {
-		LOG("failed to get save file name");
+		LOG("failed to get open file name");
 		return INVALID_HANDLE_VALUE ;
 	}
 	return Win32OpenFile(path);

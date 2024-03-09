@@ -101,11 +101,11 @@ float sd(vec2 pos, vec2 halfSize, float radius) {
 }
 
 void main() {
-	float sd_from_outer = sd(position - center, size/2.f, radius) + 0.5;
+	float sd_from_outer = sd(position - center, size/2.f, radius);
 	float sd_from_inner = sd_from_outer + borderWidth;
 	
-    float a1 = 1.0f - smoothstep(0.0f, 1.0f, sd_from_outer);
-    float a2 = 1.0f - smoothstep(0.0f, 1.0f, sd_from_inner);
+    float a1 = 1.0f - smoothstep(-0.5, +0.5, sd_from_outer);
+    float a2 = 1.0f - smoothstep(-0.5, +0.5, sd_from_inner);
 	
 	out_color = mix(borderColor, color, a2);
 	out_color.a = out_color.a*a1;

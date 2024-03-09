@@ -34,12 +34,15 @@ inline Color3 operator*(float32 a, Color3 c) {
 	return {a*c.r, a*c.g, a*c.b};
 }
 
-struct Color {
-	union {
-		Color3 rgb;
-		struct {float32 r, g, b;};
+union Color {
+	struct {
+		union {
+			Color3 rgb;
+			struct {float32 r, g, b;};
+		};
+		float32 a;
 	};
-	float32 a;
+	float32 e[4];
 };
 
 #define COLOR_BLACK 	Color{0, 0, 0, 1}
