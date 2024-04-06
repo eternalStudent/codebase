@@ -1,0 +1,4 @@
+X(wglSwapIntervalEXT, BOOL, (int interval))
+X(wglCreateContextAttribsARB, HGLRC, (HDC hDC, HGLRC hShareContext, const int* attribList))
+X(wglChoosePixelFormatARB, BOOL, (HDC dc, const int* atri, const FLOAT* atrf, UINT max_fmts, int* fmts, UINT* num_fmts))
+X(wglGetPixelFormatAttribivARB, BOOL, (HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues))

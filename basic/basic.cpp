@@ -39,6 +39,8 @@
 #  include <unistd.h>
 #endif
 
+#define STRINGIFY2(x) #x
+#define STRINGIFY(x) STRINGIFY2(x)
 
 #if defined(DEBUG)
 #  define ASSERT(expression) 	do{if(!(expression)) {*(int32*)0 = 0;}}while(0)

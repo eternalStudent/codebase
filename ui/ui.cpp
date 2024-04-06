@@ -7,7 +7,7 @@
  * theme
  */
 
-#include "uigraphics.cpp"
+#include "graphicsui.cpp"
 #include "font.cpp"
 #include "icons.cpp"
 
