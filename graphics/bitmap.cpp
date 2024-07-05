@@ -129,8 +129,7 @@ int32 ParseBMPHeader(byte** data, BMPHeader* info, Image* image) {
 
 #define MAX_DIMENSIONS (1 << 24)
 
-// BUG: image.channels is set to the number of channels in the file
-// and not the number of channels in the result, which is always 4
+// NOTE: always return image.channels == 4
 Image BMPLoadImage(Arena* arena, byte* data) {
     byte pal[256][4];
     int32 psize = 0, i, j, width;
@@ -158,10 +157,14 @@ Image BMPLoadImage(Arena* arena, byte* data) {
             psize = (info.offset - info.extra_read - info.hsz) >> 2;
     }
 
+    image.channels = 4;
+
+    /*
     if (info.bpp == 24 && info.ma == 0xff000000)
         image.channels = 3;
     else
         image.channels = info.ma ? 4 : 3;
+    */
 
     image.data = (byte*)ArenaAlloc(arena, image.channels * image.width * image.height);
     if (info.bpp < 16) {
@@ -188,7 +191,7 @@ Image BMPLoadImage(Arena* arena, byte* data) {
                     image.data[z++] = pal[color][0];
                     image.data[z++] = pal[color][1];
                     image.data[z++] = pal[color][2];
-                    if (image.channels == 4) image.data[z++] = 255;
+                    /*if (image.channels == 4)*/ image.data[z++] = 255;
                     if (i + 1 == image.width) break;
                     if ((--bit_offset) < 0) {
                         bit_offset = 7;
@@ -209,13 +212,13 @@ Image BMPLoadImage(Arena* arena, byte* data) {
                     image.data[z++] = pal[v][0];
                     image.data[z++] = pal[v][1];
                     image.data[z++] = pal[v][2];
-                    if (image.channels == 4) image.data[z++] = 255;
+                    /*if (image.channels == 4)*/ image.data[z++] = 255;
                     if (i + 1 == image.width) break;
                     v = (info.bpp == 8) ? ReadByte(&data) : v2;
                     image.data[z++] = pal[v][0];
                     image.data[z++] = pal[v][1];
                     image.data[z++] = pal[v][2];
-                    if (image.channels == 4) image.data[z++] = 255;
+                    /*if (image.channels == 4)*/ image.data[z++] = 255;
                 }
                 Skip(&data, pad);
             }
@@ -256,7 +259,7 @@ Image BMPLoadImage(Arena* arena, byte* data) {
                     z += 3;
                     a = (easy == 2 ? ReadByte(&data) : 255);
                     info.all_a |= a;
-                    if (image.channels == 4) image.data[z++] = a;
+                    /*if (image.channels == 4)*/ image.data[z++] = a;
                 }
             }
             else {
@@ -269,7 +272,7 @@ Image BMPLoadImage(Arena* arena, byte* data) {
                     image.data[z++] = BYTECAST(shiftsigned(v & info.mb, bshift, bcount));
                     a = (uint32)(info.ma ? shiftsigned(v & info.ma, ashift, acount) : 255);
                     info.all_a |= a;
-                    if (image.channels == 4) image.data[z++] = BYTECAST(a);
+                    /*if (image.channels == 4)*/ image.data[z++] = BYTECAST(a);
                 }
             }
             Skip(&data, pad);
@@ -277,7 +280,7 @@ Image BMPLoadImage(Arena* arena, byte* data) {
     }
 
     // if alpha channel is all 0s, replace with all 255s
-    if (image.channels == 4 && info.all_a == 0)
+    if (/*image.channels == 4 &&*/ info.all_a == 0)
         for (i = 4 * image.width * image.height - 1; i >= 0; i -= 4)
             image.data[i] = 255;
 

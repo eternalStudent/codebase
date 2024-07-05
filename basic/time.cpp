@@ -1,16 +1,16 @@
 #if defined(_OS_WINDOWS)
 #  include "win32time.cpp"
-#  define OsTimeInit		Win32TimeInit
-#  define OsTimeStart 		Win32TimeStart
-#  define OsTimePause 		Win32TimePause
-#  define OsTimeStop		Win32TimeStop
-#  define OsTimeRestart 	Win32TimeRestart
+#  define OSTimeInit		Win32TimeInit
+#  define OSTimeStart 		Win32TimeStart
+#  define OSTimePause 		Win32TimePause
+#  define OSTimeStop		Win32TimeStop
+#  define OSTimeRestart 	Win32TimeRestart
 #elif defined(_OS_UNIX)
 #  include <time.h>
 #  include "linuxtime.cpp"
-#  define OsTimeInit		LinuxTimeInit
-#  define OsTimeStart 		LinuxTimeStart
-#  define OsTimePause 		LinuxTimePause
-#  define OsTimeStop		LinuxTimeStop
-#  define OsTimeRestart 	LinuxTimeRestart
+#  define OSTimeInit		LinuxTimeInit
+#  define OSTimeStart 		LinuxTimeStart
+#  define OSTimePause 		LinuxTimePause
+#  define OSTimeStop		LinuxTimeStop
+#  define OSTimeRestart 	LinuxTimeRestart
 #endif

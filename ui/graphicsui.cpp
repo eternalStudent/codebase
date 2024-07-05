@@ -20,8 +20,13 @@
 # define GfxSetFontAtlas		D3D11UISetFontAtlas
 # define GfxDrawQuad			D3D11UIDrawQuad
 # define GfxDrawGlyph			D3D11UIDrawGlyph
+# define GfxDrawImage			D3D11UIDrawImage
 # define GfxDrawLine			D3D11UIDrawLine
 # define GfxDrawCurve			D3D11UIDrawCurve
 # define GfxCropScreen			D3D11UICropScreen
 # define GfxClearCrop			D3D11UIClearCrop
+# define GfxGenerateTexture		D3D11GenerateTexture
+# define GfxTexture 			D3D11Texture
+# define GFX_BILINEAR 			D3D11_BILINEAR
+# define GFX_NEAREST 			D3D11_NEAREST
 #endif

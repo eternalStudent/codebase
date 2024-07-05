@@ -135,9 +135,9 @@ inline int64 sign(float32 x) {
 
 inline float32 exp2(int32 exp) {
 	uint32 exp_part = (uint32)(exp+127);
-	union {uint32 u; float32 f;} data;
-	data.u = exp_part << 23;
-	return data.f;
+	union {uint32 u; float32 f;} cvt;
+	cvt.u = exp_part << 23;
+	return cvt.f;
 }
 
 #ifndef _MATH_ALREADY_DEFINED_
@@ -154,6 +154,7 @@ inline float32 ceil(float32 value) {
 	return _mm_cvtss_f32(_mm_ceil_ss(_mm_setzero_ps(), _mm_set_ss(value)));
 }
 
+// a*b + c
 inline float32 fmadd(float32 a, float32 b, float32 c) {
 	return _mm_cvtss_f32(_mm_fmadd_ss(_mm_set_ss(a), _mm_set_ss(b), _mm_set_ss(c)));
 }
@@ -217,4 +218,23 @@ float64 pow10(int64 n) {
 		return tab[n];
 	m = n/2;
 	return pow10(m)*pow10(n-m);
+}
+
+inline float64 round(float64 value) {
+	return _mm_cvtsd_f64(_mm_round_sd(_mm_setzero_pd(), _mm_set_sd(value),
+						_MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC ));
+}
+
+float64 power(float64 base, uint32 exponent) {
+	float64 result = 1;
+
+	while (exponent > 0) {
+		if (exponent & 1) {
+			result *= base;
+		}
+		base *= base;
+		exponent >>= 1;
+	}
+
+	return result;
 }

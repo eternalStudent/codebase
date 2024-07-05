@@ -840,6 +840,12 @@ struct StringBuilder {
 		return concat;
 	}
 
+	StringBuilder operator()(float32 f, int32 precision) {
+		StringBuilder concat = *this;
+		concat.ptr += FloatToDecimal(f, precision, concat.ptr);
+		return concat;
+	}
+
 	StringBuilder operator()(void* data, Stringify* stringify) {
 		StringBuilder concat = *this;
 		concat.ptr += stringify(data, concat.ptr);

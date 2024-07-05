@@ -18,6 +18,11 @@ struct D3D11Glyph {
 	Color color;
 };
 
+struct D3D11Rectangle {
+	Point2 pos0;
+	Point2 pos1;
+};
+
 struct D3D11Segment {
 	Point2 pos0;
 	Point2 pos1;
@@ -211,6 +216,55 @@ R"STRING(
 		if (a == 0) discard;
 		float4 color = input.color;
 		color.a *= a;
+ 		return color;
+	}				
+)STRING";
+
+static char imageCode[] = 
+"	#line " STRINGIFY(__LINE__) "\n"
+R"STRING(
+	struct VS_INPUT	{
+		float2 pos0 : POS0;
+		float2 pos1 : POS1;
+		uint vertexId : SV_VertexID;
+	};				
+					
+	struct PS_INPUT {
+		float4 pos : SV_POSITION;
+		float2 uv : UV;
+	};				
+					
+	cbuffer cbuffer0 : register(b0) {
+		row_major float4x4 mvp;
+	}
+
+	Texture2D<float4> image : register(t0);
+	SamplerState lsampler : register(s0);
+					
+	PS_INPUT vs(VS_INPUT input) {
+		PS_INPUT output;
+		float2 pixel_poses[] = {
+			float2(input.pos0.x, input.pos1.y),
+			float2(input.pos0.x, input.pos0.y),
+			float2(input.pos1.x, input.pos1.y),
+			float2(input.pos1.x, input.pos0.y),
+		};
+		float2 pixel_pos = pixel_poses[input.vertexId];
+		output.pos = mul(mvp, float4(pixel_pos, 0, 1));
+
+		float2 uvs[] = {
+			float2(0, 0),
+			float2(0, 1),
+			float2(1, 0),
+			float2(1, 1),
+		};
+		output.uv = uvs[input.vertexId];
+
+		return output;
+	}			
+					
+	float4 ps(PS_INPUT input) : SV_TARGET {				
+		float4 color = image.Sample(lsampler, input.uv);
  		return color;
 	}				
 )STRING";
@@ -542,6 +596,15 @@ void D3D11UIInit() {
 	{
 		D3D11_INPUT_ELEMENT_DESC desc[] =
 		{
+			{ "POS"   , 0, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Rectangle, pos0), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "POS"   , 1, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Rectangle, pos1), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+		};
+		d3d11.imageProgram = CreateProgram(STR(imageCode), desc, ARRAYSIZE(desc), sizeof(D3D11Rectangle));
+	}
+
+	{
+		D3D11_INPUT_ELEMENT_DESC desc[] =
+		{
 			{ "POS"   , 0, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Segment, pos0), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "POS"   , 1, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Segment, pos1), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "POS"   , 2, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Segment, pos2), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
@@ -687,6 +750,31 @@ void DrawQuad(D3D11Quad quad) {
 
 	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Quad), &quad, sizeof(D3D11Quad));
 	d3d11.quadCount++;
+}
+
+void D3D11UIDrawImage(D3D11Texture image, Point2 pos, Point2 dim) {
+	FlushVertices();
+	DisableMultiSample();
+	PixelSpaceYIsDown();
+
+	d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+	D3D11Rectangle rect = {pos, pos+dim};
+	memcpy((byte*)d3d11.mapped.pData, &rect, sizeof(D3D11Rectangle));
+	d3d11.context->Unmap((ID3D11Resource*)d3d11.vbuffer, 0);
+
+	// Input Assembler
+	d3d11.context->IASetInputLayout(d3d11.imageProgram.layout);
+	d3d11.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	UINT stride = d3d11.imageProgram.stride;
+	UINT offset = 0;
+	d3d11.context->IASetVertexBuffers(0, 1, &d3d11.vbuffer, &stride, &offset);
+
+	d3d11.context->VSSetShader(d3d11.imageProgram.vshader, NULL, 0);
+	d3d11.context->PSSetShader(d3d11.imageProgram.pshader, NULL, 0);
+	d3d11.context->PSSetShaderResources(0, 1, &image.resource);
+	d3d11.context->PSSetSamplers(0, 1, &image.sampler);
+
+	d3d11.context->DrawInstanced(4, 1, 0, 0);
 }
 
 void OSD3D11SwapBuffers() {
