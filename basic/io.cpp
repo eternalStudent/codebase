@@ -9,11 +9,12 @@
 #  define OSWriteFile			Win32WriteFile
 #  define OSGetFileSize 		Win32GetFileSize
 #  define OSCloseFile   		CloseHandle
-#  define OSFileExists			Win32FileExists
+#  define OSFileExists			PathFileExistsW
 #  define OSGetDefaultFontFile	Win32GetDefaultFontFile
 #  define OSCreateChildProcess  Win32CreateChildProcess
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)
 #  define STDOUT 				GetStdHandle(STD_OUTPUT_HANDLE)
+
 #elif defined(_OS_UNIX)
 #  include <fcntl.h>
 #  include <sys/stat.h>

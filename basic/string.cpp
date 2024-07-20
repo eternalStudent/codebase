@@ -137,7 +137,19 @@ struct String {
 	ssize length;
 };
 
+struct String16 {
+	uint16* data;
+	ssize length;
+};
+
+struct String32 {
+	uint32* data;
+	ssize length;
+};
+
 #define STR(x) String{((byte*)x), (sizeof(x)-1)}
+
+#define STR16(x) String16{((uint16*)x), ((sizeof(x)/2)-1)}
 
 ssize StringCopy(String source, byte* dest) {
 	memcpy(dest, source.data, source.length);
