@@ -1,4 +1,18 @@
 /*
+ * NOTE:
+ * A lot of work has been done here to support 
+ * all kinds of UI widget and behaviors.
+ * But this design turned out to not be as flexible as I wanted it to be,
+ * so now I mostly view this files as a reference, rather than
+ * including it as-is in my projects.
+ *
+ * I am still experimenting on how to write a ui layer that is:
+ *    a) not a framework, but a library, and
+ *    b) help me be more productive, by removing the need to rewrite boilerplate code.
+ */
+
+
+/*
  * TODO:
  * ctrl+left/right
  * multi/single line text

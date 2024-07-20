@@ -1,3 +1,10 @@
+/*
+ * TODO:
+ * This was written as a wrapper to stb_truetype,
+ * and needs to be re-written in order to support 
+ * a more robust text rendering pipeline.
+ */
+
 struct BakedChar {
 	int16 x0, y0, x1, y1;
 	float32 xoff, yoff, xadvance;
@@ -233,7 +240,6 @@ TextMetrics GetTextMetrics(BakedFont* font, String string,
 	return GetTextMetrics(font, string, string.length, shouldWrap, wrapX);
 }
 
-// TODO: Handle zoom!!
 void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string,
 						 ssize start, ssize end, 
 						 bool shouldWrap, float32 wrapX) {
