@@ -254,15 +254,19 @@ void main() {
 }   
 	)STRING";
 
-void OpenGLUIInit() {
+void OpenGLUIInit(uint32 globalFlags) {
 	opengl = {};
-	OSOpenGLInit();
+	OSOpenGLInit(globalFlags & GFX_MULTISAMPLE ? 4 : 1);
 	opengl.quads = OSAllocate(sizeof(OpenGLQuad)*1024);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glEnable(GL_FRAMEBUFFER_SRGB); 
-	glEnable(GL_SCISSOR_TEST);
+
+	if (globalFlags & GFX_SRGB)
+		glEnable(GL_FRAMEBUFFER_SRGB); 
+
+	if (globalFlags & GFX_SCISSOR)
+		glEnable(GL_SCISSOR_TEST);
 	
 	GLuint vbo;
 	glGenBuffers(1, &vbo);

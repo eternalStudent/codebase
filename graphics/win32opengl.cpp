@@ -82,7 +82,7 @@ typedef ptrdiff_t GLintptr;
 #define WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB		0x20A9
 
 
-BOOL Win32OpenGLInit() {
+BOOL Win32OpenGLInit(int samples) {
 	WNDCLASSW dummyClass = {0};
 	dummyClass.lpfnWndProc = DefWindowProcW;
 	dummyClass.hInstance = NULL;
@@ -155,7 +155,7 @@ BOOL Win32OpenGLInit() {
 		WGL_RED_BITS_ARB,		8,
 		WGL_GREEN_BITS_ARB,		8,
 		WGL_BLUE_BITS_ARB,		8,
-		WGL_SAMPLES_ARB, 		4,
+		WGL_SAMPLES_ARB, 		samples,
 		0
 	};
 		  

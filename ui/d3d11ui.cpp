@@ -184,7 +184,7 @@ R"STRING(
 		float2 atlasDim;
 	}
 
-	Texture2D<float4> atlas : register(t0);
+	Texture2D<float> atlas : register(t0);
 	SamplerState lsampler : register(s0);
 					
 	PS_INPUT vs(VS_INPUT input) {
@@ -212,7 +212,7 @@ R"STRING(
 	}			
 					
 	float4 ps(PS_INPUT input) : SV_TARGET {				
-		float a = atlas.Sample(lsampler, input.uv).r;
+		float a = atlas.Sample(lsampler, input.uv);
 		if (a == 0) discard;
 		float4 color = input.color;
 		color.a *= a;
@@ -354,7 +354,7 @@ D3D11Texture D3D11GenerateTexture(Image image, int32 filter) {
 	return {resource, d3d11.samplers[filter]};
 }
 
-void D3D11UIInit() {
+void D3D11UIInit(uint32 globalFlags) {
 	HRESULT hr;
 
 	d3d11 = {};
@@ -438,11 +438,13 @@ void D3D11UIInit() {
 			desc.Width              = 0;
 			desc.Height             = 0;
 
-			desc.Format             = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+			desc.Format             = (globalFlags & GFX_SRGB) ? 
+										DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : 
+										DXGI_FORMAT_R8G8B8A8_UNORM;
 
 			desc.Stereo             = FALSE;
 
-			desc.SampleDesc.Count   = 4;
+			desc.SampleDesc.Count   = (globalFlags & GFX_MULTISAMPLE) ? 4 : 1;
 			desc.SampleDesc.Quality = 0;
 
 			desc.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -450,7 +452,9 @@ void D3D11UIInit() {
 
 			desc.Scaling            = DXGI_SCALING_STRETCH;
 
-			desc.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD;
+			desc.SwapEffect         = (globalFlags & GFX_MULTISAMPLE) ? 
+										DXGI_SWAP_EFFECT_DISCARD : 
+										DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
 			desc.AlphaMode          = DXGI_ALPHA_MODE_UNSPECIFIED;
 			desc.Flags              = 0;
@@ -488,7 +492,8 @@ void D3D11UIInit() {
 		{
 			desc.FillMode = D3D11_FILL_SOLID;
 			desc.CullMode = D3D11_CULL_BACK;
-			desc.ScissorEnable = TRUE;
+			desc.ScissorEnable = (globalFlags & GFX_SCISSOR) ? TRUE : FALSE;
+			desc.MultisampleEnable = FALSE;
 		}
 		hr = d3d11.device->CreateRasterizerState1(&desc, &d3d11.ss_rasterizer);
 		ASSERT_HR(hr);
@@ -499,7 +504,7 @@ void D3D11UIInit() {
 		{
 			desc.FillMode = D3D11_FILL_SOLID;
 			desc.CullMode = D3D11_CULL_BACK;
-			desc.ScissorEnable = TRUE;
+			desc.ScissorEnable = (globalFlags & GFX_SCISSOR) ? TRUE : FALSE;;
 			desc.MultisampleEnable = TRUE;
 		}
 		hr = d3d11.device->CreateRasterizerState1(&desc, &d3d11.ms_rasterizer);
@@ -701,7 +706,8 @@ void D3D11UISetBackgroundColor(Color color) {
 }
 
 void D3D11UISetFontAtlas(Image image) {
-	d3d11.glyphProgram.texture = D3D11GenerateTexture(image, D3D11_BILINEAR);
+	// NOTE: Nearest works if this is a bit font, and also should work for regular font assuming no resizing
+	d3d11.glyphProgram.texture = D3D11GenerateTexture(image, D3D11_NEAREST);
 	d3d11.glyphProgram.textureDim = {(float32)image.dimensions.width, (float32)image.dimensions.height};
 }
 
@@ -811,6 +817,26 @@ void D3D11UIDrawQuad(
 		color2, 
 		color1,
 		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawSphere(Point2 center, float32 radius, Color color, float32 borderThickness, Color borderColor) {
+
+	Point2 pos0 = {center.x - radius, center.y - radius};
+	Point2 pos1 = {center.x + radius, center.y + radius};	
+
+	D3D11Quad quad = {
+		pos0,
+		pos1,
+		color,
+		color,
+		color, 
+		color,
+		radius,
 		borderThickness,
 		borderColor,
 	};
