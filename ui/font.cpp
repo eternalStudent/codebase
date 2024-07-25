@@ -23,7 +23,7 @@ struct AtlasBitmap {
 	byte* bitmap;
 };
 
-AtlasBitmap CreateAtlasBitmap(Arena* arena, int16 width, int16 height) {
+AtlasBitmap CreateAtlasBitmap(int16 width, int16 height, Arena* arena) {
 	AtlasBitmap atlas;
 	atlas.pw = width;
 	atlas.ph = height;
@@ -38,20 +38,24 @@ AtlasBitmap CreateAtlasBitmap(Arena* arena, int16 width, int16 height) {
 #include "truetype.cpp"
 
 FontInfo LoadDefaultFont(Arena* arena) {
-	byte* data = OSReadAll(OSGetDefaultFontFile(), arena).data;
+	File file = OSGetDefaultFontFile();
+	byte* data = OSReadAll(file, arena).data;
+	OSCloseFile(file);
+
 	return TTLoadFont(data);
 }
 
-BakedFont LoadAndBakeFont(Arena* arena, AtlasBitmap* atlas, byte* data, float32 height) {
+BakedFont LoadAndBakeFont(AtlasBitmap* atlas, byte* data, float32 height, Arena* arena) {
 	FontInfo fontInfo = TTLoadFont(data);
-
 	return TTBakeFont(arena, fontInfo, atlas, height);
 }
 
-BakedFont LoadAndBakeDefaultFont(Arena* arena, AtlasBitmap* atlas, float32 height) {
-	byte* data = OSReadAll(OSGetDefaultFontFile(), arena).data;
-	FontInfo fontInfo = TTLoadFont(data);
+BakedFont LoadAndBakeDefaultFont(AtlasBitmap* atlas, float32 height, Arena* arena) {
+	File file = OSGetDefaultFontFile();
+	byte* data = OSReadAll(file, arena).data;
+	OSCloseFile(file);
 
+	FontInfo fontInfo = TTLoadFont(data);
 	return TTBakeFont(arena, fontInfo, atlas, height);
 }
 
@@ -59,7 +63,6 @@ Image GetImageFromFontAtlas(AtlasBitmap* atlas) {
 	return Image{atlas->pw, atlas->ph, 1, atlas->bitmap};
 }
 
-// NOTE: adopted from stbtt_GetBakedQuad
 float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b) {
 	BakedChar bakedchar = font->chardata[b - font->firstChar];
 	

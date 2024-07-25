@@ -48,6 +48,10 @@
 #  define ASSERT(expression)
 #endif
 
+#if defined(_OS_WINDOWS)
+#  define ASSERT_HR(hr) ASSERT(SUCCEEDED(hr))
+#endif
+
 #if !defined(COMPILER_MSVC)
 #  define alignof	__alignof__
 #endif

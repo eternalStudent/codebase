@@ -4,8 +4,6 @@
 #include <dxgidebug.h>
 #include <d3dcommon.h>
 
-#define ASSERT_HR(hr) ASSERT(SUCCEEDED(hr))
-
 struct D3D11Texture {
 	ID3D11ShaderResourceView* resource;
 	ID3D11SamplerState* sampler;
