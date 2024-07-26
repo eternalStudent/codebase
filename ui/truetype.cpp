@@ -1784,7 +1784,9 @@ void MakeGlyphBitmap(Arena* arena, const FontInfo* info, byte* output,
 	MakeGlyphBitmapSubpixel(arena, info, output, out_w, out_h, out_stride, scale_x, scale_y, 0.0f, 0.0f, glyph);
 }
 
-BakedFont TTBakeFont(Arena* arena, FontInfo fontInfo, AtlasBitmap* atlas, float32 height, int32 first_char = 32, int32 num_chars = 96) {
+BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, Arena* arena) {
+	int32 first_char = 32;
+	int32 num_chars = 96;
 	float32 scale = ScaleForPixelHeight(&fontInfo, height);
 
 	BakedFont font;
@@ -1821,7 +1823,7 @@ BakedFont TTBakeFont(Arena* arena, FontInfo fontInfo, AtlasBitmap* atlas, float3
 	return font;
 }
 
-BakedFont TTBakeFont(Arena* arena, FontInfo fontInfo, AtlasBitmap* atlas, float32 height, int32* chars, int32 num_chars) {
+BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, int32* chars, int32 num_chars, Arena* arena) {
 	float32 scale = ScaleForPixelHeight(&fontInfo, height);
 
 	BakedFont font;

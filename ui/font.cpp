@@ -47,7 +47,7 @@ FontInfo LoadDefaultFont(Arena* arena) {
 
 BakedFont LoadAndBakeFont(AtlasBitmap* atlas, byte* data, float32 height, Arena* arena) {
 	FontInfo fontInfo = TTLoadFont(data);
-	return TTBakeFont(arena, fontInfo, atlas, height);
+	return TTBakeFont(fontInfo, atlas, height, arena);
 }
 
 BakedFont LoadAndBakeDefaultFont(AtlasBitmap* atlas, float32 height, Arena* arena) {
@@ -56,7 +56,7 @@ BakedFont LoadAndBakeDefaultFont(AtlasBitmap* atlas, float32 height, Arena* aren
 	OSCloseFile(file);
 
 	FontInfo fontInfo = TTLoadFont(data);
-	return TTBakeFont(arena, fontInfo, atlas, height);
+	return TTBakeFont(fontInfo, atlas, height, arena);
 }
 
 Image GetImageFromFontAtlas(AtlasBitmap* atlas) {

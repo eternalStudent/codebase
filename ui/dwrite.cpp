@@ -79,8 +79,8 @@ BakedFont DWriteBakeFont(
 	DWRITE_FONT_METRICS fontMetrics;
 	fontFace->GetMetrics(&fontMetrics);
 	FLOAT emSize = (96.f/72.f)*pixelSize;
-	FLOAT designUnits = emSize/fontMetrics.designUnitsPerEm;
-	FLOAT baselineOriginY = designUnits*fontMetrics.ascent;
+	FLOAT pixelsPerDesignUnits = emSize/fontMetrics.designUnitsPerEm;
+	FLOAT baselineOriginY = pixelsPerDesignUnits*fontMetrics.ascent;
 
 	COLORREF background = RGB(0, 0, 0);
 	COLORREF foreground = RGB(255, 255, 255);
@@ -92,6 +92,7 @@ BakedFont DWriteBakeFont(
 	BakedFont font;
 	font.firstChar = firstChar;
 	font.lastChar = firstChar + codepointCount - 1;
+	font.height = pixelsPerDesignUnits*(fontMetrics.ascent + fontMetrics.descent);
 
 	for (uint32 i = 0; i < codepointCount; i ++) {
 
@@ -159,21 +160,21 @@ BakedFont DWriteBakeFont(
 			}
 		}
 
-		DWRITE_GLYPH_METRICS glyph_metrics;
+		DWRITE_GLYPH_METRICS glyphMetrics;
 		hr = fontFace->GetDesignGlyphMetrics(
 			&glyphId,
 			1, 
-			&glyph_metrics, 
+			&glyphMetrics, 
 			FALSE);
 		ASSERT_HR(hr);
 
 		font.chardata[i].xoff = (float32)boundingBox.left;
-		font.chardata[i].yoff = (float32)boundingBox.top;
+		font.chardata[i].yoff = (float32)boundingBox.top - (int32)baselineOriginY;
 		font.chardata[i].x0 = atlas->x;
 		font.chardata[i].y0 = atlas->y;
 		font.chardata[i].x1 = atlas->x + (int16)glyphWidth;
 		font.chardata[i].y1 = atlas->y + (int16)glyphHeight;
-		font.chardata[i].xadvance = designUnits*glyph_metrics.advanceWidth;
+		font.chardata[i].xadvance = pixelsPerDesignUnits*glyphMetrics.advanceWidth;
 
 		atlas->x += (int16)glyphWidth + 1;
 		if (atlas->y + glyphHeight + 1 > atlas->bottom_y)
