@@ -106,7 +106,7 @@ Stream get_subr(Stream idx, int n) {
 	return cff_index_get(idx, n);
 }
 
-struct FontInfo {
+struct STBFontInfo {
 	byte*  data;                // pointer to .ttf file
 	int32  fontstart;           // offset of start of font
 
@@ -124,7 +124,7 @@ struct FontInfo {
 	Stream fdselect;            // map from glyph to fontdict
 };
 
-Stream cid_get_glyph_subrs(const FontInfo* info, int32 glyph_index) {
+Stream cid_get_glyph_subrs(const STBFontInfo* info, int32 glyph_index) {
 	Stream fdselect = info->fdselect;
 	int32 nranges, start, end, v, fmt, fdselector = -1, i;
 
@@ -195,9 +195,9 @@ enum {
 	MS_EID_UNICODE_FULL  =10
 };
 
-FontInfo TTLoadFont(byte* buffer) {
+STBFontInfo STBLoadFont(byte* buffer) {
 	int32 fontstart = 0;
-	FontInfo info;
+	STBFontInfo info;
 	uint32 cmap, t;
 	int32 i,numTables;
 
@@ -308,19 +308,19 @@ FontInfo TTLoadFont(byte* buffer) {
 	return info;
 }
 
-float32 ScaleForPixelHeight(const FontInfo* info, float32 height) {
+float32 ScaleForPixelHeight(const STBFontInfo* info, float32 height) {
 	int32 fheight = __SHORT(info->data + info->hhea + 4) - __SHORT(info->data + info->hhea + 6);
 	return (float32) height / fheight;
 }
 
-void GetFontMetrics(const FontInfo* info, int32* ascent, int32 *descent, int32* lineGap, int32* designUnitsPerEm) {
+void GetFontMetrics(const STBFontInfo* info, int32* ascent, int32 *descent, int32* lineGap, int32* designUnitsPerEm) {
    if (ascent ) *ascent  = __SHORT(info->data + info->hhea + 4);
    if (descent) *descent = __SHORT(info->data + info->hhea + 6);
    if (lineGap) *lineGap = __SHORT(info->data + info->hhea + 8);
    if (designUnitsPerEm) *designUnitsPerEm = __USHORT(info->data + info->head + 18);
 }
 
-int32 FindGlyphIndex(const FontInfo* info, int32 unicode_codepoint) {
+int32 FindGlyphIndex(const STBFontInfo* info, int32 unicode_codepoint) {
 	byte* data = info->data;
 	uint32 index_map = info->index_map;
 
@@ -412,7 +412,7 @@ int32 FindGlyphIndex(const FontInfo* info, int32 unicode_codepoint) {
 	return 0;
 }
 
-void GetGlyphHMetrics(const FontInfo* info, int32 glyph_index, int32* advanceWidth, 
+void GetGlyphHMetrics(const STBFontInfo* info, int32 glyph_index, int32* advanceWidth, 
 							 int32* leftSideBearing) {
 	uint16 numOfLongHorMetrics = __USHORT(info->data+info->hhea + 34);
 	if (glyph_index < numOfLongHorMetrics) {
@@ -512,7 +512,7 @@ void csctx_rccurve_to(csctx* ctx,
 	csctx_v(ctx, vcubic, (int32)ctx->x, (int32)ctx->y, (int32)cx1, (int32)cy1, (int32)cx2, (int32)cy2);
 }
 
-int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
+int32 run_charstring(const STBFontInfo* info, int32 glyph_index, csctx* c) {
 	int32 in_header = 1, maskbits = 0, subr_stack_height = 0, sp = 0, v, i, b0;
 	int32 has_subrs = 0, clear_stack;
 	float32 s[48];
@@ -768,7 +768,7 @@ int32 run_charstring(const FontInfo* info, int32 glyph_index, csctx* c) {
 	return FAIL("no endchar");
 }
 
-int32 GetGlyphInfoT2(const FontInfo* info, int32 glyph_index, 
+int32 GetGlyphInfoT2(const STBFontInfo* info, int32 glyph_index, 
 							int32* x0, int32* y0, int32* x1, int32* y1) {
 	csctx c = CSCTX_INIT(1);
 	int32 r = run_charstring(info, glyph_index, &c);
@@ -779,7 +779,7 @@ int32 GetGlyphInfoT2(const FontInfo* info, int32 glyph_index,
 	return r ? c.num_vertices : 0;
 }
 
-int32 GetGlyphOffset(const FontInfo* info, int32 glyph_index) {
+int32 GetGlyphOffset(const STBFontInfo* info, int32 glyph_index) {
 	int32 g1,g2;
 
 	ASSERT(!info->cff.length);
@@ -798,7 +798,7 @@ int32 GetGlyphOffset(const FontInfo* info, int32 glyph_index) {
 	return g1==g2 ? -1 : g1; // if length is 0, return -1
 }
 
-int32 GetGlyphBox(const FontInfo* info, int32 glyph_index, 
+int32 GetGlyphBox(const STBFontInfo* info, int32 glyph_index, 
 					 int32* x0, int32* y0, int32* x1, int32* y1) {
 	if (info->cff.length) {
 		GetGlyphInfoT2(info, glyph_index, x0, y0, x1, y1);
@@ -814,7 +814,7 @@ int32 GetGlyphBox(const FontInfo* info, int32 glyph_index,
 	return 1;
 }
 
-void GetGlyphBitmapBoxSubpixel(const FontInfo* font, int32 glyph, 
+void GetGlyphBitmapBoxSubpixel(const STBFontInfo* font, int32 glyph, 
 										 float32 scale_x, float32 scale_y, 
 										 float32 shift_x, float32 shift_y, 
 										 int32* ix0, int32* iy0, int32* ix1, int32* iy1) {
@@ -834,7 +834,7 @@ void GetGlyphBitmapBoxSubpixel(const FontInfo* font, int32 glyph,
 	}
 }
 
-void GetGlyphBitmapBox(const FontInfo* font, int32 glyph, 
+void GetGlyphBitmapBox(const STBFontInfo* font, int32 glyph, 
 							  float32 scale_x, float32 scale_y, 
 							  int32 *ix0, int32 *iy0, int32 *ix1, int32 *iy1) {
 	GetGlyphBitmapBoxSubpixel(font, glyph, scale_x, scale_y,0.0f,0.0f, ix0, iy0, ix1, iy1);
@@ -858,9 +858,9 @@ int32 close_shape(vertex* vertices, int32 num_vertices,
 	return num_vertices;
 }
 
-int32 GetGlyphShape(Arena* arena, const FontInfo* info, int32 glyph_index, vertex** pvertices);
+int32 GetGlyphShape(Arena* arena, const STBFontInfo* info, int32 glyph_index, vertex** pvertices);
 
-int32 GetGlyphShapeTT(Arena* arena, const FontInfo* info, int32 glyph_index, vertex** pvertices) {
+int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, vertex** pvertices) {
 	int16 numberOfContours;
 	byte* endPtsOfContours;
 	byte* data = info->data;
@@ -1078,7 +1078,7 @@ int32 GetGlyphShapeTT(Arena* arena, const FontInfo* info, int32 glyph_index, ver
 	return num_vertices;
 }
 
-int32 GetGlyphShapeT2(Arena* arena, const FontInfo* info, int32 glyph_index, vertex** pvertices) {
+int32 GetGlyphShapeT2(Arena* arena, const STBFontInfo* info, int32 glyph_index, vertex** pvertices) {
 	// runs the charstring twice, once to count and once to output (to avoid realloc)
 	csctx count_ctx = CSCTX_INIT(1);
 	csctx output_ctx = CSCTX_INIT(0);
@@ -1094,7 +1094,7 @@ int32 GetGlyphShapeT2(Arena* arena, const FontInfo* info, int32 glyph_index, ver
 	return 0;
 }
 
-int32 GetGlyphShape(Arena* arena, const FontInfo* info, int32 glyph_index, vertex** pvertices) {
+int32 GetGlyphShape(Arena* arena, const STBFontInfo* info, int32 glyph_index, vertex** pvertices) {
 	if (!info->cff.length)
 		return GetGlyphShapeTT(arena, info, glyph_index, pvertices);
 	else
@@ -1766,7 +1766,7 @@ void Rasterize(Arena* arena, Image* result, float32 flatness_in_pixels, vertex *
 	}
 }
 
-void MakeGlyphBitmapSubpixel(Arena* arena, const FontInfo* info, byte* output, 
+void MakeGlyphBitmapSubpixel(Arena* arena, const STBFontInfo* info, byte* output, 
 									int32 out_w, int32 out_h, int32 out_stride, 
 									float32 scale_x, float32 scale_y, 
 									float32 shift_x, float32 shift_y, int32 glyph) {
@@ -1785,15 +1785,15 @@ void MakeGlyphBitmapSubpixel(Arena* arena, const FontInfo* info, byte* output,
 		Rasterize(arena, &gbm, 0.35f, vertices, num_verts, scale_x, scale_y, shift_x, shift_y, ix0,iy0, 1);
 }
 
-void MakeGlyphBitmap(Arena* arena, const FontInfo* info, byte* output, 
+void MakeGlyphBitmap(Arena* arena, const STBFontInfo* info, byte* output, 
 							int32 out_w, int32 out_h, int32 out_stride, 
 							float32 scale_x, float32 scale_y, int32 glyph) {
 	MakeGlyphBitmapSubpixel(arena, info, output, out_w, out_h, out_stride, scale_x, scale_y, 0.0f, 0.0f, glyph);
 }
 
-BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, bool scaleForPixelHeight, Arena* arena) {
-	int32 first_char = 32;
-	int32 num_chars = 96;
+BakedFont STBBakeFont(STBFontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, bool scaleForPixelHeight, Arena* arena) {
+	int32 firstChar = 32;
+	int32 numChars = 96;
 
 	int32 ascent, descent, lineGap, designUnitsPerEm;
 	GetFontMetrics(&fontInfo, &ascent, &descent, &lineGap, &designUnitsPerEm);
@@ -1810,9 +1810,9 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, b
 	}
 
 	BakedFont font;
-	for (int32 i = 0; i < num_chars; ++i) {
+	for (int32 i = 0; i < numChars; ++i) {
 		int32 advance, lsb, x0, y0, x1, y1, gw, gh;
-		int32 g = FindGlyphIndex(&fontInfo, first_char + i);
+		int32 g = FindGlyphIndex(&fontInfo, firstChar + i);
 		GetGlyphHMetrics(&fontInfo, g, &advance, &lsb);
 		GetGlyphBitmapBox(&fontInfo, g, pixelsPerDesignUnits, pixelsPerDesignUnits, &x0, &y0, &x1, &y1);
 		gw = x1 - x0;
@@ -1838,13 +1838,22 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, b
 
 	font.height = pixelHeight;
 	font.lineGap = pixelsPerDesignUnits*lineGap;
-	font.firstChar = first_char;
-	font.lastChar = first_char + num_chars - 1;
+	font.firstChar = firstChar;
+	font.lastChar = firstChar + numChars - 1;
 
 	return font;
 }
 
-BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, bool scaleForPixelHeight, int32* chars, int32 num_chars, Arena* arena) {
+BakedFont STBBakeFont(
+	STBFontInfo fontInfo, 
+	AtlasBitmap* atlas, 
+	float32 pixelSize, 
+	bool scaleForPixelHeight,
+	int32* codepoints, 
+	int32 codepointCount, 
+	Arena* arena) {
+
+	ASSERT(codepointCount <= 96);
 
 	int32 ascent, descent, lineGap, designUnitsPerEm;
 	GetFontMetrics(&fontInfo, &ascent, &descent, &lineGap, &designUnitsPerEm);
@@ -1861,9 +1870,9 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, b
 	}
 
 	BakedFont font;
-	for (int32 i = 0; i < num_chars; ++i) {
+	for (int32 i = 0; i < codepointCount; ++i) {
 		int32 advance, lsb, x0, y0, x1, y1, gw, gh;
-		int32 g = FindGlyphIndex(&fontInfo, chars[i]);
+		int32 g = FindGlyphIndex(&fontInfo, codepoints[i]);
 		GetGlyphHMetrics(&fontInfo, g, &advance, &lsb);
 		GetGlyphBitmapBox(&fontInfo, g, pixelsPerDesignUnits, pixelsPerDesignUnits, &x0, &y0, &x1, &y1);
 		gw = x1 - x0;
@@ -1890,7 +1899,29 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, b
 	font.height = pixelHeight;
 	font.lineGap = pixelsPerDesignUnits*lineGap;
 	font.firstChar = 1;
-	font.lastChar = num_chars;
+	font.lastChar = codepointCount;
 
 	return font;
+}
+
+STBFontInfo STBLoadDefaultFont(Arena* arena) {
+	File file = OSGetDefaultFontFile();
+	byte* data = OSReadAll(file, arena).data;
+	OSCloseFile(file);
+
+	return STBLoadFont(data);
+}
+
+BakedFont STBLoadAndBakeFont(AtlasBitmap* atlas, byte* data, float32 height, bool scaleForPixelHeight, Arena* arena) {
+	STBFontInfo fontInfo = STBLoadFont(data);
+	return STBBakeFont(fontInfo, atlas, height, scaleForPixelHeight, arena);
+}
+
+BakedFont STBLoadAndBakeDefaultFont(AtlasBitmap* atlas, float32 height, bool scaleForPixelHeight, Arena* arena) {
+	File file = OSGetDefaultFontFile();
+	byte* data = OSReadAll(file, arena).data;
+	OSCloseFile(file);
+
+	STBFontInfo fontInfo = STBLoadFont(data);
+	return STBBakeFont(fontInfo, atlas, height, scaleForPixelHeight, arena);
 }

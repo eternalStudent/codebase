@@ -18,6 +18,7 @@ struct BakedFont {
 	BakedChar chardata[96];
 };
 
+// TODO: rename pw, ph to width and height, and rename bitmap to data
 // TODO: change byte* to byte[0]?
 struct AtlasBitmap {
 	int16 pw, ph, x, y, bottom_y;
@@ -36,29 +37,13 @@ AtlasBitmap CreateAtlasBitmap(int16 width, int16 height, Arena* arena) {
 	return atlas;
 }
 
+#if defined(_OS_WINDOWS)
+#  include "dwrite.cpp"
+#endif
+
+// TODO: add #if here
 #include "truetype.cpp"
 
-FontInfo LoadDefaultFont(Arena* arena) {
-	File file = OSGetDefaultFontFile();
-	byte* data = OSReadAll(file, arena).data;
-	OSCloseFile(file);
-
-	return TTLoadFont(data);
-}
-
-BakedFont LoadAndBakeFont(AtlasBitmap* atlas, byte* data, float32 height, bool scaleForPixelHeight, Arena* arena) {
-	FontInfo fontInfo = TTLoadFont(data);
-	return TTBakeFont(fontInfo, atlas, height, scaleForPixelHeight, arena);
-}
-
-BakedFont LoadAndBakeDefaultFont(AtlasBitmap* atlas, float32 height, bool scaleForPixelHeight, Arena* arena) {
-	File file = OSGetDefaultFontFile();
-	byte* data = OSReadAll(file, arena).data;
-	OSCloseFile(file);
-
-	FontInfo fontInfo = TTLoadFont(data);
-	return TTBakeFont(fontInfo, atlas, height, scaleForPixelHeight, arena);
-}
 
 Image GetImageFromFontAtlas(AtlasBitmap* atlas) {
 	return Image{atlas->pw, atlas->ph, 1, atlas->bitmap};
