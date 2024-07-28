@@ -141,7 +141,7 @@ ssize GetCharIndex(BakedFont* font, String string,
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
 				if (cursory <= y) return i;
-				y += font->height;
+				y += font->height + font->lineGap;
 				x = 0;
 				if (cursorx <= x && cursory <= y) return i + 1;
 			}
@@ -150,7 +150,7 @@ ssize GetCharIndex(BakedFont* font, String string,
 
 		if (b == 10) {
 			if (cursory <= y) return i + 1;
-			y += font->height;
+			y += font->height + font->lineGap;
 			x = 0;
 		}
 		if (cursorx <= x && cursory <= y) return i + 1;
@@ -191,7 +191,7 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, String string,
 
 	if (metrics.lastCharIsNewLine) {
 		metrics.x = 0;
-		metrics.y += font->height;
+		metrics.y += font->height + font->lineGap;
 	}
 	byte b = string.data[i];
 	bool whiteSpace = IsWhiteSpace(b);
@@ -200,7 +200,7 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, String string,
 		if (wrapX <= metrics.x + wordWidth) {
 			metrics.maxx = MAX(metrics.maxx, metrics.x);
 			metrics.x = 0;
-			metrics.y += font->height;
+			metrics.y += font->height + font->lineGap;
 		}
 	}
 	metrics.x += GetCharWidth(font, b);
@@ -246,14 +246,14 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= x + wordWidth) {
 				x = 0;
-				y += font->height;
+				y += font->height + font->lineGap;
 			}
 		}
 		if (i == start) break;
 		x += GetCharWidth(font, b);
 		if (b == 10) {
 			x = 0;
-			y += font->height;
+			y += font->height + font->lineGap;
 		}
 		prevCharWasWhiteSpace = whiteSpace;
 	}
@@ -274,7 +274,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 				startx = 0;
 
 				x = 0;
-				y += font->height;
+				y += font->height + font->lineGap;
 				i++;
 				break;
 			}
@@ -288,7 +288,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 			startx = 0;
 			
 			x = 0;
-			y += font->height;
+			y += font->height + font->lineGap;
 			i++;
 			break;
 		}
@@ -308,7 +308,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 				GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
 
 				x = 0;
-				y += font->height;
+				y += font->height + font->lineGap;
 			}
 		}
 		x += GetCharWidth(font, b);
@@ -319,7 +319,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 			GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
 
 			x = 0;
-			y += font->height;
+			y += font->height + font->lineGap;
 		}
 		prevCharWasWhiteSpace = whiteSpace;
 	}
@@ -368,7 +368,7 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 				pos.x += 4*font->chardata[32 - font->firstChar].xadvance;
 			}
 			if (b == 10) {
-				pos.y += font->height;
+				pos.y += font->height + font->lineGap;
 				pos.x = initialX;
 			}
 			if (font->firstChar <= b && b <= font->lastChar) {
@@ -399,7 +399,7 @@ StringListPos GetCharPos(BakedFont* font, StringList list,
 				float32 wordWidth = GetWordWidth(font, {node, i});
 				if (wrapX <= x + wordWidth) {
 					if (cursory <= y) return {node, i};
-					y += font->height;
+					y += font->height + font->lineGap;
 					x = 0;
 					if (cursorx <= x && cursory <= y) return StringListPosInc({node, i});
 				}
@@ -408,7 +408,7 @@ StringListPos GetCharPos(BakedFont* font, StringList list,
 
 			if (b == 10) {
 				if (cursory <= y) return StringListPosInc({node, i});
-				y += font->height;
+				y += font->height + font->lineGap;
 				x = 0;
 			}
 			if (cursorx <= x && cursory <= y) return StringListPosInc({node, i});
@@ -439,7 +439,7 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, StringListPos 
 
 	if (metrics.lastCharIsNewLine) {
 		metrics.x = 0;
-		metrics.y += font->height;
+		metrics.y += font->height + font->lineGap;
 	}
 	byte b = pos.node->string.data[pos.index];
 	bool whiteSpace = IsWhiteSpace(b);
@@ -448,7 +448,7 @@ TextMetrics NextTextMetrics(TextMetrics metrics, BakedFont* font, StringListPos 
 		if (wrapX <= metrics.x + wordWidth) {
 			metrics.maxx = MAX(metrics.maxx, metrics.x);
 			metrics.x = 0;
-			metrics.y += font->height;
+			metrics.y += font->height + font->lineGap;
 		}
 	}
 	metrics.x += GetCharWidth(font, b);
