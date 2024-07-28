@@ -12,6 +12,7 @@ struct BakedChar {
 
 struct BakedFont {
 	float32 height;
+	float32 lineGap;
 	int32 firstChar;
 	int32 lastChar;
 	BakedChar chardata[96];
@@ -45,18 +46,18 @@ FontInfo LoadDefaultFont(Arena* arena) {
 	return TTLoadFont(data);
 }
 
-BakedFont LoadAndBakeFont(AtlasBitmap* atlas, byte* data, float32 height, Arena* arena) {
+BakedFont LoadAndBakeFont(AtlasBitmap* atlas, byte* data, float32 height, bool scaleForPixelHeight, Arena* arena) {
 	FontInfo fontInfo = TTLoadFont(data);
-	return TTBakeFont(fontInfo, atlas, height, arena);
+	return TTBakeFont(fontInfo, atlas, height, scaleForPixelHeight, arena);
 }
 
-BakedFont LoadAndBakeDefaultFont(AtlasBitmap* atlas, float32 height, Arena* arena) {
+BakedFont LoadAndBakeDefaultFont(AtlasBitmap* atlas, float32 height, bool scaleForPixelHeight, Arena* arena) {
 	File file = OSGetDefaultFontFile();
 	byte* data = OSReadAll(file, arena).data;
 	OSCloseFile(file);
 
 	FontInfo fontInfo = TTLoadFont(data);
-	return TTBakeFont(fontInfo, atlas, height, arena);
+	return TTBakeFont(fontInfo, atlas, height, scaleForPixelHeight, arena);
 }
 
 Image GetImageFromFontAtlas(AtlasBitmap* atlas) {
@@ -119,7 +120,7 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, String string,
 		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
 			if (wrapX <= pos.x + wordWidth) {
-				pos.y += height;
+				pos.y += height + font->lineGap;
 				pos.x = initialX;
 			}
 		}
@@ -127,7 +128,7 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, String string,
 			pos.x += 4*font->chardata[32 - font->firstChar].xadvance;
 		}
 		if (b == 10) {
-			pos.y += height;
+			pos.y += height + font->lineGap;
 			pos.x = initialX;
 		}
 		if (font->firstChar <= b && b <= font->lastChar) {
@@ -374,7 +375,7 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 				float32 wordWidth = GetWordWidth(font, {node, i});
 				if (wrapX <= pos.x + wordWidth) {
-					pos.y += height;
+					pos.y += height + font->lineGap;
 					pos.x = initialX;
 				}
 			}
@@ -535,7 +536,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					float32 wordWidth = GetWordWidth(font, {node, i});
 					if (wrapX <= x + wordWidth) {
 						x = 0;
-						y += height;
+						y += height + font->lineGap;
 					}
 				}
 				if (node == start.node && i == start.index) {
@@ -556,7 +557,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 				x += GetCharWidth(font, b);
 				if (b == 10) {
 					x = 0;
-					y += height;
+					y += height + font->lineGap;
 				}
 			}
 
@@ -573,7 +574,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 						startx = 0;
 
 						x = 0;
-						y += height;
+						y += height + font->lineGap;
 						state++;
 						i--;
 						continue;
@@ -589,7 +590,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					startx = 0;
 					
 					x = 0;
-					y += height;
+					y += height + font->lineGap;
 					state++;
 					continue;
 				}
@@ -607,7 +608,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 						GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
 
 						x = 0;
-						y += height;
+						y += height + font->lineGap;
 					}
 				}
 				x += GetCharWidth(font, b);
@@ -619,7 +620,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
 
 					x = 0;
-					y += height;
+					y += height + font->lineGap;
 				}
 			}
 

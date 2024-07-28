@@ -67,7 +67,8 @@ IDWriteFontFace* DWriteLoadDefaultFont() {
 BakedFont DWriteBakeFont(
 	IDWriteFontFace* fontFace, 
 	AtlasBitmap* atlas, 
-	FLOAT pixelSize, 
+	FLOAT pixelSize,
+	BOOL scaleForPixelHeight,
 	UINT32* codepoints, 
 	UINT32 codepointCount, 
 	int32 firstChar) {
@@ -78,9 +79,20 @@ BakedFont DWriteBakeFont(
 	// get some font metrics
 	DWRITE_FONT_METRICS fontMetrics;
 	fontFace->GetMetrics(&fontMetrics);
-	FLOAT emSize = (96.f/72.f)*pixelSize;
-	FLOAT pixelsPerDesignUnits = emSize/fontMetrics.designUnitsPerEm;
-	FLOAT baselineOriginY = pixelsPerDesignUnits*fontMetrics.ascent;
+
+	FLOAT emSize, height, pixelsPerDesignUnits;
+	if (scaleForPixelHeight) {
+		UINT16 heightInDesignUnits = fontMetrics.ascent + fontMetrics.descent;
+		emSize = pixelSize*fontMetrics.designUnitsPerEm/heightInDesignUnits;
+		pixelsPerDesignUnits = pixelSize/heightInDesignUnits;
+		height = pixelSize;
+	}
+	else {
+		emSize = (96.f/72.f)*pixelSize;
+		pixelsPerDesignUnits = emSize/fontMetrics.designUnitsPerEm;
+		height = pixelsPerDesignUnits*(fontMetrics.ascent + fontMetrics.descent);
+	}
+	FLOAT ascent = pixelsPerDesignUnits*fontMetrics.ascent;
 
 	COLORREF background = RGB(0, 0, 0);
 	COLORREF foreground = RGB(255, 255, 255);
@@ -92,7 +104,8 @@ BakedFont DWriteBakeFont(
 	BakedFont font;
 	font.firstChar = firstChar;
 	font.lastChar = firstChar + codepointCount - 1;
-	font.height = pixelsPerDesignUnits*(fontMetrics.ascent + fontMetrics.descent);
+	font.height = height;
+	font.lineGap = pixelsPerDesignUnits*fontMetrics.lineGap;
 
 	for (uint32 i = 0; i < codepointCount; i ++) {
 
@@ -117,7 +130,7 @@ BakedFont DWriteBakeFont(
 
 		hr = dwrite.renderTarget->DrawGlyphRun(
 			0, 
-			baselineOriginY,
+			ascent,
 			DWRITE_MEASURING_MODE_NATURAL, 
 			&glyphRun, 
 			dwrite.renderingParams, 
@@ -169,7 +182,7 @@ BakedFont DWriteBakeFont(
 		ASSERT_HR(hr);
 
 		font.chardata[i].xoff = (float32)boundingBox.left;
-		font.chardata[i].yoff = (float32)boundingBox.top - (int32)baselineOriginY;
+		font.chardata[i].yoff = (float32)boundingBox.top - (int32)ascent;
 		font.chardata[i].x0 = atlas->x;
 		font.chardata[i].y0 = atlas->y;
 		font.chardata[i].x1 = atlas->x + (int16)glyphWidth;
@@ -188,7 +201,8 @@ BakedFont DWriteBakeFont(
 BakedFont DWriteBakeFont(
 	IDWriteFontFace* fontFace, 
 	AtlasBitmap* atlas, 
-	FLOAT pixelSize) {
+	FLOAT pixelSize,
+	BOOL scaleForPixelHeight) {
 
 	static UINT32 codepoints[] = {
 		0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2f,
@@ -199,12 +213,12 @@ BakedFont DWriteBakeFont(
 		0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7f,
 	};
 
-	return DWriteBakeFont(fontFace, atlas, pixelSize, codepoints, 96, 32);
+	return DWriteBakeFont(fontFace, atlas, pixelSize, scaleForPixelHeight, codepoints, 96, 32);
 }
 
-BakedFont DWriteLoadAndBakeDefaultFont(AtlasBitmap* atlas, FLOAT pixelSize) {
+BakedFont DWriteLoadAndBakeDefaultFont(AtlasBitmap* atlas, FLOAT pixelSize, BOOL scaleForPixelHeight) {
 	IDWriteFontFace* fontFace = DWriteLoadDefaultFont();
-	BakedFont font = DWriteBakeFont(fontFace, atlas, pixelSize);
+	BakedFont font = DWriteBakeFont(fontFace, atlas, pixelSize, scaleForPixelHeight);
 	fontFace->Release();
 
 	return font;

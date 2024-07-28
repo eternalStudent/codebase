@@ -313,6 +313,13 @@ float32 ScaleForPixelHeight(const FontInfo* info, float32 height) {
 	return (float32) height / fheight;
 }
 
+void GetFontMetrics(const FontInfo* info, int32* ascent, int32 *descent, int32* lineGap, int32* designUnitsPerEm) {
+   if (ascent ) *ascent  = __SHORT(info->data + info->hhea + 4);
+   if (descent) *descent = __SHORT(info->data + info->hhea + 6);
+   if (lineGap) *lineGap = __SHORT(info->data + info->hhea + 8);
+   if (designUnitsPerEm) *designUnitsPerEm = __USHORT(info->data + info->head + 18);
+}
+
 int32 FindGlyphIndex(const FontInfo* info, int32 unicode_codepoint) {
 	byte* data = info->data;
 	uint32 index_map = info->index_map;
@@ -772,7 +779,7 @@ int32 GetGlyphInfoT2(const FontInfo* info, int32 glyph_index,
 	return r ? c.num_vertices : 0;
 }
 
-int32 GetGlyfOffset(const FontInfo* info, int32 glyph_index) {
+int32 GetGlyphOffset(const FontInfo* info, int32 glyph_index) {
 	int32 g1,g2;
 
 	ASSERT(!info->cff.length);
@@ -796,7 +803,7 @@ int32 GetGlyphBox(const FontInfo* info, int32 glyph_index,
 	if (info->cff.length) {
 		GetGlyphInfoT2(info, glyph_index, x0, y0, x1, y1);
 	} else {
-		int32 g = GetGlyfOffset(info, glyph_index);
+		int32 g = GetGlyphOffset(info, glyph_index);
 		if (g < 0) return 0;
 
 		if (x0) *x0 = __SHORT(info->data + g + 2);
@@ -859,7 +866,7 @@ int32 GetGlyphShapeTT(Arena* arena, const FontInfo* info, int32 glyph_index, ver
 	byte* data = info->data;
 	vertex* vertices=0;
 	int32 num_vertices=0;
-	int32 g = GetGlyfOffset(info, glyph_index);
+	int32 g = GetGlyphOffset(info, glyph_index);
 
 	*pvertices = NULL;
 
@@ -1784,17 +1791,30 @@ void MakeGlyphBitmap(Arena* arena, const FontInfo* info, byte* output,
 	MakeGlyphBitmapSubpixel(arena, info, output, out_w, out_h, out_stride, scale_x, scale_y, 0.0f, 0.0f, glyph);
 }
 
-BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, Arena* arena) {
+BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, bool scaleForPixelHeight, Arena* arena) {
 	int32 first_char = 32;
 	int32 num_chars = 96;
-	float32 scale = ScaleForPixelHeight(&fontInfo, height);
+
+	int32 ascent, descent, lineGap, designUnitsPerEm;
+	GetFontMetrics(&fontInfo, &ascent, &descent, &lineGap, &designUnitsPerEm);
+	int32 height = ascent - descent;
+
+	float32 pixelHeight, pixelsPerDesignUnits;
+	if (scaleForPixelHeight) {
+		pixelHeight = pixelSize;
+		pixelsPerDesignUnits = pixelSize/height;
+	}
+	else {
+		pixelsPerDesignUnits = (96.f/72.f)*pixelSize/designUnitsPerEm;
+		pixelHeight = pixelsPerDesignUnits*height;
+	}
 
 	BakedFont font;
 	for (int32 i = 0; i < num_chars; ++i) {
 		int32 advance, lsb, x0, y0, x1, y1, gw, gh;
 		int32 g = FindGlyphIndex(&fontInfo, first_char + i);
 		GetGlyphHMetrics(&fontInfo, g, &advance, &lsb);
-		GetGlyphBitmapBox(&fontInfo, g, scale, scale, &x0, &y0, &x1, &y1);
+		GetGlyphBitmapBox(&fontInfo, g, pixelsPerDesignUnits, pixelsPerDesignUnits, &x0, &y0, &x1, &y1);
 		gw = x1 - x0;
 		gh = y1 - y0;
 		if (atlas->x + gw + 1 >= atlas->pw)
@@ -1803,12 +1823,12 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, Aren
 			return {};
 		ASSERT(atlas->x + gw < atlas->pw);
 		ASSERT(atlas->y + gh < atlas->ph);
-		MakeGlyphBitmap(arena, &fontInfo, atlas->bitmap + atlas->x + atlas->y*atlas->pw, gw, gh, atlas->pw, scale, scale, g);
+		MakeGlyphBitmap(arena, &fontInfo, atlas->bitmap + atlas->x + atlas->y*atlas->pw, gw, gh, atlas->pw, pixelsPerDesignUnits, pixelsPerDesignUnits, g);
 		font.chardata[i].x0 = atlas->x;
 		font.chardata[i].y0 = atlas->y;
 		font.chardata[i].x1 = atlas->x + (int16) gw;
 		font.chardata[i].y1 = atlas->y + (int16) gh;
-		font.chardata[i].xadvance = scale * advance;
+		font.chardata[i].xadvance = pixelsPerDesignUnits * advance;
 		font.chardata[i].xoff     = (float32) x0;
 		font.chardata[i].yoff     = (float32) y0;
 		atlas->x = atlas->x + (int16) gw + 1;
@@ -1816,22 +1836,36 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, Aren
 			atlas->bottom_y = atlas->y + (int16) gh + 1;
 	}
 
-	font.height = height;
+	font.height = pixelHeight;
+	font.lineGap = pixelsPerDesignUnits*lineGap;
 	font.firstChar = first_char;
 	font.lastChar = first_char + num_chars - 1;
 
 	return font;
 }
 
-BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, int32* chars, int32 num_chars, Arena* arena) {
-	float32 scale = ScaleForPixelHeight(&fontInfo, height);
+BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, bool scaleForPixelHeight, int32* chars, int32 num_chars, Arena* arena) {
+
+	int32 ascent, descent, lineGap, designUnitsPerEm;
+	GetFontMetrics(&fontInfo, &ascent, &descent, &lineGap, &designUnitsPerEm);
+	int32 height = ascent - descent;
+
+	float32 pixelHeight, pixelsPerDesignUnits;
+	if (scaleForPixelHeight) {
+		pixelHeight = pixelSize;
+		pixelsPerDesignUnits = pixelSize/height;
+	}
+	else {
+		pixelsPerDesignUnits = (96.f/72.f)*pixelSize/designUnitsPerEm;
+		pixelHeight = pixelsPerDesignUnits*height;
+	}
 
 	BakedFont font;
 	for (int32 i = 0; i < num_chars; ++i) {
 		int32 advance, lsb, x0, y0, x1, y1, gw, gh;
 		int32 g = FindGlyphIndex(&fontInfo, chars[i]);
 		GetGlyphHMetrics(&fontInfo, g, &advance, &lsb);
-		GetGlyphBitmapBox(&fontInfo, g, scale, scale, &x0, &y0, &x1, &y1);
+		GetGlyphBitmapBox(&fontInfo, g, pixelsPerDesignUnits, pixelsPerDesignUnits, &x0, &y0, &x1, &y1);
 		gw = x1 - x0;
 		gh = y1 - y0;
 		if (atlas->x + gw + 1 >= atlas->pw)
@@ -1840,12 +1874,12 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, int3
 			return {};
 		ASSERT(atlas->x + gw < atlas->pw);
 		ASSERT(atlas->y + gh < atlas->ph);
-		MakeGlyphBitmap(arena, &fontInfo, atlas->bitmap + atlas->x + atlas->y*atlas->pw, gw, gh, atlas->pw, scale, scale, g);
+		MakeGlyphBitmap(arena, &fontInfo, atlas->bitmap + atlas->x + atlas->y*atlas->pw, gw, gh, atlas->pw, pixelsPerDesignUnits, pixelsPerDesignUnits, g);
 		font.chardata[i].x0 = atlas->x;
 		font.chardata[i].y0 = atlas->y;
 		font.chardata[i].x1 = atlas->x + (int16) gw;
 		font.chardata[i].y1 = atlas->y + (int16) gh;
-		font.chardata[i].xadvance = scale * advance;
+		font.chardata[i].xadvance = pixelsPerDesignUnits * advance;
 		font.chardata[i].xoff     = (float32) x0;
 		font.chardata[i].yoff     = (float32) y0;
 		atlas->x = atlas->x + (int16) gw + 1;
@@ -1853,7 +1887,8 @@ BakedFont TTBakeFont(FontInfo fontInfo, AtlasBitmap* atlas, float32 height, int3
 			atlas->bottom_y = atlas->y + (int16) gh + 1;
 	}
 
-	font.height = height;
+	font.height = pixelHeight;
+	font.lineGap = pixelsPerDesignUnits*lineGap;
 	font.firstChar = 1;
 	font.lastChar = num_chars;
 
