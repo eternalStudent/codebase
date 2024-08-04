@@ -116,7 +116,8 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			// TODO: probably more stuff should be reset here
 		} break;
 
-		case WM_KEYDOWN: {
+		case WM_KEYDOWN:
+		case WM_SYSKEYDOWN: {
 			WORD vkCode = LOWORD(wParam);
 			WORD keyFlags = HIWORD(lParam);
 			WORD scanCode = LOBYTE(keyFlags);
@@ -132,6 +133,7 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			event.keyboard.ctrlIsDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
 			event.keyboard.shiftIsDown = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 			Win32EnqueueEvent(event);
+			return TRUE;
 		} break;
 		case WM_KEYUP: {
 

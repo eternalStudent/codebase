@@ -69,6 +69,7 @@ enum : uint32 {
 #define KEY_ENTER				0x0D
 #define KEY_SHIFT 				0x10
 #define KEY_CTRL				0x11
+#define KEY_ALT					0x12
 #define KEY_ESC 				0x1B
 #define KEY_SPACE 				0x20
 #define KEY_PGUP				0x21

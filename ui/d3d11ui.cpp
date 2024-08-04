@@ -844,6 +844,40 @@ void D3D11UIDrawSphere(Point2 center, float32 radius, Color color, float32 borde
 	DrawQuad(quad);
 }
 
+void D3D11UIDrawSolidColorQuad(Point2 pos, Dimensions2 dim, Color color) {
+
+	D3D11Quad quad = {
+		pos,
+		pos + dim,
+		color,
+		color,
+		color, 
+		color,
+		0,
+		0,
+		{},
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
+
+	D3D11Quad quad = {
+		pos,
+		pos + dim,
+		{},
+		{},
+		{}, 
+		{},
+		0,
+		thickness,
+		color,
+	};
+
+	DrawQuad(quad);
+}
+
 void D3D11UIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 	if (d3d11.currentProgram != &d3d11.glyphProgram) {
 		FlushVertices();
