@@ -1,6 +1,6 @@
 /*
  * TODO:
- * This was written as a wrapper to stb_truetype,
+ * This was written for pre-baked fonts,
  * and needs to be re-written in order to support 
  * a more robust text rendering pipeline.
  */
@@ -270,7 +270,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 
 				selection.x = round(pos.x + startx);
 				selection.y = round(pos.y + y + 2);
-				GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+				GfxDrawSolidColorQuad(selection, {x - startx, font->height + 2}, color);
 				startx = 0;
 
 				x = 0;
@@ -284,7 +284,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 
 			selection.x = round(pos.x + startx);
 			selection.y = round(pos.y + y + 2);
-			GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+			GfxDrawSolidColorQuad(selection, {x - startx, font->height + 2}, color);
 			startx = 0;
 			
 			x = 0;
@@ -305,7 +305,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 
 				selection.x = round(pos.x);
 				selection.y = round(pos.y + y + 2);
-				GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
+				GfxDrawSolidColorQuad(selection, {x, font->height + 2}, color);
 
 				x = 0;
 				y += font->height + font->lineGap;
@@ -316,7 +316,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 
 			selection.x = round(pos.x);
 			selection.y = round(pos.y + y + 2);
-			GfxDrawQuad(selection, {x, font->height + 2}, color, 0, 0, {}, color);
+			GfxDrawSolidColorQuad(selection, {x, font->height + 2}, color);
 
 			x = 0;
 			y += font->height + font->lineGap;
@@ -326,7 +326,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 
 	selection.x = round(pos.x + startx);
 	selection.y = round(pos.y + y + 2);
-	GfxDrawQuad(selection, {x - startx, font->height + 2}, color, 0, 0, {}, color);
+	GfxDrawSolidColorQuad(selection, {x - startx, font->height + 2}, color);
 }
 
 // StringList
@@ -532,7 +532,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 						selection.x = round(pos.x + startx);
 						selection.y = round(pos.y + y + 2);
 						Dimensions2 dim = {1, height + 2};
-						GfxDrawQuad(selection, dim, caretColor, 0, 0, {}, caretColor);
+						GfxDrawSolidColorQuad(selection, dim, caretColor);
 					}
 
 					i--;
@@ -555,7 +555,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 						selection.x = round(pos.x + startx);
 						selection.y = round(pos.y + y + 2);
 						Dimensions2 dim = {(x - startx), height + 2};
-						GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
+						GfxDrawSolidColorQuad(selection, dim, color);
 						startx = 0;
 
 						x = 0;
@@ -571,7 +571,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					selection.x = round(pos.x + startx);
 					selection.y = round(pos.y + y + 2);
 					Dimensions2 dim = {(x - startx), height + 2};
-					GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
+					GfxDrawSolidColorQuad(selection, dim, color);
 					startx = 0;
 					
 					x = 0;
@@ -590,7 +590,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 						selection.x = round(pos.x);
 						selection.y = round(pos.y + y + 2);
 						Dimensions2 dim = {x, height + 2};
-						GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
+						GfxDrawSolidColorQuad(selection, dim, color);
 
 						x = 0;
 						y += height + font->lineGap;
@@ -602,7 +602,7 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					selection.x = round(pos.x);
 					selection.y = round(pos.y + y + 2);
 					Dimensions2 dim = {x, height + 2};
-					GfxDrawQuad(selection, dim, color, 0, 0, {}, color);
+					GfxDrawSolidColorQuad(selection, dim, color);
 
 					x = 0;
 					y += height + font->lineGap;
@@ -618,11 +618,11 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 	bool eq = StringListPosEquals(tail, head);
 	if (!eq) {
 		selection.x = round(pos.x + startx);
-		GfxDrawQuad(selection, {(x - startx), height + 2}, color, 0, 0, {}, color);
+		GfxDrawSolidColorQuad(selection, {(x - startx), height + 2}, color);
 	}
 
 	if (onEnd || eq) {
 		selection.x = round(pos.x + x);
-		GfxDrawQuad(selection, {1, height + 2}, caretColor, 0, 0, {}, caretColor);
+		GfxDrawSolidColorQuad(selection, {1, height + 2}, caretColor);
 	}
 }

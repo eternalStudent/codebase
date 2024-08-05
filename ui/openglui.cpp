@@ -396,7 +396,7 @@ void FlushVertices() {
 
 void OpenGLUIEndDrawing() {
 	FlushVertices();
-	GfxSwapBuffers();
+	OSOpenGLSwapBuffers();
 }
 
 void DrawQuad(OpenGLQuad quad) {
@@ -410,15 +410,93 @@ void DrawQuad(OpenGLQuad quad) {
 	opengl.quadCount++;
 }
 
-// TODO: rethink API function names and params
-void OpenGLUIDrawQuad(
+void OpenGLUIDrawSolidColorQuad(Point2 pos, Dimensions2 dim, Color color) {
+
+	OpenGLQuad quad = {
+		pos,
+		pos + dim,
+		color,
+		color,
+		color, 
+		color,
+		0,
+		0,
+		{},
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawSolidColorQuad(Box2 box, Color color) {
+
+	OpenGLQuad quad = {
+		box.p0,
+		box.p1,
+		color,
+		color,
+		color, 
+		color,
+		0,
+		0,
+		{},
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawSolidColorQuad(
 	Point2 pos, 
 	Dimensions2 dim, 
-	Color color1, 
+	Color color, 
 	float32 cornerRadius, 
 	float32 borderThickness, 
-	Color borderColor,
-	Color color2) {
+	Color borderColor) {
+
+	OpenGLQuad quad = {
+		pos,
+		pos + dim,
+		color,
+		color,
+		color, 
+		color,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawSolidColorQuad(
+	Box2 box, 
+	Color color, 
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
+
+	OpenGLQuad quad = {
+		box.p0,
+		box.p1,
+		color,
+		color,
+		color, 
+		color,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawVerticalGradQuad(
+	Point2 pos, 
+	Dimensions2 dim, 
+	Color color1,
+	Color color2, 
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
 
 	OpenGLQuad quad = {
 		pos,
@@ -428,6 +506,66 @@ void OpenGLUIDrawQuad(
 		color1, 
 		color2,
 		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawVerticalGradQuad(
+	Box2 box, 
+	Color color1,
+	Color color2, 
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
+
+	OpenGLQuad quad = {
+		box.p0,
+		box.p1,
+		color1,
+		color2,
+		color1, 
+		color2,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
+
+	OpenGLQuad quad = {
+		pos,
+		pos + dim,
+		{},
+		{},
+		{}, 
+		{},
+		0,
+		thickness,
+		color,
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawSphere(Point2 center, float32 radius, Color color, float32 borderThickness, Color borderColor) {
+
+	Point2 pos0 = {center.x - radius, center.y - radius};
+	Point2 pos1 = {center.x + radius, center.y + radius};	
+
+	OpenGLQuad quad = {
+		pos0,
+		pos1,
+		color,
+		color,
+		color, 
+		color,
+		radius,
 		borderThickness,
 		borderColor,
 	};

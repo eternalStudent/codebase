@@ -799,15 +799,93 @@ void D3D11UIEndDrawing() {
 	OSD3D11SwapBuffers();
 }
 
-// TODO: rethink API function names and params
-void D3D11UIDrawQuad(
+void D3D11UIDrawSolidColorQuad(Point2 pos, Dimensions2 dim, Color color) {
+
+	D3D11Quad quad = {
+		pos,
+		pos + dim,
+		color,
+		color,
+		color, 
+		color,
+		0,
+		0,
+		{},
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawSolidColorQuad(Box2 box, Color color) {
+
+	D3D11Quad quad = {
+		box.p0,
+		box.p1,
+		color,
+		color,
+		color, 
+		color,
+		0,
+		0,
+		{},
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawSolidColorQuad(
+	Point2 pos, 
+	Dimensions2 dim, 
+	Color color, 
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
+
+	D3D11Quad quad = {
+		pos,
+		pos + dim,
+		color,
+		color,
+		color, 
+		color,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawSolidColorQuad(
+	Box2 box, 
+	Color color,
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
+
+	D3D11Quad quad = {
+		box.p0,
+		box.p1,
+		color,
+		color,
+		color, 
+		color,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawVerticalGradQuad(
 	Point2 pos, 
 	Dimensions2 dim, 
 	Color color1, 
+	Color color2,
 	float32 cornerRadius, 
 	float32 borderThickness, 
-	Color borderColor,
-	Color color2) {
+	Color borderColor) {
 
 	D3D11Quad quad = {
 		pos,
@@ -819,6 +897,63 @@ void D3D11UIDrawQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawVerticalGradQuad(
+	Box2 box, 
+	Color color1, 
+	Color color2,
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
+
+	D3D11Quad quad = {
+		box.p0,
+		box.p1,
+		color2,
+		color1,
+		color2, 
+		color1,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
+
+	D3D11Quad quad = {
+		pos,
+		pos + dim,
+		{},
+		{},
+		{}, 
+		{},
+		0,
+		thickness,
+		color,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawOutlineQuad(Box2 box, float32 thickness, Color color) {
+
+	D3D11Quad quad = {
+		box.p0,
+		box.p1,
+		{},
+		{},
+		{}, 
+		{},
+		0,
+		thickness,
+		color,
 	};
 
 	DrawQuad(quad);
@@ -839,40 +974,6 @@ void D3D11UIDrawSphere(Point2 center, float32 radius, Color color, float32 borde
 		radius,
 		borderThickness,
 		borderColor,
-	};
-
-	DrawQuad(quad);
-}
-
-void D3D11UIDrawSolidColorQuad(Point2 pos, Dimensions2 dim, Color color) {
-
-	D3D11Quad quad = {
-		pos,
-		pos + dim,
-		color,
-		color,
-		color, 
-		color,
-		0,
-		0,
-		{},
-	};
-
-	DrawQuad(quad);
-}
-
-void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
-
-	D3D11Quad quad = {
-		pos,
-		pos + dim,
-		{},
-		{},
-		{}, 
-		{},
-		0,
-		thickness,
-		color,
 	};
 
 	DrawQuad(quad);

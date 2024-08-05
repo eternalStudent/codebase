@@ -93,8 +93,10 @@ bool UIMenuProcessEvent(OSEvent event, UIMenu* menu) {
 
 	case Event_KeyboardPress: {
 		if (event.keyboard.vkCode == KEY_ALT) {
-			if (menu->focused)
+			if (menu->focused) {
 				menu->focused = NULL;
+				CloseEverything(&menu->root);
+			}
 			else
 				menu->focused = menu->root.children;
 			return true;
@@ -185,8 +187,10 @@ bool UIMenuProcessEvent(OSEvent event, UIMenu* menu) {
 			}
 			else if (event.keyboard.vkCode == KEY_DOWN) {
 				if (menu->focused->parent == &menu->root) {
-					menu->focused->parent->opened = menu->focused;
-					menu->focused = menu->focused->children;
+					if (menu->focused->count) {
+						menu->focused->parent->opened = menu->focused;
+						menu->focused = menu->focused->children;
+					}
 				}
 				else {
 					if (menu->focused + 1 < menu->focused->parent->children + menu->focused->parent->count) {
