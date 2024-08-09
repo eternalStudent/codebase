@@ -525,7 +525,7 @@ void D3D11UIInit(uint32 globalFlags) {
 
 			desc.Scaling            = DXGI_SCALING_STRETCH;
 
-			desc.SwapEffect         = (globalFlags & GFX_MULTISAMPLE) ? 
+			desc.SwapEffect         = ((globalFlags & GFX_MULTISAMPLE) || (globalFlags & GFX_SRGB)) ? 
 										DXGI_SWAP_EFFECT_DISCARD : 
 										DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
