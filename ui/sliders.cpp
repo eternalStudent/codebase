@@ -29,7 +29,7 @@ Box2i GetNewBoxButKeepInBounds(int32 x, int32 y, int32 width, int32 height, Box2
 	return {x, y, x + width, y + height};
 }
 
-bool SliderProcessEvent(OSEvent event, UISlider* status) {
+bool UISliderProcessEvent(OSEvent event, UISlider* status) {
 
 	int32 width = status->hitBox.x1 - status->hitBox.x0;
 	int32 height = status->hitBox.y1 - status->hitBox.y0;

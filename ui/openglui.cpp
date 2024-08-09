@@ -26,6 +26,14 @@ struct OpenGLSegment {
 	Color color;
 };
 
+struct OpenGLShadow {
+	Point2 pos0;
+	Point2 pos1;
+	float32 cornerRadius;
+	float32 blur;
+	Color color;
+};
+
 struct OpenGLInputElement {
 	GLint size;
 	ssize offset;
@@ -47,6 +55,7 @@ struct {
 	OpenGLProgram glyphProgram;
 	OpenGLProgram segmentProgram;
 	OpenGLProgram imageProgram;
+	OpenGLProgram shadowProgram;
 	OpenGLProgram* currentProgram;
 	void* quads;
 	int32 quadCount;
@@ -254,6 +263,70 @@ void main() {
 }   
 	)STRING";
 
+GLchar* shadowVertexSource = (GLchar*)R"STRING(
+#version 330 core
+
+layout (location = 0) in vec2 in_pos0;
+layout (location = 1) in vec2 in_pos1;
+layout (location = 2) in float in_cornerRadius;
+layout (location = 3) in float in_blur;
+layout (location = 4) in vec4 in_color;
+
+uniform mat4 mvp;
+
+out vec4 color;
+out vec2 pixelpos;
+out float cornerRadius;
+out float blur;
+out vec2 halfSize;
+out vec2 center;
+
+void main()
+{
+	vec2 poses[4] = {
+		vec2(in_pos0.x, in_pos0.y),
+		vec2(in_pos0.x, in_pos1.y),
+		vec2(in_pos1.x, in_pos0.y),
+		vec2(in_pos1.x, in_pos1.y),
+	};
+	pixelpos = poses[gl_VertexID];
+	gl_Position = mvp * vec4(pixelpos, 0.0, 1.0);
+
+	color = in_color;
+	blur = in_blur;
+	cornerRadius = in_cornerRadius;
+	halfSize = 0.5*(in_pos1 - in_pos0);
+	center = 0.5*(in_pos1 + in_pos0);
+} 
+	)STRING";
+
+GLchar* shadowFragmentSource = (GLchar*)R"STRING(
+#version 330 core
+out vec4 out_color;
+
+in vec4 color;
+in vec2 pixelpos;
+in float cornerRadius;
+in float blur;
+in vec2 halfSize;
+in vec2 center;
+
+float sd(vec2 pos, vec2 halfSize, float radius) {
+	pos = abs(pos) - halfSize + radius;
+	return length(max(pos, 0)) + min(max(pos.x, pos.y), 0) - radius;
+}
+
+void main()
+{
+	float sd_ = sd(pixelpos - center, halfSize, cornerRadius + blur);
+	
+	float a = 1.0f - smoothstep(-blur, +0.5, sd_);
+	
+	out_color = color;
+	out_color.a = out_color.a*a;
+}
+	)STRING";
+
 void OpenGLUIInit(uint32 globalFlags) {
 	opengl = {};
 	OSOpenGLInit(globalFlags & GFX_MULTISAMPLE ? 4 : 1);
@@ -316,6 +389,18 @@ void OpenGLUIInit(uint32 globalFlags) {
 		},
 		5,
 		"atlas"
+	};
+	opengl.shadowProgram = {
+		CreateProgram(shadowVertexSource, shadowFragmentSource),
+		sizeof(OpenGLShadow),
+		{
+			{2, offsetof(OpenGLShadow, pos0)},
+			{2, offsetof(OpenGLShadow, pos1)},
+			{1, offsetof(OpenGLShadow, cornerRadius)},
+			{1, offsetof(OpenGLShadow, blur)},
+			{4, offsetof(OpenGLShadow, color)}
+		},
+		5
 	};
 	opengl.quadCount = 0;
 }
@@ -650,6 +735,23 @@ void OpenGLUIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick
 		prev = current;
 	}
 #undef SEGMENTS
+}
+
+void OpenGLUIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offset, float32 blur, Color color) {
+	if (opengl.currentProgram != &opengl.shadowProgram) {
+		FlushVertices();
+		opengl.currentProgram = &opengl.shadowProgram;
+		glDisable(GL_MULTISAMPLE);
+	}
+
+	OpenGLShadow shadow = {
+		{pos.x + offset.x - blur/2,             pos.y + offset.y - blur/2}, 
+		{pos.x + offset.x + blur/2 + dim.width, pos.y + offset.y + blur/2 + dim.height}, 
+		radius, blur, color
+	};
+
+	memcpy((OpenGLShadow*)opengl.quads + opengl.quadCount, &shadow, sizeof(shadow));
+	opengl.quadCount++;
 }
 
 // TESTME!

@@ -31,6 +31,14 @@ struct D3D11Segment {
 	Color color;
 };
 
+struct D3D11Shadow {
+	Point2 pos0;
+	Point2 pos1;
+	float32 cornerRadius;
+	float32 blur;
+	Color color;
+};
+
 struct D3D11Program {
 	UINT stride;
 	ID3D11VertexShader* vshader;
@@ -72,6 +80,7 @@ struct {
 	D3D11Program glyphProgram;
 	D3D11Program segmentProgram;
 	D3D11Program imageProgram;
+	D3D11Program shadowProgram;
 	D3D11Program* currentProgram;
 	
 	int32 quadCount;
@@ -308,6 +317,70 @@ R"STRING(
 	float4 ps(PS_INPUT input) : SV_TARGET {				
  		return input.color;
 	}
+)STRING";
+
+static char shadowCode[] = 
+"	#line " STRINGIFY(__LINE__) "\n"
+R"STRING(
+	struct VS_INPUT	{
+		float2 pos0 : POS0;
+		float2 pos1 : POS1;
+		float radius : RAD;
+		float blur : BLUR;
+		float4 color : COLOR;
+		uint vertexId : SV_VertexID;
+	};				
+					
+	struct PS_INPUT {
+		float4 pos : SV_POSITION;
+		float2 center : POS;
+		float2 size : SIZE;
+		float radius : RAD;
+		float blur : BLUR;
+		float4 color : COLOR;
+	};				
+					
+	cbuffer cbuffer0 : register(b0) {
+		row_major float4x4 mvp;
+	}				
+					
+	PS_INPUT vs(VS_INPUT input) {
+		PS_INPUT output;
+		float2 pixel_poses[] = {
+			float2(input.pos0.x, input.pos1.y),
+			float2(input.pos0.x, input.pos0.y),
+			float2(input.pos1.x, input.pos1.y),
+			float2(input.pos1.x, input.pos0.y),
+		};			
+		float2 pixel_pos = pixel_poses[input.vertexId];
+		float4 pos = mul(mvp, float4(pixel_pos, 0, 1));
+		output.pos = pos;
+		
+		output.size = float2(	
+			(input.pos1.x - input.pos0.x)/2,
+			(input.pos1.y - input.pos0.y)/2 
+		);			
+		output.center = input.pos0 + output.size;
+		output.radius = input.radius;
+		output.blur = input.blur;
+		output.color = input.color;
+		return output;
+	}				
+					
+	float sd(float2 pos, float2 halfSize, float radius) {
+		pos = abs(pos) - halfSize + radius;	
+		return length(max(pos, 0)) + min(max(pos.x, pos.y), 0) - radius;
+	}				
+					
+	float4 ps(PS_INPUT input) : SV_TARGET	
+	{				
+		float2 pos = input.pos.xy;
+		float sd_ = sd(pos - input.center, input.size, input.radius + input.blur);
+		float a = 1 - smoothstep(-input.blur, 0.5f, sd_);
+		float4 color = input.color;
+		color.a *= a;
+		return color;
+	}				
 )STRING";
 
 // TODO: move some of this to d3d11.cpp
@@ -618,6 +691,18 @@ void D3D11UIInit(uint32 globalFlags) {
 		};
 		d3d11.segmentProgram = CreateProgram(STR(segmentCode), desc, ARRAYSIZE(desc), sizeof(D3D11Segment));
 	}
+
+	{
+		D3D11_INPUT_ELEMENT_DESC desc[] =
+		{
+			{ "POS" ,  0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(struct D3D11Shadow, pos0), 		 D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "POS" ,  1, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(struct D3D11Shadow, pos1), 		 D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "RAD" ,  0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11Shadow, cornerRadius), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "BLUR",  0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11Shadow, blur),    	 D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(struct D3D11Shadow, color),	     D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+		};
+		d3d11.shadowProgram = CreateProgram(STR(shadowCode), desc, ARRAYSIZE(desc), sizeof(D3D11Shadow));
+	}
 }
 
 void D3D11UIBeginDrawing() {
@@ -925,6 +1010,53 @@ void D3D11UIDrawVerticalGradQuad(
 	DrawQuad(quad);
 }
 
+void D3D11UIDrawHorizontalGradQuad(
+	Point2 pos, 
+	Dimensions2 dim, 
+	Color color1, 
+	Color color2,
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
+
+	D3D11Quad quad = {
+		pos,
+		pos + dim,
+		color1,
+		color1,
+		color2, 
+		color2,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawHorizontalGradQuad(
+	Box2 box, 
+	Color color1, 
+	Color color2,
+	float32 cornerRadius, 
+	float32 borderThickness, 
+	Color borderColor) {
+
+	D3D11Quad quad = {
+		box.p0,
+		box.p1,
+		color1,
+		color1,
+		color2, 
+		color2,
+		cornerRadius,
+		borderThickness,
+		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
 void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
 
 	D3D11Quad quad = {
@@ -1037,6 +1169,26 @@ void D3D11UIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick,
 		prev = current;
 	}
 #undef SEGMENTS
+}
+
+void D3D11UIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offset, float32 blur, Color color) {
+	if (d3d11.currentProgram != &d3d11.shadowProgram) {
+		FlushVertices();
+		d3d11.currentProgram = &d3d11.shadowProgram;
+		DisableMultiSample();
+	}
+
+	D3D11Shadow shadow = {
+		{pos.x + offset.x - blur/2,             pos.y + offset.y - blur/2}, 
+		{pos.x + offset.x + blur/2 + dim.width, pos.y + offset.y + blur/2 + dim.height}, 
+		radius, blur, color
+	};
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Shadow), &shadow, sizeof(D3D11Shadow));
+	d3d11.quadCount++;
 }
 
 void D3D11UICropScreen(LONG left, LONG top, LONG width, LONG height) {

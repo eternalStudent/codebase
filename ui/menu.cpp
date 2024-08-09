@@ -61,8 +61,10 @@ bool UIMenuProcessEvent(OSEvent event, UIMenu* menu) {
 					menu->hovered->parent->opened = NULL;
 			}
 
-			if (!IsAncestorOf(menu->root.opened, menu->hovered))
+			if (!IsAncestorOf(menu->root.opened, menu->hovered)) {
+				menu->focused = NULL;
 				CloseEverything(&menu->root);
+			}
 
 			return true;
 		}
@@ -74,18 +76,21 @@ bool UIMenuProcessEvent(OSEvent event, UIMenu* menu) {
 		if (menu->hovered) {
 			if (menu->hovered->parent->opened == menu->hovered) {
 				menu->hovered->parent->opened = NULL;
+				menu->focused = menu->hovered;
 			}
 			else if (menu->hovered->count) {
 				menu->hovered->parent->opened = menu->hovered;
+				menu->focused = menu->hovered;
 			}
 			else {
 				menu->clicked = menu->hovered;
+				menu->focused = NULL;
 				CloseEverything(&menu->root);
 			}
-			menu->focused = menu->hovered;
 			return true;
 		}
 		else {
+			menu->focused = NULL;
 			CloseEverything(&menu->root);
 			return false;
 		}

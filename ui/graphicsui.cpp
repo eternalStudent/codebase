@@ -12,6 +12,7 @@
 # define GfxDrawGlyph				OpenGLUIDrawGlyph
 # define GfxDrawLine				OpenGLUIDrawLine
 # define GfxDrawCurve				OpenGLUIDrawCurve
+# define GfxDrawShadow				OpenGLUIDrawShadow
 # define GfxCropScreen				OpenGLUICropScreen
 # define GfxClearCrop				OpenGLUIClearCrop
 
@@ -30,6 +31,7 @@
 # define GfxDrawImage				D3D11UIDrawImage
 # define GfxDrawLine				D3D11UIDrawLine
 # define GfxDrawCurve				D3D11UIDrawCurve
+# define GfxDrawShadow				D3D11UIDrawShadow
 # define GfxCropScreen				D3D11UICropScreen
 # define GfxClearCrop				D3D11UIClearCrop
 #endif
