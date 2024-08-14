@@ -14,12 +14,6 @@ struct UISlider {
 	bool isFocused; // intercept keyboard
 };
 
-// NOTE: The bounds are in terms of pixel grid boundaries, while the cursor is in term of pixel centers,
-//       that is why the lower bounds is inclusive, and the upper bound is exclusive
-bool InBounds(Box2i bounds, Point2i p) {
-	return bounds.x0 <= p.x && p.x < bounds.x1 && bounds.y0 <= p.y && p.y < bounds.y1;
-}
-
 Box2i GetNewBoxButKeepInBounds(int32 x, int32 y, int32 width, int32 height, Box2i bounds) {
 	if (x < bounds.x0) x = bounds.x0;
 	if (x + width >= bounds.x1) x = bounds.x1 - width;
@@ -29,52 +23,52 @@ Box2i GetNewBoxButKeepInBounds(int32 x, int32 y, int32 width, int32 height, Box2
 	return {x, y, x + width, y + height};
 }
 
-bool UISliderProcessEvent(OSEvent event, UISlider* status) {
+bool UISliderProcessEvent(OSEvent event, UISlider* slider) {
 
-	int32 width = status->hitBox.x1 - status->hitBox.x0;
-	int32 height = status->hitBox.y1 - status->hitBox.y0;
+	int32 width = slider->hitBox.x1 - slider->hitBox.x0;
+	int32 height = slider->hitBox.y1 - slider->hitBox.y0;
 	Point2i cursor = event.mouse.cursorPos;
 
 	switch (event.type) {
 	case Event_MouseMove: {
 
-		if (status->isGrabbing) {
-			if (cursor.x != status->grabPos.x || cursor.y != status->grabPos.y) {
+		if (slider->isGrabbing) {
+			if (cursor.x != slider->grabPos.x || cursor.y != slider->grabPos.y) {
 
-				int32 x = status->grabPos.x + cursor.x;
-				int32 y = status->grabPos.y + cursor.y;
-				status->hitBox = GetNewBoxButKeepInBounds(x, y, width, height, status->boundaries);
+				int32 x = slider->grabPos.x + cursor.x;
+				int32 y = slider->grabPos.y + cursor.y;
+				slider->hitBox = GetNewBoxButKeepInBounds(x, y, width, height, slider->boundaries);
 			}
 
 			return true;
 		}
-		else if (InBounds(status->hitBox, cursor)) {
+		else if (InBounds(slider->hitBox, cursor)) {
 
-			status->isActive = true;
+			slider->isActive = true;
 
 			return true;
 		}
 		else {
-			status->isActive = false;
+			slider->isActive = false;
 
 			return false;
 		}
 	} break;
 
 	case Event_MouseLeftButtonDown: {
-		if (status->isActive){
-			status->isGrabbing = true;
-			status->grabPos = status->hitBox.p0 - cursor;
+		if (slider->isActive){
+			slider->isGrabbing = true;
+			slider->grabPos = slider->hitBox.p0 - cursor;
 
 			return true;
 		}
-		else if (InBounds(status->boundaries, cursor)) {
+		else if (InBounds(slider->boundaries, cursor)) {
 
 			int32 x = cursor.x - width/2;
 			int32 y = cursor.y - height/2;
-			status->hitBox = GetNewBoxButKeepInBounds(x, y, width, height, status->boundaries);
+			slider->hitBox = GetNewBoxButKeepInBounds(x, y, width, height, slider->boundaries);
 
-			status->isActive = true;
+			slider->isActive = true;
 
 			return true;
 		}
@@ -84,37 +78,37 @@ bool UISliderProcessEvent(OSEvent event, UISlider* status) {
 	} break;
 
 	case Event_MouseLeftButtonUp: {
-		status->isGrabbing = false;
+		slider->isGrabbing = false;
 
 		return false;
 	} break;
 
 	case Event_KeyboardPress: {
-		if (!status->isFocused) return false;
+		if (!slider->isFocused) return false;
 
 		switch (event.keyboard.vkCode) {
 		case KEY_LEFT: {
-			if (status->boundaries.x0 <= status->hitBox.x0 - 1) {
-				status->hitBox.x0--;
-				status->hitBox.x1--;
+			if (slider->boundaries.x0 <= slider->hitBox.x0 - 1) {
+				slider->hitBox.x0--;
+				slider->hitBox.x1--;
 			}
 		} break;
 		case KEY_RIGHT: {
-			if (status->hitBox.x1 + 1 < status->boundaries.x1) {
-				status->hitBox.x0++;
-				status->hitBox.x1++;
+			if (slider->hitBox.x1 + 1 < slider->boundaries.x1) {
+				slider->hitBox.x0++;
+				slider->hitBox.x1++;
 			}
 		} break;
 		case KEY_UP: {
-			if (status->boundaries.y0 <= status->hitBox.y0 - 1) {
-				status->hitBox.y0--;
-				status->hitBox.y1--;
+			if (slider->boundaries.y0 <= slider->hitBox.y0 - 1) {
+				slider->hitBox.y0--;
+				slider->hitBox.y1--;
 			}
 		} break;
 		case KEY_DOWN: {
-			if (status->hitBox.y1 + 1 < status->boundaries.y1) {
-				status->hitBox.y0++;
-				status->hitBox.y1++;
+			if (slider->hitBox.y1 + 1 < slider->boundaries.y1) {
+				slider->hitBox.y0++;
+				slider->hitBox.y1++;
 			}
 		} break;
 		}

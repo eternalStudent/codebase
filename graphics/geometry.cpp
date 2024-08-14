@@ -80,6 +80,10 @@ union Box2i {
 	struct {int32 x0, y0, x1, y1;};
 };
 
+bool InBounds(Box2i bounds, Point2i p) {
+	return bounds.x0 <= p.x && p.x < bounds.x1 && bounds.y0 <= p.y && p.y < bounds.y1;
+}
+
 union Point3 {
 	struct {float32 x, y, z;};
 	struct {Point2 xy; float32 z;};

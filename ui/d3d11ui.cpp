@@ -1057,7 +1057,7 @@ void D3D11UIDrawHorizontalGradQuad(
 	DrawQuad(quad);
 }
 
-void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
+void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 cornerRadius, float32 thickness, Color color) {
 
 	D3D11Quad quad = {
 		pos,
@@ -1066,7 +1066,7 @@ void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Colo
 		{},
 		{}, 
 		{},
-		0,
+		cornerRadius,
 		thickness,
 		color,
 	};
@@ -1074,7 +1074,7 @@ void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 thickness, Colo
 	DrawQuad(quad);
 }
 
-void D3D11UIDrawOutlineQuad(Box2 box, float32 thickness, Color color) {
+void D3D11UIDrawOutlineQuad(Box2 box, float32 cornerRadius, float32 thickness, Color color) {
 
 	D3D11Quad quad = {
 		box.p0,
@@ -1083,7 +1083,7 @@ void D3D11UIDrawOutlineQuad(Box2 box, float32 thickness, Color color) {
 		{},
 		{}, 
 		{},
-		0,
+		cornerRadius,
 		thickness,
 		color,
 	};

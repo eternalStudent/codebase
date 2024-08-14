@@ -13,10 +13,6 @@ struct UIMenu {
 	UIMenuItem* clicked;
 };
 
-bool InBounds(Box2i bounds, Point2i p) {
-	return bounds.x0 <= p.x && p.x < bounds.x1 && bounds.y0 <= p.y && p.y < bounds.y1;
-}
-
 UIMenuItem* GetMenuItemByPosition(UIMenuItem* parent, Point2i pos) {
 	for (int32 i = 0; i < parent->count; i++) {
 		UIMenuItem* item = parent->children + i;
