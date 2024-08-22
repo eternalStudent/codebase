@@ -3,6 +3,7 @@ enum UIPanelState {
 	UIPS_Grab,
 	UIPS_ResizeHover,
 	UIPS_Resize,
+	UIPS_Hidden
 };
 
 enum UIPanelDock {
@@ -39,6 +40,8 @@ struct UIPanel {
 };
 
 bool UIPanelProcessEvent(OSEvent event, UIPanel* panel) {
+	if (panel->state == UIPS_Hidden) return false;
+
 	Point2i cursor = event.mouse.cursorPos;
 
 	switch (event.type) {
@@ -181,6 +184,11 @@ bool UIPanelProcessEvent(OSEvent event, UIPanel* panel) {
 			else
 				panel->grabPos = panel->borders.p1 - cursor;
 
+			return true;
+		}
+		else if (panel->hover == UIPH_Closing) {
+			panel->state = UIPS_Hidden;
+			panel->hover = UIPH_None;
 			return true;
 		}
 	} break;
