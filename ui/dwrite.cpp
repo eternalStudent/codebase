@@ -97,10 +97,6 @@ BakedFont DWriteBakeFont(
 	COLORREF background = RGB(0, 0, 0);
 	COLORREF foreground = RGB(255, 255, 255);
 
-	UINT16 glyphIds[96] = {};
-	hr = fontFace->GetGlyphIndices(codepoints, codepointCount, glyphIds);
-	ASSERT_HR(hr);
-
 	BakedFont font;
 	font.firstChar = firstChar;
 	font.lastChar = firstChar + codepointCount - 1;
@@ -108,8 +104,9 @@ BakedFont DWriteBakeFont(
 	font.lineGap = pixelsPerDesignUnits*fontMetrics.lineGap;
 
 	for (uint32 i = 0; i < codepointCount; i ++) {
-
-		UINT16 glyphId = glyphIds[i];
+		UINT16 glyphId;
+		hr = fontFace->GetGlyphIndices(codepoints + i, 1, &glyphId);
+		ASSERT_HR(hr);
 
 		HDC dc = dwrite.renderTarget->GetMemoryDC();
 		{
