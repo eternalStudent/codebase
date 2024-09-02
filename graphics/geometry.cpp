@@ -38,6 +38,10 @@ inline float32 DistanceSquared(Point2 p0, Point2 p1) {
 	return Dot(p2, p2);
 }
 
+bool InBounds(Point2 pos, Dimensions2 dim, Point2 p) {
+	return pos.x <= p.x && p.x < pos.x + dim.width && pos.y <= p.y && p.y < pos.y + dim.height;
+}
+
 union Point2i {
 	struct {int32 x, y;};
 	struct {int32 width, height;};
@@ -75,12 +79,28 @@ inline Box2 operator*(float32 a, Box2 b) {
 	return {a*b.x0, a*b.y0, a*b.x1, a*b.y1};
 }
 
+inline Box2 operator+(Box2 a, Point2 p) {
+	return {a.x0 + p.x, a.y0 + p.y, a.x1 + p.x, a.y1 + p.y};
+}
+
+inline Dimensions2 GetDim(Box2 box) {
+	return {box.x1 - box.x0, box.y1 - box.y0};
+}
+
+inline bool InBounds(Box2 bounds, Point2 p) {
+	return bounds.x0 <= p.x && p.x < bounds.x1 && bounds.y0 <= p.y && p.y < bounds.y1;
+}
+
+inline Box2 GetBounds(Point2 pos, Dimensions2 dim) {
+	return {pos.x, pos.y, pos.x + dim.width, pos.y + dim.height};
+}
+
 union Box2i {
 	struct {Point2i p0, p1;};
 	struct {int32 x0, y0, x1, y1;};
 };
 
-bool InBounds(Box2i bounds, Point2i p) {
+inline bool InBounds(Box2i bounds, Point2i p) {
 	return bounds.x0 <= p.x && p.x < bounds.x1 && bounds.y0 <= p.y && p.y < bounds.y1;
 }
 
