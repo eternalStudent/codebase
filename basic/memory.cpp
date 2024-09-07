@@ -17,32 +17,9 @@
 #  define OSFree				LinuxFree
 #endif
 
+#define RESERVE_SIZE	1024*1024*1024*16ull
+#define CHUNK_SIZE 		1024*1024*16
+
 #include "arena.cpp"
+#include "bigarray.cpp"
 #include "fixedsize.cpp"
-
-Arena CreateArena(int64 capacity) {
-	void* buffer = OSAllocate(capacity);
-	Arena arena;
- 	ArenaInit(&arena, buffer, capacity);
- 	return arena;
-}
-
-void DestroyArena(Arena* arena) {
-	OSFree(arena->buffer, arena->capacity);
-}
-
-FixedSize CreateFixedSize(int32 capacity, int32 size) {
-	void* buffer = OSAllocate(capacity*size);
-	memset(buffer, 0, capacity*size);
-	FixedSize allocator;
-	FixedSizeInit(&allocator, (byte*)buffer, capacity, size);
-	return allocator;
-}
-
-FixedSize CreateFixedSize(Arena* arena, int32 capacity, int32 size) {
-	void* buffer = ArenaAlloc(arena, capacity*size, 8);
-	memset(buffer, 0, capacity*size);
-	FixedSize allocator;
-	FixedSizeInit(&allocator, (byte*)buffer, capacity, size);
-	return allocator;
-}

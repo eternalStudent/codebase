@@ -1,43 +1,74 @@
+// TODO: have a backing big array instead of a fixed-size buffer
+
 struct FixedSize {
-	void* buffer;
-	void* next;
-	ssize size;
-	int32 cap;
+	byte* buffer;
+	ssize capacity;
+	byte* next;
+	ssize sizeofItem;
 };
 
 void FixedSizeReset(FixedSize* allocator) {
-	byte* buffer = (byte*)allocator->buffer;
-	allocator->next = buffer;
+	allocator->next = allocator->buffer;
 
-	for (int32 i = 0; i < allocator->cap-2; i++) {
-		*(void**)buffer = (void*)(buffer + allocator->size);
-		buffer = *(byte**)buffer;
+	for (byte* buffer = allocator->buffer; 
+		 buffer + allocator->sizeofItem < allocator->buffer + allocator->capacity; 
+		 buffer += allocator->sizeofItem) {
+
+		*(byte**)buffer = buffer + allocator->sizeofItem;
 	}
-	*(void**)buffer = NULL;
+
+	*(byte**)(allocator->buffer + allocator->capacity - allocator->sizeofItem) = NULL;
 }
 
-void FixedSizeInit(FixedSize* allocator, byte* buffer, int32 cap, ssize size) {
-	allocator->buffer = buffer;
-	allocator->size = size;
-	allocator->cap = cap;
-	
-	FixedSizeReset(allocator);
+FixedSize CreateFixedSize(ssize sizeofItem) {
+	FixedSize allocator = {};
+	allocator.buffer = (byte*)OSReserve(RESERVE_SIZE);
+	allocator.capacity = (CHUNK_SIZE/sizeofItem) * sizeofItem; // Remove the remainder
+	allocator.sizeofItem = sizeofItem;
+	allocator.next = allocator.buffer;
+
+	OSCommit(allocator.buffer, allocator.capacity);
+	FixedSizeReset(&allocator);
+
+	return allocator;
+}
+
+void Grow(FixedSize* allocator) {
+	ssize extraCapacity = (CHUNK_SIZE/allocator->sizeofItem) * allocator->sizeofItem;
+	OSCommit(allocator->buffer + allocator->capacity, extraCapacity);
+
+	allocator->next = allocator->buffer + allocator->capacity - allocator->sizeofItem;
+
+	for (byte* buffer = allocator->buffer + allocator->capacity - allocator->sizeofItem; 
+		 buffer + allocator->sizeofItem < allocator->buffer + allocator->capacity + extraCapacity; 
+		 buffer += allocator->sizeofItem) {
+
+		*(byte**)buffer = buffer + allocator->sizeofItem;
+	}
+
+	allocator->capacity += extraCapacity;
+	*(byte**)(allocator->buffer + allocator->capacity - allocator->sizeofItem) = NULL;
 }
 
 void* FixedSizeAlloc(FixedSize*  allocator) {
-	if (allocator->next == NULL) return NULL;
-	void* data = allocator->next;
-	allocator->next = *(void**)data;
-	memset(data, 0, allocator->size);
+	if (allocator->next == NULL) Grow(allocator);
+
+	byte* data = allocator->next;
+	allocator->next = *(byte**)data;
+	memset(data, 0, allocator->sizeofItem);
 	return data;
 }
 
 void FixedSizeFree(FixedSize* allocator, void* data) {
 	if (data == NULL) return;
-	*(void**)data = allocator->next;
-	allocator->next = data;
+	*(byte**)data = allocator->next;
+	allocator->next = (byte*)data;
 }
 
-int32 FixedSizeGetIndex(FixedSize* allocator, void* data) {
-	return (int32)(((byte*)data - (byte*)allocator->buffer)/allocator->size);
+ssize FixedSizeGetIndex(FixedSize* allocator, void* data) {
+	return (ssize)(((byte*)data - allocator->buffer)/allocator->sizeofItem);
+}
+
+void DestroyFixedSize(FixedSize* allocator) {
+	OSFree(allocator->buffer, RESERVE_SIZE);
 }

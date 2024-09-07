@@ -1,11 +1,3 @@
-/*
- * NOTE:
- * non-growing arena
- *
- * TODO:
- * experiment with additional arena types
- */
-
 struct Arena {
 	byte* buffer;
 	ssize ptr;			// base-address realtive to the buffer
@@ -13,16 +5,21 @@ struct Arena {
 	ssize last;
 };
 
-void ArenaInit(Arena* arena, void* buffer, ssize capacity) {
-	arena->ptr = 0;
-	arena->last = 0;
-	arena->buffer = (byte*)buffer;
-	arena->capacity = capacity;
+Arena CreateArena() {
+	Arena arena;
+	arena.ptr = 0;
+	arena.last = 0;
+	arena.buffer = (byte*)OSReserve(RESERVE_SIZE);
+	OSCommit(arena.buffer, CHUNK_SIZE);
+	arena.capacity = CHUNK_SIZE;
+	return arena;
 }
 
 byte* ArenaAlloc(Arena* arena, ssize size, int32 alignment = 0) {
 	ASSERT(0 <= size);
-	if (size == 0) return NULL;
+
+	if (size == 0) 
+		return arena->buffer + arena->ptr;
 
 	int32 moveToAlign = 0;
 	if (alignment > 1) {
@@ -30,7 +27,10 @@ byte* ArenaAlloc(Arena* arena, ssize size, int32 alignment = 0) {
 		moveToAlign = alignment - modulo;
 	}
 
-	if (arena->capacity < arena->ptr + size + moveToAlign) return NULL;
+	while (arena->capacity < arena->ptr + size + moveToAlign) {
+		OSCommit(arena->buffer + arena->capacity, CHUNK_SIZE);
+		arena->capacity += CHUNK_SIZE;
+	}
 
 	arena->last = arena->ptr;
 	arena->ptr += moveToAlign;
@@ -52,10 +52,25 @@ void ArenaReset(Arena* arena) {
 }
 
 void* ArenaReAlloc(Arena* arena, void* oldData, ssize oldSize, ssize newSize) {
-	if (oldData == arena->buffer + arena->last || newSize <= oldSize)
+	if (oldData == NULL) 
+		return ArenaAlloc(arena, newSize);
+
+	if (newSize <= oldSize)
 		return oldData;
+
+	if (oldData == arena->buffer + arena->last) {
+		while (arena->capacity < arena->last + newSize) {
+			OSCommit(arena->buffer + arena->capacity, CHUNK_SIZE);
+		    arena->capacity += CHUNK_SIZE;
+		}
+		return oldData;
+	}
 
 	void* result = ArenaAlloc(arena, newSize);
 	memcpy(result, oldData, oldSize);
 	return result;
+}
+
+void DestroyArena(Arena* arena) {
+	OSFree(arena->buffer, RESERVE_SIZE);
 }
