@@ -53,17 +53,17 @@ void BigBufferEnsureCapacity(BigBuffer* buffer, ssize length) {
 	}
 }
 
-void BigBufferAdd(BigBuffer* buffer, byte* data, ssize length) {
+void BigBufferWrite(BigBuffer* buffer, byte* data, ssize length) {
 	BigBufferEnsureCapacity(buffer, length);
 	memcpy(buffer->pos, data, length);
 	buffer->pos += length;
 }
 
-void BigBufferAdd(BigBuffer* buffer, String str) {
-	BigBufferAdd(buffer, str.data, str.length);
+void BigBufferWrite(BigBuffer* buffer, String str) {
+	BigBufferWrite(buffer, str.data, str.length);
 }
 
-// NOTE: same as BigBufferAdd, but does not update `pos`
+// NOTE: same as BigBufferWrite, but does not update `pos`
 ssize StringCopy(String source, BigBuffer* buffer) {
 	BigBufferEnsureCapacity(buffer, source.length);
 	return StringCopy(source, buffer->pos);

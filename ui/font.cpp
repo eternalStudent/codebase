@@ -5,7 +5,7 @@
  * a more robust text rendering pipeline.
  */
 
-struct BakedChar {
+struct BakedGlyph {
 	int16 x0, y0, x1, y1;
 	float32 xoff, yoff, xadvance;
 };
@@ -15,25 +15,24 @@ struct BakedFont {
 	float32 lineGap;
 	int32 firstChar;
 	int32 lastChar;
-	BakedChar chardata[96];
+	BakedGlyph glyphs[96];
 };
 
-// TODO: rename pw, ph to width and height, and rename bitmap to data
 // TODO: change byte* to byte[0]?
 struct AtlasBitmap {
-	int16 pw, ph, x, y, bottom_y;
-	byte* bitmap;
+	int32 width, height, x, y, bottom_y;
+	byte* data;
 };
 
-AtlasBitmap CreateAtlasBitmap(int16 width, int16 height, byte* buffer) {
+AtlasBitmap CreateAtlasBitmap(int32 width, int32 height, byte* buffer) {
 	AtlasBitmap atlas;
-	atlas.pw = width;
-	atlas.ph = height;
+	atlas.width = width;
+	atlas.height = height;
 	atlas.x = 1;
 	atlas.y = 1;
 	atlas.bottom_y = 1;
-	atlas.bitmap = buffer;
-	memset(atlas.bitmap, 0, width*height);
+	atlas.data = buffer;
+	memset(atlas.data, 0, width*height);
 	return atlas;
 }
 
@@ -46,37 +45,37 @@ AtlasBitmap CreateAtlasBitmap(int16 width, int16 height, byte* buffer) {
 
 
 Image GetImageFromFontAtlas(AtlasBitmap* atlas) {
-	return Image{atlas->pw, atlas->ph, 1, atlas->bitmap};
+	return Image{atlas->width, atlas->height, 1, atlas->data};
 }
 
 float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b) {
-	BakedChar bakedchar = font->chardata[b - font->firstChar];
+	BakedGlyph glyph = font->glyphs[b - font->firstChar];
 	
-	float32 round_y = round(pos.y + (bakedchar.yoff + font->height));
-	float32 round_x = round(pos.x + bakedchar.xoff);
+	float32 round_y = round(pos.y + (glyph.yoff + font->height));
+	float32 round_x = round(pos.x + glyph.xoff);
 	
-	float32 width = (float32)(bakedchar.x1 - bakedchar.x0);
-	float32 height = (float32)(bakedchar.y1 - bakedchar.y0);
+	float32 width = (float32)(glyph.x1 - glyph.x0);
+	float32 height = (float32)(glyph.y1 - glyph.y0);
 	pos = {round_x, round_y};
 	
 	Box2 crop = {
-		(float32)bakedchar.x0,
-		(float32)bakedchar.y0,
-		(float32)bakedchar.x1,
-		(float32)bakedchar.y1
+		(float32)glyph.x0,
+		(float32)glyph.y0,
+		(float32)glyph.x1,
+		(float32)glyph.y1
 	};
 	
 	GfxDrawGlyph(pos, {width, height}, crop, color);
-	return bakedchar.xadvance;
+	return glyph.xadvance;
 }
 
 float32 GetCharWidth(BakedFont* font, byte b) {
 	if (font->firstChar <= b && b <= font->lastChar) {
-		BakedChar bakedchar = font->chardata[b - font->firstChar];
-		return bakedchar.xadvance;
+		BakedGlyph glyph = font->glyphs[b - font->firstChar];
+		return glyph.xadvance;
 	}
-	if (b == 10) return font->chardata[32 - font->firstChar].xadvance;
-	if (b == 9) return 4*font->chardata[32 - font->firstChar].xadvance;
+	if (b == 10) return font->glyphs[32 - font->firstChar].xadvance;
+	if (b == 9) return 4*font->glyphs[32 - font->firstChar].xadvance;
 	return 0;
 }
 
@@ -110,7 +109,7 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, String string,
 			}
 		}
 		if (b == 9) {
-			pos.x += 4*font->chardata[32 - font->firstChar].xadvance;
+			pos.x += 4*font->glyphs[32 - font->firstChar].xadvance;
 		}
 		if (b == 10) {
 			pos.y += height + font->lineGap;
@@ -367,7 +366,7 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 				}
 			}
 			if (b == 9) {
-				pos.x += 4*font->chardata[32 - font->firstChar].xadvance;
+				pos.x += 4*font->glyphs[32 - font->firstChar].xadvance;
 			}
 			if (b == 10) {
 				pos.y += font->height + font->lineGap;

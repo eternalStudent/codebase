@@ -173,7 +173,7 @@ uint32 find_table(byte* data, uint32 fontstart, const char* tag) {
 	int32 num_tables = __USHORT(data+fontstart+4);
 	uint32 tabledir = fontstart + 12;
 	int32 i;
-	for (i=0; i < num_tables; ++i) {
+	for (i = 0; i < num_tables; ++i) {
 		uint32 loc = tabledir + 16*i;
 		if (tag(data+loc+0, tag))
 			return __ULONG(data+loc+8);
@@ -182,17 +182,17 @@ uint32 find_table(byte* data, uint32 fontstart, const char* tag) {
 }
 
 enum { 
-	PLATFORM_ID_UNICODE   =0,
-	PLATFORM_ID_MAC       =1,
-	PLATFORM_ID_ISO       =2,
-	PLATFORM_ID_MICROSOFT =3
+	PLATFORM_ID_UNICODE   = 0,
+	PLATFORM_ID_MAC       = 1,
+	PLATFORM_ID_ISO       = 2,
+	PLATFORM_ID_MICROSOFT = 3
 };
 
 enum { 
-	MS_EID_SYMBOL        =0,
-	MS_EID_UNICODE_BMP   =1,
-	MS_EID_SHIFTJIS      =2,
-	MS_EID_UNICODE_FULL  =10
+	MS_EID_SYMBOL        = 0,
+	MS_EID_UNICODE_BMP   = 1,
+	MS_EID_SHIFTJIS      = 2,
+	MS_EID_UNICODE_FULL  = 10
 };
 
 STBFontInfo STBLoadFont(byte* buffer) {
@@ -282,7 +282,7 @@ STBFontInfo STBLoadFont(byte* buffer) {
 	// the same regardless of glyph.
 	numTables = __USHORT(buffer + cmap + 2);
 	info.index_map = 0;
-	for (i=0; i < numTables; ++i) {
+	for (i = 0; i < numTables; ++i) {
 		uint32 encoding_record = cmap + 4 + 8 * i;
 		// find an encoding we understand:
 		switch(__USHORT(buffer+encoding_record)) {
@@ -818,7 +818,7 @@ void GetGlyphBitmapBoxSubpixel(const STBFontInfo* font, int32 glyph,
 										 float32 scale_x, float32 scale_y, 
 										 float32 shift_x, float32 shift_y, 
 										 int32* ix0, int32* iy0, int32* ix1, int32* iy1) {
-	int32 x0=0,y0=0,x1,y1; // =0 suppresses compiler warning
+	int32 x0 = 0,y0 = 0,x1,y1; //  = 0 suppresses compiler warning
 	if (!GetGlyphBox(font, glyph, &x0,&y0,&x1,&y1)) {
 		// e.g. space character
 		if (ix0) *ix0 = 0;
@@ -864,8 +864,8 @@ int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, 
 	int16 numberOfContours;
 	byte* endPtsOfContours;
 	byte* data = info->data;
-	vertex* vertices=0;
-	int32 num_vertices=0;
+	vertex* vertices = 0;
+	int32 num_vertices = 0;
 	int32 g = GetGlyphOffset(info, glyph_index);
 
 	*pvertices = NULL;
@@ -875,8 +875,8 @@ int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, 
 	numberOfContours = __SHORT(data + g);
 
 	if (numberOfContours > 0) {
-		byte flags=0,flagcount;
-		int32 ins, i,j=0,m,n, next_move, was_off=0, off, start_off=0;
+		byte flags = 0,flagcount;
+		int32 ins, i,j = 0,m,n, next_move, was_off = 0, off, start_off = 0;
 		int32 x,y,cx,cy,sx,sy, scx,scy;
 		byte* points;
 		endPtsOfContours = (data + g + 10);
@@ -891,7 +891,7 @@ int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, 
 			return 0;
 
 		next_move = 0;
-		flagcount=0;
+		flagcount = 0;
 
 		// in first pass, we load uninterpreted data into the allocated array
 		// above, shifted to the end of the array so we won't overwrite it when
@@ -901,7 +901,7 @@ int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, 
 
 		// first load flags
 
-		for (i=0; i < n; ++i) {
+		for (i = 0; i < n; ++i) {
 			if (flagcount == 0) {
 				flags = *points++;
 				if (flags & 8)
@@ -912,8 +912,8 @@ int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, 
 		}
 
 		// now load x coordinates
-		x=0;
-		for (i=0; i < n; ++i) {
+		x = 0;
+		for (i = 0; i < n; ++i) {
 			flags = vertices[off+i].type;
 			if (flags & 2) {
 				int16 dx = *points++;
@@ -928,8 +928,8 @@ int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, 
 		}
 
 		// now load y coordinates
-		y=0;
-		for (i=0; i < n; ++i) {
+		y = 0;
+		for (i = 0; i < n; ++i) {
 			flags = vertices[off+i].type;
 			if (flags & 4) {
 				int16 dy = *points++;
@@ -944,9 +944,9 @@ int32 GetGlyphShapeTT(Arena* arena, const STBFontInfo* info, int32 glyph_index, 
 		}
 
 		// now convert them to our format
-		num_vertices=0;
+		num_vertices = 0;
 		sx = sy = cx = cy = scx = scy = 0;
-		for (i=0; i < n; ++i) {
+		for (i = 0; i < n; ++i) {
 			flags = vertices[off+i].type;
 			x     = (int16) vertices[off+i].x;
 			y     = (int16) vertices[off+i].y;
@@ -1151,7 +1151,7 @@ struct edge {
 
 
 struct active_edge {
-	struct active_edge *next;
+	active_edge *next;
 	float32 fx, fdx, fdy;
 	float32 direction;
 	float32 sy;
@@ -1315,7 +1315,7 @@ void fill_active_edges_new(float32 *scanline, float32 *scanline_fill,
 				// of this library, we use a different, very slow brute
 				// force implementation
 				int32 x;
-				for (x=0; x < len; ++x) {
+				for (x = 0; x < len; ++x) {
 					// cases:
 					//
 					// there can be up to two intersections with the pixel. any intersection
@@ -1378,7 +1378,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 {
 	hheap hh = { 0, 0, 0 };
 	active_edge *active = NULL;
-	int32 y,j=0, i;
+	int32 y,j = 0, i;
 	float32 scanline_data[129], *scanline, *scanline2;
 
 	(void)(vsubsample);
@@ -1442,7 +1442,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 
 		{
 			float32 sum = 0;
-			for (i=0; i < result->width; ++i) {
+			for (i = 0; i < result->width; ++i) {
 				float32 k;
 				int32 m;
 				sum += scanline2[i];
@@ -1470,8 +1470,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 
 #define COMPARE(a,b)  ((a)->y0 < (b)->y0)
 
-void sort_edges_ins_sort(edge *p, int32 n)
-{
+void sort_edges_ins_sort(edge *p, int32 n) {
 	int32 i,j;
 	for (i=1; i < n; ++i) {
 		edge t = p[i], *a = &t;
@@ -1488,8 +1487,7 @@ void sort_edges_ins_sort(edge *p, int32 n)
 	}
 }
 
-void sort_edges_quicksort(edge *p, int32 n)
-{
+void sort_edges_quicksort(edge *p, int32 n) {
 	/* threshold for transitioning to insertion sort */
 	while (n > 12) {
 		edge t;
@@ -1550,8 +1548,7 @@ void sort_edges_quicksort(edge *p, int32 n)
 	}
 }
 
-void sort_edges(edge *p, int32 n)
-{
+void sort_edges(edge *p, int32 n) {
 	sort_edges_quicksort(p, n);
 	sort_edges_ins_sort(p, n);
 }
@@ -1568,19 +1565,19 @@ void rasterize(Arena* arena, Image* result, Point2 *pts, int32 *wcount,
 
 	// now we have to blow out the windings into explicit edge lists
 	n = 0;
-	for (i=0; i < windings; ++i)
+	for (i = 0; i < windings; ++i)
 		n += wcount[i];
 
 	e = (edge *) ArenaAlloc(arena, sizeof(*e) * (n+1)); // add an extra one as a sentinel
 	if (e == 0) return;
 	n = 0;
 
-	m=0;
-	for (i=0; i < windings; ++i) {
+	m = 0;
+	for (i = 0; i < windings; ++i) {
 		Point2 *p = pts + m;
 		m += wcount[i];
 		j = wcount[i]-1;
-		for (k=0; k < wcount[i]; j=k++) {
+		for (k = 0; k < wcount[i]; j=k++) {
 			int32 a=k,b=j;
 			// skip the edge if horizontal
 			if (p[j].y == p[k].y)
@@ -1606,16 +1603,14 @@ void rasterize(Arena* arena, Image* result, Point2 *pts, int32 *wcount,
 	rasterize_sorted_edges(arena, result, e, n, vsubsample, off_x, off_y);
 }
 
-void add_point(Point2 *points, int32 n, float32 x, float32 y)
-{
+void add_point(Point2 *points, int32 n, float32 x, float32 y) {
 	if (!points) return; // during first pass, it's unallocated
 	points[n].x = x;
 	points[n].y = y;
 }
 
 // tessellate until threshold p is happy... @TODO warped to compensate for non-linear stretching
-int32 tesselate_curve(Point2 *points, int32 *num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 objspace_flatness_squared, int32 n)
-{
+int32 tesselate_curve(Point2 *points, int32 *num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 objspace_flatness_squared, int32 n) {
 	// midpoint
 	float32 mx = (x0 + 2*x1 + x2)/4;
 	float32 my = (y0 + 2*y1 + y2)/4;
@@ -1634,8 +1629,7 @@ int32 tesselate_curve(Point2 *points, int32 *num_points, float32 x0, float32 y0,
 	return 1;
 }
 
-void tesselate_cubic(Point2 *points, int32 *num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 x3, float32 y3, float32 objspace_flatness_squared, int32 n)
-{
+void tesselate_cubic(Point2 *points, int32 *num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 x3, float32 y3, float32 objspace_flatness_squared, int32 n) {
 	// @TODO this "flatness" calculation is just made-up nonsense that seems to work well enough
 	float32 dx0 = x1-x0;
 	float32 dy0 = y1-y0;
@@ -1677,16 +1671,15 @@ void tesselate_cubic(Point2 *points, int32 *num_points, float32 x0, float32 y0, 
 }
 
 // returns number of contours
-Point2 *FlattenCurves(Arena* arena, vertex *vertices, int32 num_verts, float32 objspace_flatness, int32 **contour_lengths, int32 *num_contours)
-{
-	Point2 *points=0;
-	int32 num_points=0;
+Point2 *FlattenCurves(Arena* arena, vertex *vertices, int32 num_verts, float32 objspace_flatness, int32 **contour_lengths, int32 *num_contours) {
+	Point2 *points = 0;
+	int32 num_points = 0;
 
 	float32 objspace_flatness_squared = objspace_flatness * objspace_flatness;
-	int32 i,n=0,start=0, pass;
+	int32 i,n = 0,start = 0, pass;
 
 	// count how many "moves" there are to get the contour count
-	for (i=0; i < num_verts; ++i)
+	for (i = 0; i < num_verts; ++i)
 		if (vertices[i].type == vmove)
 			++n;
 
@@ -1701,15 +1694,15 @@ Point2 *FlattenCurves(Arena* arena, vertex *vertices, int32 num_verts, float32 o
 	}
 
 	// make two passes through the points so we don't need to realloc
-	for (pass=0; pass < 2; ++pass) {
-		float32 x=0,y=0;
+	for (pass = 0; pass < 2; ++pass) {
+		float32 x = 0,y = 0;
 		if (pass == 1) {
 			points = (Point2 *) ArenaAlloc(arena, num_points * sizeof(points[0]));
 			if (points == NULL) goto error;
 		}
 		num_points = 0;
 		n= -1;
-		for (i=0; i < num_verts; ++i) {
+		for (i = 0; i < num_verts; ++i) {
 			switch (vertices[i].type) {
 				case vmove:
 					// start the next contour
@@ -1793,7 +1786,7 @@ void MakeGlyphBitmap(Arena* arena, const STBFontInfo* info, byte* output,
 
 BakedFont STBBakeFont(STBFontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSize, bool scaleForPixelHeight, Arena* arena) {
 	int32 firstChar = 32;
-	int32 numChars = 96;
+	int32 codepointCount = 96;
 
 	int32 ascent, descent, lineGap, designUnitsPerEm;
 	GetFontMetrics(&fontInfo, &ascent, &descent, &lineGap, &designUnitsPerEm);
@@ -1810,36 +1803,36 @@ BakedFont STBBakeFont(STBFontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSiz
 	}
 
 	BakedFont font;
-	for (int32 i = 0; i < numChars; ++i) {
+	for (int32 i = 0; i < codepointCount; ++i) {
 		int32 advance, lsb, x0, y0, x1, y1, gw, gh;
 		int32 g = FindGlyphIndex(&fontInfo, firstChar + i);
 		GetGlyphHMetrics(&fontInfo, g, &advance, &lsb);
 		GetGlyphBitmapBox(&fontInfo, g, pixelsPerDesignUnits, pixelsPerDesignUnits, &x0, &y0, &x1, &y1);
 		gw = x1 - x0;
 		gh = y1 - y0;
-		if (atlas->x + gw + 1 >= atlas->pw)
+		if (atlas->x + gw + 1 >= atlas->width)
 			atlas->y = atlas->bottom_y, atlas->x = 1; // advance to next row
-		if (atlas->y + gh + 1 >= atlas->ph) // check if it fits vertically AFTER potentially moving to next row
+		if (atlas->y + gh + 1 >= atlas->height) // check if it fits vertically AFTER potentially moving to next row
 			return {};
-		ASSERT(atlas->x + gw < atlas->pw);
-		ASSERT(atlas->y + gh < atlas->ph);
-		MakeGlyphBitmap(arena, &fontInfo, atlas->bitmap + atlas->x + atlas->y*atlas->pw, gw, gh, atlas->pw, pixelsPerDesignUnits, pixelsPerDesignUnits, g);
-		font.chardata[i].x0 = atlas->x;
-		font.chardata[i].y0 = atlas->y;
-		font.chardata[i].x1 = atlas->x + (int16) gw;
-		font.chardata[i].y1 = atlas->y + (int16) gh;
-		font.chardata[i].xadvance = pixelsPerDesignUnits * advance;
-		font.chardata[i].xoff     = (float32) x0;
-		font.chardata[i].yoff     = (float32) y0;
-		atlas->x = atlas->x + (int16) gw + 1;
+		ASSERT(atlas->x + gw < atlas->width);
+		ASSERT(atlas->y + gh < atlas->height);
+		MakeGlyphBitmap(arena, &fontInfo, atlas->data + atlas->x + atlas->y*atlas->width, gw, gh, atlas->width, pixelsPerDesignUnits, pixelsPerDesignUnits, g);
+		font.glyphs[i].x0 = (int16)atlas->x;
+		font.glyphs[i].y0 = (int16)atlas->y;
+		font.glyphs[i].x1 = (int16)atlas->x + (int16)gw;
+		font.glyphs[i].y1 = (int16)atlas->y + (int16)gh;
+		font.glyphs[i].xadvance = pixelsPerDesignUnits*advance;
+		font.glyphs[i].xoff     = (float32)x0;
+		font.glyphs[i].yoff     = (float32)y0;
+		atlas->x = atlas->x + (int16)gw + 1;
 		if (atlas->y + gh + 1 > atlas->bottom_y)
-			atlas->bottom_y = atlas->y + (int16) gh + 1;
+			atlas->bottom_y = atlas->y + (int16)gh + 1;
 	}
 
 	font.height = pixelHeight;
 	font.lineGap = pixelsPerDesignUnits*lineGap;
 	font.firstChar = firstChar;
-	font.lastChar = firstChar + numChars - 1;
+	font.lastChar = firstChar + codepointCount - 1;
 
 	return font;
 }
@@ -1877,23 +1870,23 @@ BakedFont STBBakeFont(
 		GetGlyphBitmapBox(&fontInfo, g, pixelsPerDesignUnits, pixelsPerDesignUnits, &x0, &y0, &x1, &y1);
 		gw = x1 - x0;
 		gh = y1 - y0;
-		if (atlas->x + gw + 1 >= atlas->pw)
+		if (atlas->x + gw + 1 >= atlas->width)
 			atlas->y = atlas->bottom_y, atlas->x = 1; // advance to next row
-		if (atlas->y + gh + 1 >= atlas->ph) // check if it fits vertically AFTER potentially moving to next row
+		if (atlas->y + gh + 1 >= atlas->height) // check if it fits vertically AFTER potentially moving to next row
 			return {};
-		ASSERT(atlas->x + gw < atlas->pw);
-		ASSERT(atlas->y + gh < atlas->ph);
-		MakeGlyphBitmap(arena, &fontInfo, atlas->bitmap + atlas->x + atlas->y*atlas->pw, gw, gh, atlas->pw, pixelsPerDesignUnits, pixelsPerDesignUnits, g);
-		font.chardata[i].x0 = atlas->x;
-		font.chardata[i].y0 = atlas->y;
-		font.chardata[i].x1 = atlas->x + (int16) gw;
-		font.chardata[i].y1 = atlas->y + (int16) gh;
-		font.chardata[i].xadvance = pixelsPerDesignUnits * advance;
-		font.chardata[i].xoff     = (float32) x0;
-		font.chardata[i].yoff     = (float32) y0;
-		atlas->x = atlas->x + (int16) gw + 1;
+		ASSERT(atlas->x + gw < atlas->width);
+		ASSERT(atlas->y + gh < atlas->height);
+		MakeGlyphBitmap(arena, &fontInfo, atlas->data + atlas->x + atlas->y*atlas->width, gw, gh, atlas->width, pixelsPerDesignUnits, pixelsPerDesignUnits, g);
+		font.glyphs[i].x0 = (int16)atlas->x;
+		font.glyphs[i].y0 = (int16)atlas->y;
+		font.glyphs[i].x1 = (int16)atlas->x + (int16)gw;
+		font.glyphs[i].y1 = (int16)atlas->y + (int16)gh;
+		font.glyphs[i].xadvance = pixelsPerDesignUnits*advance;
+		font.glyphs[i].xoff     = (float32)x0;
+		font.glyphs[i].yoff     = (float32)y0;
+		atlas->x = atlas->x + (int16)gw + 1;
 		if (atlas->y + gh + 1 > atlas->bottom_y)
-			atlas->bottom_y = atlas->y + (int16) gh + 1;
+			atlas->bottom_y = atlas->y + (int16)gh + 1;
 	}
 
 	font.height = pixelHeight;

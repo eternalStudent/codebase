@@ -139,7 +139,7 @@ BakedFont DWriteBakeFont(
 		int32 glyphHeight = boundingBox.bottom - boundingBox.top;
 		int32 glyphWidth = boundingBox.right - boundingBox.left;
 
-		if (atlas->x + glyphWidth + 1 >= atlas->pw)
+		if (atlas->x + glyphWidth + 1 >= atlas->width)
 			atlas->y = atlas->bottom_y, atlas->x = 1;
 		
 		// Get the Bitmap
@@ -150,10 +150,10 @@ BakedFont DWriteBakeFont(
 		// copy and convert to single channel
 		{
 			int32 in_pitch = dib.dsBm.bmWidthBytes;
-			int32 out_pitch = atlas->pw;
+			int32 out_pitch = atlas->width;
 
 			byte* in_data = (byte*)dib.dsBm.bmBits + in_pitch*(boundingBox.bottom - glyphHeight) + 4*boundingBox.left;
-			byte* out_data = atlas->bitmap + atlas->x + out_pitch*(atlas->y);
+			byte* out_data = atlas->data + atlas->x + out_pitch*(atlas->y);
 
 			byte* in_line = in_data;
 			byte* out_line = out_data;
@@ -178,13 +178,13 @@ BakedFont DWriteBakeFont(
 			FALSE);
 		ASSERT_HR(hr);
 
-		font.chardata[i].xoff = (float32)boundingBox.left;
-		font.chardata[i].yoff = (float32)boundingBox.top - (int32)ascent;
-		font.chardata[i].x0 = atlas->x;
-		font.chardata[i].y0 = atlas->y;
-		font.chardata[i].x1 = atlas->x + (int16)glyphWidth;
-		font.chardata[i].y1 = atlas->y + (int16)glyphHeight;
-		font.chardata[i].xadvance = pixelsPerDesignUnits*glyphMetrics.advanceWidth;
+		font.glyphs[i].xoff = (float32)boundingBox.left;
+		font.glyphs[i].yoff = (float32)boundingBox.top - (int32)ascent;
+		font.glyphs[i].x0 = (int16)atlas->x;
+		font.glyphs[i].y0 = (int16)atlas->y;
+		font.glyphs[i].x1 = (int16)atlas->x + (int16)glyphWidth;
+		font.glyphs[i].y1 = (int16)atlas->y + (int16)glyphHeight;
+		font.glyphs[i].xadvance = pixelsPerDesignUnits*glyphMetrics.advanceWidth;
 
 		atlas->x += (int16)glyphWidth + 1;
 		if (atlas->y + glyphHeight + 1 > atlas->bottom_y)
