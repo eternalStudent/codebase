@@ -1,5 +1,3 @@
-// TODO: have a backing big array instead of a fixed-size buffer
-
 struct FixedSize {
 	byte* buffer;
 	ssize capacity;

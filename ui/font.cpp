@@ -332,6 +332,8 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, String string
 // StringList
 //------------
 
+#include "stringlist.cpp"
+
 float32 GetWordWidth(BakedFont* font, StringListPos pos) {
 	float32 width = 0;
 	for (StringNode* node = pos.node; node != NULL; node = node->next) {
