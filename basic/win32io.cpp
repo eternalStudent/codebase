@@ -59,6 +59,9 @@ HANDLE Win32GetDefaultFontFile() {
 	return Win32OpenFile(filePath);
 }
 
+// TODO: I also need to output the process handle
+//       use GetExitCodeProcess to know if the process is still active
+// NOTE: https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
 HANDLE Win32CreateChildProcess(LPWSTR cmd) {
 	HANDLE readHandle = NULL;
 	HANDLE writeHandle = NULL;

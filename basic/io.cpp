@@ -38,14 +38,14 @@ bool OSReadAll(File file, byte* buffer, ssize length) {
 	if (file == FILE_ERROR)
 		return false;
 
-	int64 size = OSGetFileSize(file);
+	ssize size = OSGetFileSize(file);
 	if (!size) 
 		return false;
 
 	buffer[size] = 0;	
-	int64 left = MIN(size, length);
+	ssize left = MIN(size, length);
 	byte* pos = buffer;
-	int64 read;
+	ssize read;
 	do {
 		read = OSReadFile(file, pos, (int32)(left & MAX_INT32));
 		pos  += read;
@@ -58,7 +58,7 @@ String OSReadAll(File file, Arena* arena) {
 	if (file == FILE_ERROR)
 		return {};
 
-	int64 size = OSGetFileSize(file);
+	ssize size = OSGetFileSize(file);
 	if (!size) 
 		return {};
 
@@ -67,15 +67,36 @@ String OSReadAll(File file, Arena* arena) {
 		return {};
 
 	buffer[size] = 0;	
-	int64 left = size;
+	ssize left = size;
 	byte* pos = buffer;
-	int64 read;
+	ssize read;
 	do {
 		read = OSReadFile(file, pos, (int32)(left & MAX_INT32));
 		pos  += read;
 		left -= read;
 	} while ((0 < left) && (0 < read));
 	return {buffer, (ssize)size};
+}
+
+bool OSReadAll(File file, BigBuffer* buffer) {
+	if (file == FILE_ERROR)
+		return false;
+
+	ssize size = OSGetFileSize(file);
+	if (!size) 
+		return false;
+
+	BigBufferEnsureCapacity(buffer, size);
+
+	ssize left = size;
+	ssize read;
+	do {
+		read = OSReadFile(file, buffer->pos, (int32)(left & MAX_INT32));
+		buffer->pos  += read;
+		left -= read;
+	} while ((0 < left) && (0 < read));
+
+	return true;
 }
 
 bool OSWriteAll(File file, byte* buffer, ssize length) {

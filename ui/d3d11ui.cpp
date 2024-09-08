@@ -1196,9 +1196,9 @@ void D3D11UICropScreen(LONG left, LONG top, LONG width, LONG height) {
 
 	D3D11_RECT rect = {};
 	rect.left = left;
-	rect.right = left + width;
+	rect.right = left + MAX(width, 0);
 	rect.top = top;
-	rect.bottom = top + height;
+	rect.bottom = top + MAX(height, 0);
 	d3d11.context->RSSetScissorRects(1, &rect);
 }
 

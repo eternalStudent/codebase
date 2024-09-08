@@ -25,14 +25,14 @@ struct AtlasBitmap {
 	byte* bitmap;
 };
 
-AtlasBitmap CreateAtlasBitmap(int16 width, int16 height, Arena* arena) {
+AtlasBitmap CreateAtlasBitmap(int16 width, int16 height, byte* buffer) {
 	AtlasBitmap atlas;
 	atlas.pw = width;
 	atlas.ph = height;
 	atlas.x = 1;
 	atlas.y = 1;
 	atlas.bottom_y = 1;
-	atlas.bitmap = (byte*)ArenaAlloc(arena, width*height);
+	atlas.bitmap = buffer;
 	memset(atlas.bitmap, 0, width*height);
 	return atlas;
 }
