@@ -93,3 +93,7 @@ inline uint64 BitRotateRight(uint64 value, int32 shift) {
 	return (value << (64 - shift)) | (value >> shift);
 #endif
 }
+
+inline bool IsPowerOf2(uint64 value) {
+	return (value & (value - 1)) == 0;
+}

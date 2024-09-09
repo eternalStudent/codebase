@@ -334,10 +334,7 @@ struct StringNode {
 struct StringList {
 	StringNode* first;
 	StringNode* last;
-	union {
-		ssize totalLength;
-		ssize length;
-	};
+	ssize length;
 };
 
 ssize StringListCopy(StringList list, byte* buffer) {

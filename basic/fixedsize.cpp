@@ -3,6 +3,8 @@ struct FixedSize {
 	ssize capacity;
 	byte* next;
 	ssize sizeofItem;
+
+	ssize commitSize;
 };
 
 void FixedSizeReset(FixedSize* allocator) {
@@ -18,12 +20,14 @@ void FixedSizeReset(FixedSize* allocator) {
 	*(byte**)(allocator->buffer + allocator->capacity - allocator->sizeofItem) = NULL;
 }
 
-FixedSize CreateFixedSize(ssize sizeofItem) {
+FixedSize CreateFixedSize(ssize sizeofItem, ssize commitSize) {
+	commitSize = (commitSize/sizeofItem)*sizeofItem; // Remove the remainder
 	FixedSize allocator = {};
 	allocator.buffer = (byte*)OSReserve(RESERVE_SIZE);
-	allocator.capacity = (CHUNK_SIZE/sizeofItem) * sizeofItem; // Remove the remainder
+	allocator.capacity = commitSize; 
 	allocator.sizeofItem = sizeofItem;
 	allocator.next = allocator.buffer;
+	allocator.commitSize = commitSize;
 
 	OSCommit(allocator.buffer, allocator.capacity);
 	FixedSizeReset(&allocator);
@@ -32,19 +36,18 @@ FixedSize CreateFixedSize(ssize sizeofItem) {
 }
 
 void Grow(FixedSize* allocator) {
-	ssize extraCapacity = (CHUNK_SIZE/allocator->sizeofItem) * allocator->sizeofItem;
-	OSCommit(allocator->buffer + allocator->capacity, extraCapacity);
+	OSCommit(allocator->buffer + allocator->capacity, allocator->commitSize);
 
 	allocator->next = allocator->buffer + allocator->capacity - allocator->sizeofItem;
 
 	for (byte* buffer = allocator->buffer + allocator->capacity - allocator->sizeofItem; 
-		 buffer + allocator->sizeofItem < allocator->buffer + allocator->capacity + extraCapacity; 
+		 buffer + allocator->sizeofItem < allocator->buffer + allocator->capacity + allocator->commitSize; 
 		 buffer += allocator->sizeofItem) {
 
 		*(byte**)buffer = buffer + allocator->sizeofItem;
 	}
 
-	allocator->capacity += extraCapacity;
+	allocator->capacity += allocator->commitSize;
 	*(byte**)(allocator->buffer + allocator->capacity - allocator->sizeofItem) = NULL;
 }
 

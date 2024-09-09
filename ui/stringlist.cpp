@@ -6,12 +6,23 @@ StringList CreateStringList(String string, StringNode* node) {
 void StringListAppend(StringList* list, StringNode* node) {
 	if (node->string.length == 0) return;
 	LINKEDLIST_ADD(list, node);
-	list->totalLength += node->string.length;
+	list->length += node->string.length;
 }
 
 ssize StringListCopy(StringList list, BigBuffer* buffer) {
 	BigBufferEnsureCapacity(buffer, list.length);
 	return StringListCopy(list, buffer->pos);
+}
+
+String StringListToString(StringList list, BigBuffer* buffer) {
+	byte* data = buffer->pos;
+	ssize length = StringListCopy(list, buffer);
+	buffer->pos += length;
+	return {data, length};
+}
+
+String StringListToTempString(StringList list, BigBuffer* buffer) {
+	return {buffer->pos, StringListCopy(list, buffer)};
 }
 
 struct StringListPos {
@@ -295,7 +306,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 				node2->string.length = length2;
 			}
 		}
-		list->totalLength--;
+		list->length--;
 		StringListPosDec(&head);
 	}
 	else {
@@ -338,7 +349,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 				LINKEDLIST_ADD_AFTER(list, node, node1);
 			}
 
-			list->totalLength -= endIndex - startIndex;
+			list->length -= endIndex - startIndex;
 			if (node == end.node) break;
 		}
 
@@ -424,7 +435,7 @@ StringListPos StringListInsert(StringList* list, String newString,
 	}
 
 	buffer->pos += newString.length;
-	list->totalLength += newString.length;
+	list->length += newString.length;
 	head.index += newString.length;
 	return head;
 }

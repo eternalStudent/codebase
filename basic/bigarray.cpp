@@ -2,25 +2,28 @@ struct BigArray {
 	byte* data;
 	ssize size;
 	ssize capacity;
+	
+	ssize commitSize;
 };
 
-BigArray CreateBigArray() {
+BigArray CreateBigArray(ssize commitSize) {
 	BigArray arr = {};
 	arr.data = (byte*)OSReserve(RESERVE_SIZE);
-	OSCommit(arr.data, CHUNK_SIZE);
-	arr.capacity = CHUNK_SIZE;
+	OSCommit(arr.data, commitSize);
+	arr.capacity = commitSize;
+	arr.commitSize = commitSize;
 	arr.size = 0;
 	return arr;
 }
 
-void BigArrayAdd(BigArray* array, void* data, ssize size) {
-	while (array->capacity < array->size + size) {
-		OSCommit(array->data + array->capacity, CHUNK_SIZE);
-		array->capacity += CHUNK_SIZE;
+void BigArrayAdd(BigArray* arr, void* data, ssize size) {
+	while (arr->capacity < arr->size + size) {
+		OSCommit(arr->data + arr->capacity, arr->commitSize);
+		arr->capacity += arr->commitSize;
 	}
 
-	memcpy(array->data + array->size, data, size);
-	array->size += size;
+	memcpy(arr->data + arr->size, data, size);
+	arr->size += size;
 }
 
 void DestroyBigArray(BigArray* arr) {
@@ -33,14 +36,17 @@ struct BigBuffer {
 	byte* start;
 	byte* pos;
 	byte* end;
+
+	ssize commitSize;
 };
 
-BigBuffer CreateBigBuffer() {
+BigBuffer CreateBigBuffer(ssize commitSize) {
 	BigBuffer buffer = {};
 	buffer.start = (byte*)OSReserve(RESERVE_SIZE);
-	OSCommit(buffer.start, CHUNK_SIZE);
-	buffer.end = buffer.start + CHUNK_SIZE;
+	OSCommit(buffer.start, commitSize);
+	buffer.end = buffer.start + commitSize;
 	buffer.pos = buffer.start;
+	buffer.commitSize = commitSize;
 	return buffer;
 }
 
@@ -48,8 +54,8 @@ void BigBufferEnsureCapacity(BigBuffer* buffer, ssize length) {
 	// NOTE: unlike BigArray, I want to make sure there is always extra capacity
 	//       the `while` is slightly unnecessary, but why not
 	while (buffer->end < buffer->pos + length + 20) {
-		OSCommit(buffer->end, CHUNK_SIZE);
-		buffer->end += CHUNK_SIZE;
+		OSCommit(buffer->end, buffer->commitSize);
+		buffer->end += buffer->commitSize;
 	}
 }
 

@@ -17,8 +17,10 @@
 #  define OSFree				LinuxFree
 #endif
 
-#define RESERVE_SIZE	1024*1024*1024*16ull
-#define CHUNK_SIZE 		1024*1024*16
+#define KB(n)	(((ssize)(n)) << 10)
+#define MB(n)	(((ssize)(n)) << 20)
+#define GB(n)	(((ssize)(n)) << 30)
+#define RESERVE_SIZE		GB(16)
 
 #include "arena.cpp"
 #include "bigarray.cpp"
