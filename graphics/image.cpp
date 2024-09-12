@@ -45,6 +45,18 @@ union Color {
 	float32 e[4];
 };
 
+inline Color operator+(Color c0, Color c1) {
+	return {c0.r + c1.r, c0.g + c1.g, c0.b + c1.b, c0.a + c1.a};
+}
+
+inline Color operator-(Color c0, Color c1) {
+	return {c0.r - c1.r, c0.g - c1.g, c0.b - c1.b, c0.a - c1.a};
+}
+
+inline Color operator*(float32 a, Color c) {
+	return {a*c.r, a*c.g, a*c.b, a*c.a};
+}
+
 #define COLOR_BLACK 	Color{0, 0, 0, 1}
 #define COLOR_BLUE		Color{0, 0, 1, 1}
 #define COLOR_GREEN		Color{0, 1, 0, 1}

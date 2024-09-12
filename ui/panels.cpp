@@ -16,7 +16,8 @@ enum UIPanelHover {
 	UIPH_BottomRight,
 	UIPH_Splitter,
 	UIPH_Header,
-	UIPH_Closing
+	UIPH_Closing,
+	UIPH_Body,
 };
 
 enum UIPanelState {
@@ -48,6 +49,15 @@ struct UIPanel {
 		UIPanel* selected;
 		int32 count;
 	} tabs;
+
+	struct {
+		union {
+			struct {Point2 pos; Dimensions2 dim;};
+			struct {float32 x, y, width, height;};
+		};
+		bool isHorizontal;
+		bool isVertical;
+	} scroll;
 };
 
 struct UIPanelManager;
@@ -88,6 +98,7 @@ void UIPanelSplit(FixedSize* allocator, UIPanel* parent, UIAlignement align, flo
 	parent->b->data = parent->data;
 	parent->data = NULL;
 	parent->b->tabs = parent->tabs;
+	parent->b->scroll = parent->scroll;
 	LINKEDLIST_FOREACH(&(parent->b->tabs), UIPanel, tab) tab->parent = parent->b;
 }
 
@@ -100,6 +111,7 @@ void UIPanelSplit(FixedSize* allocator, UIPanel* parent, UIAlignement align, UIP
 		b->data = parent->data;
 		parent->data = NULL;
 		b->tabs = parent->tabs;
+		b->scroll = parent->scroll;
 		LINKEDLIST_FOREACH(&(b->tabs), UIPanel, tab) tab->parent = b;
 	}
 	else {
@@ -107,6 +119,7 @@ void UIPanelSplit(FixedSize* allocator, UIPanel* parent, UIAlignement align, UIP
 		b->splitPoint = parent->splitPoint;
 		b->data = parent->data;
 		b->tabs = parent->tabs;
+		b->scroll = parent->scroll;
 		LINKEDLIST_FOREACH(&(b->tabs), UIPanel, tab) tab->parent = b;
 		b->a = parent->a;
 		b->b = parent->b;
@@ -131,6 +144,7 @@ void UIPanelUndock(FixedSize* allocator, UIPanel* panel) {
 			parent->align = Align_Unaligned;
 			parent->data = sibling->data;
 			parent->tabs = sibling->tabs;
+			parent->scroll = sibling->scroll;
 			LINKEDLIST_FOREACH(&(parent->tabs), UIPanel, tab) tab->parent = parent;
 			sibling->data = NULL;
 			parent->a = NULL;
@@ -174,6 +188,7 @@ void UIPanelAddTab(FixedSize* allocator, UIPanel* panel, UIPanel* tab) {
 		LINKEDLIST_ADD(&(panel->tabs), first);
 		first->data = panel->data;
 		first->tabs = panel->tabs;
+		first->scroll = panel->scroll;
 		first->parent = panel;
 		panel->data = NULL;
 		panel->tabs.count = 1;
@@ -267,14 +282,18 @@ bool UIPanelsProcessEvent(UIPanelManager* manager, OSEvent event) {
 		}
 
 		manager->SetActivePanel(manager, cursor);
-		return manager->active != NULL;
+		return manager->active != NULL && manager->hover != UIPH_Body;
 	} break;
 
 	case Event_MouseLeftButtonDown: {
 		if (manager->active) {
 			UIPanel* panel = manager->active;
 
-			if (manager->hover == UIPH_Header) {
+			if (manager->hover == UIPH_Body) {
+				return false;
+			}
+
+			else if (manager->hover == UIPH_Header) {
 				manager->state = UIPS_Drag;
 
 				if (!panel->parent) // floating
@@ -370,6 +389,20 @@ bool UIPanelsProcessEvent(UIPanelManager* manager, OSEvent event) {
 		}
 
 		return false;
+	} break;
+
+	case Event_MouseVerticalWheel: {
+		if (manager->active && manager->hover == UIPH_Body && manager->active->scroll.isVertical) {
+			manager->active->scroll.y -= event.mouse.wheelDelta;
+			if (manager->active->scroll.y < 0) manager->active->scroll.y = 0;
+		}
+	} break;
+
+	case Event_MouseHorizontalWheel: {
+		if (manager->active && manager->hover == UIPH_Body && manager->active->scroll.isHorizontal) {
+			manager->active->scroll.x += event.mouse.wheelDelta;
+			if (manager->active->scroll.x < 0) manager->active->scroll.x = 0;
+		}
 	} break;
 
 	}

@@ -39,6 +39,14 @@ struct D3D11Shadow {
 	Color color;
 };
 
+struct D3D11SemiSphere {
+	Point2 pos;
+	float32 radius;
+	uint32 quadrant;
+	float32 thickness;
+	Color color;
+};
+
 struct D3D11Program {
 	UINT stride;
 	ID3D11VertexShader* vshader;
@@ -81,6 +89,7 @@ struct {
 	D3D11Program segmentProgram;
 	D3D11Program imageProgram;
 	D3D11Program shadowProgram;
+	D3D11Program semiSphereProgram;
 	D3D11Program* currentProgram;
 	
 	int32 quadCount;
@@ -379,6 +388,62 @@ R"STRING(
 		float a = 1 - smoothstep(-input.blur, 0.5f, sd_);
 		float4 color = input.color;
 		color.a *= a;
+		return color;
+	}				
+)STRING";
+
+static char semiSphereCode[] = 
+"	#line " STRINGIFY(__LINE__) "\n"
+R"STRING(
+	struct VS_INPUT	{
+		float2 pos : POS;
+		float radius : RAD;
+		uint quadrant : QUADRANT;
+		float thickness : THICK;
+		float4 color : COLOR;	
+		uint vertexId : SV_VertexID;
+	};				
+					
+	struct PS_INPUT {
+		float4 pos : SV_POSITION;
+		float4 color : COLOR;
+		float2 center : POS;
+		float radius : RAD;
+		float thickness : THICK;
+	};				
+					
+	cbuffer cbuffer0 : register(b0) {
+		row_major float4x4 mvp;
+	}				
+					
+	PS_INPUT vs(VS_INPUT input) {
+		PS_INPUT output;
+		float2 pixel_poses[] = {
+			float2(input.pos.x, input.pos.y + input.radius),
+			float2(input.pos.x, input.pos.y),
+			float2(input.pos.x + input.radius, input.pos.y + input.radius),
+			float2(input.pos.x + input.radius, input.pos.y),
+		};			
+		float2 pixel_pos = pixel_poses[input.vertexId];
+		float4 pos = mul(mvp, float4(pixel_pos, 0, 1));
+		output.pos = pos;
+		
+		output.center = pixel_poses[input.quadrant];
+		output.color = input.color;
+		output.radius = input.radius;
+		output.thickness = input.thickness;
+		return output;
+	}				
+					
+	float4 ps(PS_INPUT input) : SV_TARGET	
+	{				
+		float2 pos = input.pos.xy;
+		float sd_ = distance(pos, input.center) - input.radius;
+		float sd2 = sd_ + input.thickness;	
+		float a = 1 - smoothstep(-0.5f, +0.5f, sd_);
+		float a2 = 1 - smoothstep(-0.5f, +0.5f, sd2);
+		float4 color = input.color;
+		color.a = a*(1 - a2)*color.a;
 		return color;
 	}				
 )STRING";
@@ -703,6 +768,19 @@ void D3D11UIInit(uint32 globalFlags) {
 		};
 		d3d11.shadowProgram = CreateProgram(STR(shadowCode), desc, ARRAYSIZE(desc), sizeof(D3D11Shadow));
 	}
+
+	{
+		D3D11_INPUT_ELEMENT_DESC desc[] =
+		{
+			{ "POS",      0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(struct D3D11SemiSphere, pos), 			D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "RAD",      0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11SemiSphere, radius), 		D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "QUADRANT", 0, DXGI_FORMAT_R32_UINT,           0, offsetof(struct D3D11SemiSphere, quadrant), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "THICK",    0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11SemiSphere, thickness), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(struct D3D11SemiSphere, color),   		D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+
+		};
+		d3d11.semiSphereProgram = CreateProgram(STR(semiSphereCode), desc, ARRAYSIZE(desc), sizeof(D3D11SemiSphere));
+	}
 }
 
 void D3D11UIBeginDrawing() {
@@ -964,6 +1042,26 @@ void D3D11UIDrawSolidColorQuad(
 }
 
 void D3D11UIDrawVerticalGradQuad(
+	Box2 box, 
+	Color color1, 
+	Color color2) {
+
+	D3D11Quad quad = {
+		box.p0,
+		box.p1 ,
+		color2,
+		color1,
+		color2, 
+		color1,
+		0,
+		0,
+		{},
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawVerticalGradQuad(
 	Point2 pos, 
 	Dimensions2 dim, 
 	Color color1, 
@@ -1029,6 +1127,26 @@ void D3D11UIDrawHorizontalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawHorizontalGradQuad(
+	Box2 box, 
+	Color color1, 
+	Color color2) {
+
+	D3D11Quad quad = {
+		box.p0,
+		box.p1,
+		color1,
+		color1,
+		color2, 
+		color2,
+		0,
+		0,
+		{},
 	};
 
 	DrawQuad(quad);
@@ -1188,6 +1306,24 @@ void D3D11UIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offse
 		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
 
 	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Shadow), &shadow, sizeof(D3D11Shadow));
+	d3d11.quadCount++;
+}
+
+void D3D11UIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float32 thickness, Color color) {
+	uint32 quadrants[] = {0, 2, 3, 1};
+
+	if (d3d11.currentProgram != &d3d11.semiSphereProgram) {
+		FlushVertices();
+		d3d11.currentProgram = &d3d11.semiSphereProgram;
+		DisableMultiSample();
+	}
+
+	D3D11SemiSphere semi = {pos, radius, quadrants[(int32)quadrant], thickness, color};
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11SemiSphere), &semi, sizeof(D3D11SemiSphere));
 	d3d11.quadCount++;
 }
 
