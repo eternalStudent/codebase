@@ -962,47 +962,13 @@ void D3D11UIEndDrawing() {
 	OSD3D11SwapBuffers();
 }
 
-void D3D11UIDrawSolidColorQuad(Point2 pos, Dimensions2 dim, Color color) {
-
-	D3D11Quad quad = {
-		pos,
-		pos + dim,
-		color,
-		color,
-		color, 
-		color,
-		0,
-		0,
-		{},
-	};
-
-	DrawQuad(quad);
-}
-
-void D3D11UIDrawSolidColorQuad(Box2 box, Color color) {
-
-	D3D11Quad quad = {
-		box.p0,
-		box.p1,
-		color,
-		color,
-		color, 
-		color,
-		0,
-		0,
-		{},
-	};
-
-	DrawQuad(quad);
-}
-
 void D3D11UIDrawSolidColorQuad(
 	Point2 pos, 
 	Dimensions2 dim, 
 	Color color, 
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	D3D11Quad quad = {
 		pos,
@@ -1022,9 +988,9 @@ void D3D11UIDrawSolidColorQuad(
 void D3D11UIDrawSolidColorQuad(
 	Box2 box, 
 	Color color,
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	D3D11Quad quad = {
 		box.p0,
@@ -1042,33 +1008,13 @@ void D3D11UIDrawSolidColorQuad(
 }
 
 void D3D11UIDrawVerticalGradQuad(
-	Box2 box, 
-	Color color1, 
-	Color color2) {
-
-	D3D11Quad quad = {
-		box.p0,
-		box.p1 ,
-		color2,
-		color1,
-		color2, 
-		color1,
-		0,
-		0,
-		{},
-	};
-
-	DrawQuad(quad);
-}
-
-void D3D11UIDrawVerticalGradQuad(
 	Point2 pos, 
 	Dimensions2 dim, 
 	Color color1, 
 	Color color2,
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	D3D11Quad quad = {
 		pos,
@@ -1089,9 +1035,9 @@ void D3D11UIDrawVerticalGradQuad(
 	Box2 box, 
 	Color color1, 
 	Color color2,
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	D3D11Quad quad = {
 		box.p0,
@@ -1113,9 +1059,9 @@ void D3D11UIDrawHorizontalGradQuad(
 	Dimensions2 dim, 
 	Color color1, 
 	Color color2,
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	D3D11Quad quad = {
 		pos,
@@ -1135,30 +1081,10 @@ void D3D11UIDrawHorizontalGradQuad(
 void D3D11UIDrawHorizontalGradQuad(
 	Box2 box, 
 	Color color1, 
-	Color color2) {
-
-	D3D11Quad quad = {
-		box.p0,
-		box.p1,
-		color1,
-		color1,
-		color2, 
-		color2,
-		0,
-		0,
-		{},
-	};
-
-	DrawQuad(quad);
-}
-
-void D3D11UIDrawHorizontalGradQuad(
-	Box2 box, 
-	Color color1, 
 	Color color2,
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	D3D11Quad quad = {
 		box.p0,

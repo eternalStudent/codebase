@@ -495,47 +495,13 @@ void DrawQuad(OpenGLQuad quad) {
 	opengl.quadCount++;
 }
 
-void OpenGLUIDrawSolidColorQuad(Point2 pos, Dimensions2 dim, Color color) {
-
-	OpenGLQuad quad = {
-		pos,
-		pos + dim,
-		color,
-		color,
-		color, 
-		color,
-		0,
-		0,
-		{},
-	};
-
-	DrawQuad(quad);
-}
-
-void OpenGLUIDrawSolidColorQuad(Box2 box, Color color) {
-
-	OpenGLQuad quad = {
-		box.p0,
-		box.p1,
-		color,
-		color,
-		color, 
-		color,
-		0,
-		0,
-		{},
-	};
-
-	DrawQuad(quad);
-}
-
 void OpenGLUIDrawSolidColorQuad(
 	Point2 pos, 
 	Dimensions2 dim, 
 	Color color, 
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	OpenGLQuad quad = {
 		pos,
@@ -555,9 +521,9 @@ void OpenGLUIDrawSolidColorQuad(
 void OpenGLUIDrawSolidColorQuad(
 	Box2 box, 
 	Color color, 
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	OpenGLQuad quad = {
 		box.p0,
@@ -579,9 +545,9 @@ void OpenGLUIDrawVerticalGradQuad(
 	Dimensions2 dim, 
 	Color color1,
 	Color color2, 
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	OpenGLQuad quad = {
 		pos,
@@ -602,9 +568,9 @@ void OpenGLUIDrawVerticalGradQuad(
 	Box2 box, 
 	Color color1,
 	Color color2, 
-	float32 cornerRadius, 
-	float32 borderThickness, 
-	Color borderColor) {
+	float32 cornerRadius = 0, 
+	float32 borderThickness = 0, 
+	Color borderColor = {}) {
 
 	OpenGLQuad quad = {
 		box.p0,
