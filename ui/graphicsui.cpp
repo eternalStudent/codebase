@@ -61,7 +61,7 @@ struct Walk {
 };
 
 
-void DrawStraightLine(Point2* pos, Direction dir, float32 length, float32 half, Color color0, Color color1) {
+void GfxDrawStraightLine(Point2* pos, Direction dir, float32 length, float32 half, Color color0, Color color1) {
 	switch (dir) {
 	case Dir_Left: {
 		GfxDrawHorizontalGradQuad({pos->x - length, pos->y - half}, {length, 2*half}, color1, color0);
@@ -82,13 +82,12 @@ void DrawStraightLine(Point2* pos, Direction dir, float32 length, float32 half, 
 	}
 }
 
-// TODO: Add gradient
 void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, float32 thickness, Color color0, Color color1) {
 	float32 half = 0.5f*thickness;
 	Point2 pos = start;
 
 	if (count == 1) {
-		DrawStraightLine(&pos, walks->dir, walks->length, half, color0, color1);
+		GfxDrawStraightLine(&pos, walks->dir, walks->length, half, color0, color1);
 		return;
 	}
 
@@ -111,7 +110,7 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 		float32 length = walks->length + half - radius;
 		t += length/totalLength;
 		Color c1 = (1 - t)*color0 + t*color1;
-		DrawStraightLine(&pos, walks->dir, length, half, color0, c1);
+		GfxDrawStraightLine(&pos, walks->dir, length, half, color0, c1);
 	}
 		
 	Direction prev = walks->dir;
@@ -206,7 +205,7 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 		GfxDrawSemiSphere(pos + offset, radius, quadrant, thickness, c0);
 		pos = pos + advancement;
 
-		DrawStraightLine(&pos, walk->dir, length, half, c0, c1);
+		GfxDrawStraightLine(&pos, walk->dir, length, half, c0, c1);
 
 		prev = walk->dir;
 	}
