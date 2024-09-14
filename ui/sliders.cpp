@@ -1,7 +1,6 @@
 /*
- * NOTE:
- * This is a plug-n-play style library for adding sliders without a ui framework.
- * 
+ * TODO:
+ * go back to float32
  */
 
 struct UISlider {
@@ -23,7 +22,7 @@ Box2i GetNewBoxButKeepInBounds(int32 x, int32 y, int32 width, int32 height, Box2
 	return {x, y, x + width, y + height};
 }
 
-bool UISliderProcessEvent(OSEvent event, UISlider* slider) {
+bool UISliderProcessEvent(UISlider* slider, OSEvent event) {
 
 	int32 width = slider->hitBox.x1 - slider->hitBox.x0;
 	int32 height = slider->hitBox.y1 - slider->hitBox.y0;

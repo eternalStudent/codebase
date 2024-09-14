@@ -65,6 +65,10 @@ inline int32 Dot(Point2i p0, Point2i p1) {
 	return (p0.x*p1.x) + (p0.y*p1.y);
 }
 
+inline Point2 operator+(Point2i p0, float32 a) {
+	return {p0.x + a, p0.y + a};
+}
+
 inline int32 DistanceSquared(Point2i p0, Point2i p1) {
 	Point2i p2 = p0 - p1;
 	return Dot(p2, p2);

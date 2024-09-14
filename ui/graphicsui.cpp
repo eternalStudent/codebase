@@ -47,69 +47,189 @@ enum Quadrant {
 # define GfxClearCrop				D3D11UIClearCrop
 #endif
 
-// TODO: doesn't solve corner cases
-void GfxDrawPath(Point2 pos0, Point2 pos1, bool vertFirst, float32 radius, float32 thickness, Color color0, Color color1) {
-	float32 x0 = MIN(pos0.x, pos1.x);
-	float32 x1 = MAX(pos0.x, pos1.x);
-	float32 y0 = MIN(pos0.y, pos1.y);
-	float32 y1 = MAX(pos0.y, pos1.y);
-	float32 dx = x1 - x0;
-	float32 dy = y1 - y0;
+
+enum Direction {
+	Dir_Left,
+	Dir_Up,
+	Dir_Right,
+	Dir_Down
+};
+
+struct Walk {
+	Direction dir;
+	float32 length;
+};
+
+
+void DrawStraightLine(Point2* pos, Direction dir, float32 length, float32 half, Color color0, Color color1) {
+	switch (dir) {
+	case Dir_Left: {
+		GfxDrawHorizontalGradQuad({pos->x - length, pos->y - half}, {length, 2*half}, color1, color0);
+		pos->x -= length;
+	} break;
+	case Dir_Up: {
+		GfxDrawVerticalGradQuad({pos->x - half, pos->y - length}, {2*half, length}, color1, color0);
+		pos->y -= length;
+	} break;
+	case Dir_Right: {
+		GfxDrawHorizontalGradQuad({pos->x, pos->y - half}, {length, 2*half}, color0, color1);
+		pos->x += length;
+	} break;
+	case Dir_Down: {
+		GfxDrawVerticalGradQuad({pos->x - half, pos->y}, {2*half, length}, color0, color1);
+		pos->y += length;
+	} break;
+	}
+}
+
+// TODO: Add gradient
+void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, float32 thickness, Color color0, Color color1) {
 	float32 half = 0.5f*thickness;
-	float32 length = dx + 2*thickness - 4*radius + dy;
-	if (vertFirst) {
-		float32 midy = y0 + 0.5f*dy;
-		float32 l1 = 0.5f*dy + half - radius;
-		float32 t1 = l1/length;
-		float32 l2 = dx + thickness - 2*radius;
-		float32 t2 = (l1 + l2)/length;
+	Point2 pos = start;
 
-		Color c1 = t1*color0 + (1 - t1)*color1;
-		Color c2 = t2*color0 + (1 - t2)*color1;
+	if (count == 1) {
+		DrawStraightLine(&pos, walks->dir, walks->length, half, color0, color1);
+		return;
+	}
 
-
-		if (pos0.x < pos1.x) {
-			GfxDrawVerticalGradQuad({x0 - half, y0, x0 + half, midy + half - radius}, color0, c1);
-			GfxDrawHorizontalGradQuad({x0 - half + radius, midy - half, x1 + half - radius, midy + half}, c1, c2);
-			GfxDrawVerticalGradQuad({x1 - half, midy - half + radius, x1 + half, y1}, c2, color1);
-
-			GfxDrawSemiSphere({x0 - half, midy + half - radius}, radius, Quadrant_III, thickness, c1);
-			GfxDrawSemiSphere({x1 + half - radius, midy - half}, radius, Quadrant_I, thickness, c2);
+	float32 totalLength = 0;
+	for (int32 i = 0; i < count; i++) {
+		if (i == 0 || i == count - 1) {
+			totalLength += MAX(0, walks->length + half - maxRadius);
 		}
 		else {
-			GfxDrawVerticalGradQuad({x0 - half, midy - half + radius, x0 + half, y1}, color0, c1);
-			GfxDrawHorizontalGradQuad({x0 - half + radius, midy - half, x1 + half - radius, midy + half}, c1, c2);
-			GfxDrawVerticalGradQuad({x1 - half, y0, x1 + half, midy + half - radius}, c2, color1);
-
-			GfxDrawSemiSphere({x0 - half, midy - half}, radius, Quadrant_II, thickness, c1);
-			GfxDrawSemiSphere({x1 + half - radius, midy + half - radius}, radius, Quadrant_IV, thickness, c2);
+			totalLength += MAX(0, walks->length + thickness - 2*maxRadius);
 		}
 	}
-	else {
-		float32 midx = x0 + 0.5f*dx;
-		float32 l1 = 0.5f*dx + half - radius;
-		float32 t1 = l1/length;
-		float32 l2 = dy + thickness - 2*radius;
-		float32 t2 = (l1 + l2)/length;
+	float32 t = 0;
 
-		Color c1 = t1*color0 + (1 - t1)*color1;
-		Color c2 = t2*color0 + (1 - t2)*color1;
+	{
+		float32 radius = walks->length + half >= maxRadius
+			? maxRadius
+			: walks->length + half;
 
-		if (pos0.y < pos1.y) {
-			GfxDrawHorizontalGradQuad({x0, y0 - half, midx + half - radius, y0 + half}, color0, c1);
-			GfxDrawVerticalGradQuad({midx - half, y0 - half + radius, midx + half, y1 + half - radius}, c1, c2);
-			GfxDrawHorizontalGradQuad({midx - half + radius, y1 - half, x1, y1 + half}, c2, color1);
+		float32 length = walks->length + half - radius;
+		t += length/totalLength;
+		Color c1 = (1 - t)*color0 + t*color1;
+		DrawStraightLine(&pos, walks->dir, length, half, color0, c1);
+	}
+		
+	Direction prev = walks->dir;
 
-			GfxDrawSemiSphere({midx + half - radius, y0 - half}, radius, Quadrant_I, thickness, c1);
-			GfxDrawSemiSphere({midx - half, y1 + half - radius}, radius, Quadrant_III, thickness, c2);
+	for (int32 i = 1; i < count; i++) {
+		Walk* walk = walks + i;
+
+		float32 radius, length;
+		if (i == count - 1) {
+			radius = walk->length + half >= maxRadius
+				? maxRadius
+				: walk->length + half;
+
+			length = walk->length + half - radius;
 		}
 		else {
-			GfxDrawHorizontalGradQuad({x0, y1 - half, midx + half - radius, y1 + half}, color0, c1);
-			GfxDrawVerticalGradQuad({midx - half, y0 - half + radius, midx + half, y1 + half - radius}, c2, c1);
-			GfxDrawHorizontalGradQuad({midx - half + radius, y0 - half, x1, y0 + half}, c2, color1);
+			radius = walk->length + thickness >= 2*maxRadius
+				? maxRadius
+				: 0.5f*walk->length + half;
 
-			GfxDrawSemiSphere({midx + half - radius, y1 + half - radius,}, radius, Quadrant_IV, thickness, c1);
-			GfxDrawSemiSphere({midx - half, y0 - half}, radius, Quadrant_II, thickness, c2);
+			length = walk->length + thickness - 2*radius;
 		}
+
+		Color c0 = (1 - t)*color0 + t*color1;
+		t += length/totalLength;
+		Color c1 = (1 - t)*color0 + t*color1;
+
+		Quadrant quadrant = {};
+		Point2 offset = {};
+		Point2 advancement = {};
+
+		switch (prev) {
+		case Dir_Left: {
+			advancement.x = -radius + half;
+			offset.x = -radius;
+			if (walk->dir == Dir_Up) {
+				quadrant = Quadrant_III;
+				advancement.y = -radius + half;
+				offset.y = -radius + half;
+			}
+			else {
+				quadrant = Quadrant_II;
+				advancement.y = radius - half;
+				offset.y = -half;
+			}
+		} break; 
+		case Dir_Up: {
+			advancement.y = -radius + half;
+			offset.y = -radius;
+
+			if (walk->dir == Dir_Left) {
+				quadrant = Quadrant_I;
+				advancement.x = -radius + half;
+				offset.x = -radius + half;
+			}
+			else {
+				quadrant = Quadrant_II;
+				advancement.x = radius - half;
+				offset.x = -half;
+			}
+		} break; 
+		case Dir_Right: {
+			advancement.x = radius - half;
+			offset.x = 0;
+			if (walk->dir == Dir_Up) {
+				quadrant = Quadrant_IV;
+				advancement.y = -radius + half;
+				offset.y = -radius + half;
+			}
+			else {
+				quadrant = Quadrant_I;
+				advancement.y = radius - half;
+				offset.y = -half;
+			}
+		} break; 
+		case Dir_Down: {
+			advancement.y = radius - half;
+			offset.y = 0;
+			if (walk->dir == Dir_Left) {
+				quadrant = Quadrant_IV;
+				advancement.x = -radius + half;
+				offset.x = -radius + half;
+			}
+			else {
+				quadrant = Quadrant_III;
+				advancement.x = radius - half;
+				offset.x = -half;
+			}
+		} break; 
+		}
+
+		GfxDrawSemiSphere(pos + offset, radius, quadrant, thickness, c0);
+		pos = pos + advancement;
+
+		DrawStraightLine(&pos, walk->dir, length, half, c0, c1);
+
+		prev = walk->dir;
+	}
+}
+
+
+void GfxDrawPath(Point2 start, Point2 end, bool vertFirst, float32 maxRadius, float32 thickness, Color color0, Color color1) {
+	if (vertFirst) {
+		float32 midy = round((start.y + end.y)/2);
+		Walk walk[] = {
+			{midy < start.x ? Dir_Down : Dir_Up, ABS(midy - start.y)},
+			{start.x < end.x ? Dir_Left : Dir_Left, ABS(start.x - end.x)},
+			{midy < end.y ? Dir_Down : Dir_Up, ABS(midy - end.y)}
+		};
+		GfxDrawPath(start, walk, 3, maxRadius, thickness, color0, color1);
+	}
+	else {
+		float32 midx = round((start.y + end.y)/2);
+		Walk walk[] = {
+			{midx < start.x ? Dir_Left : Dir_Right, ABS(midx - start.x)},
+			{start.y < end.y ? Dir_Down : Dir_Up, ABS(start.y - end.y)},
+			{midx < end.x ? Dir_Left : Dir_Right, ABS(midx - end.x)}
+		};
+		GfxDrawPath(start, walk, 3, maxRadius, thickness, color0, color1);
 	}
 }
