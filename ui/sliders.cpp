@@ -30,7 +30,6 @@ bool UISliderProcessEvent(UISlider* slider, OSEvent event) {
 
 	switch (event.type) {
 	case Event_MouseMove: {
-
 		if (slider->isGrabbing) {
 			if (cursor.x != slider->grabPos.x || cursor.y != slider->grabPos.y) {
 
@@ -39,12 +38,13 @@ bool UISliderProcessEvent(UISlider* slider, OSEvent event) {
 				slider->hitBox = GetNewBoxButKeepInBounds(x, y, width, height, slider->boundaries);
 			}
 
+			OSSetCursorIcon(CUR_ARROW);
 			return true;
 		}
 		else if (InBounds(slider->hitBox, cursor)) {
-
 			slider->isActive = true;
 
+			OSSetCursorIcon(CUR_ARROW);
 			return true;
 		}
 		else {

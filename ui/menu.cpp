@@ -62,6 +62,7 @@ bool UIMenuProcessEvent(OSEvent event, UIMenu* menu) {
 				CloseEverything(&menu->root);
 			}
 
+			OSSetCursorIcon(CUR_ARROW);
 			return true;
 		}
 
