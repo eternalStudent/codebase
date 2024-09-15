@@ -61,25 +61,27 @@ struct Walk {
 };
 
 
-void GfxDrawStraightLine(Point2* pos, Direction dir, float32 length, float32 half, Color color0, Color color1) {
+Point2 GfxDrawStraightLine(Point2 pos, Direction dir, float32 length, float32 thickness, Color color0, Color color1) {
+	float32 half = 0.5f*thickness;
 	switch (dir) {
 	case Dir_Left: {
-		GfxDrawHorizontalGradQuad({pos->x - length, pos->y - half}, {length, 2*half}, color1, color0);
-		pos->x -= length;
+		GfxDrawHorizontalGradQuad({pos.x - length, pos.y - half}, {length, thickness}, color1, color0);
+		pos.x -= length;
 	} break;
 	case Dir_Up: {
-		GfxDrawVerticalGradQuad({pos->x - half, pos->y - length}, {2*half, length}, color1, color0);
-		pos->y -= length;
+		GfxDrawVerticalGradQuad({pos.x - half, pos.y - length}, {thickness, length}, color1, color0);
+		pos.y -= length;
 	} break;
 	case Dir_Right: {
-		GfxDrawHorizontalGradQuad({pos->x, pos->y - half}, {length, 2*half}, color0, color1);
-		pos->x += length;
+		GfxDrawHorizontalGradQuad({pos.x, pos.y - half}, {length, thickness}, color0, color1);
+		pos.x += length;
 	} break;
 	case Dir_Down: {
-		GfxDrawVerticalGradQuad({pos->x - half, pos->y}, {2*half, length}, color0, color1);
-		pos->y += length;
+		GfxDrawVerticalGradQuad({pos.x - half, pos.y}, {thickness, length}, color0, color1);
+		pos.y += length;
 	} break;
 	}
+	return pos;
 }
 
 void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, float32 thickness, Color color0, Color color1) {
@@ -87,17 +89,21 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 	Point2 pos = start;
 
 	if (count == 1) {
-		GfxDrawStraightLine(&pos, walks->dir, walks->length, half, color0, color1);
+		GfxDrawStraightLine(pos, walks->dir, walks->length, thickness, color0, color1);
 		return;
 	}
 
 	float32 totalLength = 0;
 	for (int32 i = 0; i < count; i++) {
+		Walk* walk = walks + i;
+
 		if (i == 0 || i == count - 1) {
-			totalLength += MAX(0, walks->length + half - maxRadius);
+			float32 length = walk->length + half - maxRadius;
+			totalLength += MAX(0, length);
 		}
 		else {
-			totalLength += MAX(0, walks->length + thickness - 2*maxRadius);
+			float32 length = walk->length + thickness - 2*maxRadius;
+			totalLength += MAX(0, length);
 		}
 	}
 	float32 t = 0;
@@ -110,7 +116,7 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 		float32 length = walks->length + half - radius;
 		t += length/totalLength;
 		Color c1 = (1 - t)*color0 + t*color1;
-		GfxDrawStraightLine(&pos, walks->dir, length, half, color0, c1);
+		pos = GfxDrawStraightLine(pos, walks->dir, length, thickness, color0, c1);
 	}
 		
 	Direction prev = walks->dir;
@@ -129,9 +135,9 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 		else {
 			radius = walk->length + thickness >= 2*maxRadius
 				? maxRadius
-				: 0.5f*walk->length + half;
+				: walk->length + thickness - maxRadius;
 
-			length = walk->length + thickness - 2*radius;
+			length = walk->length + thickness - maxRadius - radius;
 		}
 
 		Color c0 = (1 - t)*color0 + t*color1;
@@ -205,30 +211,45 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 		GfxDrawSemiSphere(pos + offset, radius, quadrant, thickness, c0);
 		pos = pos + advancement;
 
-		GfxDrawStraightLine(&pos, walk->dir, length, half, c0, c1);
+		pos = GfxDrawStraightLine(pos, walk->dir, length, thickness, c0, c1);
 
 		prev = walk->dir;
 	}
 }
 
-
-void GfxDrawPath(Point2 start, Point2 end, bool vertFirst, float32 maxRadius, float32 thickness, Color color0, Color color1) {
+void GfxDrawPath(Point2 start, Point2 end, float32 mid, bool vertFirst, float32 maxRadius, float32 thickness, Color color0, Color color1) {
 	if (vertFirst) {
-		float32 midy = round((start.y + end.y)/2);
-		Walk walk[] = {
-			{midy < start.x ? Dir_Down : Dir_Up, ABS(midy - start.y)},
-			{start.x < end.x ? Dir_Left : Dir_Left, ABS(start.x - end.x)},
-			{midy < end.y ? Dir_Down : Dir_Up, ABS(midy - end.y)}
-		};
-		GfxDrawPath(start, walk, 3, maxRadius, thickness, color0, color1);
+		if (start.x == end.x) {
+			GfxDrawStraightLine(start, start.y < end.y ? Dir_Down : Dir_Up, ABS(start.y - end.y), thickness, color0, color1);
+		}
+		else {
+			Walk walk[] = {
+				{mid < start.y ? Dir_Up : Dir_Down, ABS(mid - start.y)},
+				{start.x < end.x ? Dir_Right : Dir_Left, ABS(start.x - end.x)},
+				{mid < end.y ? Dir_Down : Dir_Up, ABS(mid - end.y)}
+			};
+			GfxDrawPath(start, walk, 3, maxRadius, thickness, color0, color1);
+		}
 	}
 	else {
-		float32 midx = round((start.y + end.y)/2);
-		Walk walk[] = {
-			{midx < start.x ? Dir_Left : Dir_Right, ABS(midx - start.x)},
-			{start.y < end.y ? Dir_Down : Dir_Up, ABS(start.y - end.y)},
-			{midx < end.x ? Dir_Left : Dir_Right, ABS(midx - end.x)}
-		};
-		GfxDrawPath(start, walk, 3, maxRadius, thickness, color0, color1);
+		if (start.y == end.y) {
+			GfxDrawStraightLine(start, start.x < end.x ? Dir_Left : Dir_Right, ABS(start.x - end.x), thickness, color0, color1);
+		}
+		else {
+			Walk walk[] = {
+				{mid < start.x ? Dir_Left : Dir_Right, ABS(mid - start.x)},
+				{start.y < end.y ? Dir_Down : Dir_Up, ABS(start.y - end.y)},
+				{mid < end.x ? Dir_Left : Dir_Right, ABS(mid - end.x)}
+			};
+			GfxDrawPath(start, walk, 3, maxRadius, thickness, color0, color1);
+		}
 	}
+}
+
+void GfxDrawPath(Point2 start, Point2 end, bool vertFirst, float32 maxRadius, float32 thickness, Color color0, Color color1) {
+	float32 mid = vertFirst 
+		? round((start.y + end.y)/2)
+		: round((start.x + end.x)/2);
+
+	GfxDrawPath(start, end, mid, vertFirst, maxRadius, thickness, color0, color1);
 }
