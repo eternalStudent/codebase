@@ -313,7 +313,7 @@ float32 ScaleForPixelHeight(const STBFontInfo* info, float32 height) {
 	return (float32) height / fheight;
 }
 
-void GetFontMetrics(const STBFontInfo* info, int32* ascent, int32 *descent, int32* lineGap, int32* designUnitsPerEm) {
+void GetFontMetrics(const STBFontInfo* info, int32* ascent, int32* descent, int32* lineGap, int32* designUnitsPerEm) {
    if (ascent ) *ascent  = __SHORT(info->data + info->hhea + 4);
    if (descent) *descent = __SHORT(info->data + info->hhea + 6);
    if (lineGap) *lineGap = __SHORT(info->data + info->hhea + 8);
@@ -836,7 +836,7 @@ void GetGlyphBitmapBoxSubpixel(const STBFontInfo* font, int32 glyph,
 
 void GetGlyphBitmapBox(const STBFontInfo* font, int32 glyph, 
 							  float32 scale_x, float32 scale_y, 
-							  int32 *ix0, int32 *iy0, int32 *ix1, int32 *iy1) {
+							  int32* ix0, int32* iy0, int32* ix1, int32* iy1) {
 	GetGlyphBitmapBoxSubpixel(font, glyph, scale_x, scale_y,0.0f,0.0f, ix0, iy0, ix1, iy1);
 }
 
@@ -1111,10 +1111,10 @@ struct hheap {
 	int32 num_remaining_in_head_chunk;
 };
 
-void *hheap_alloc(Arena* arena, hheap *hh, int64 size) {
+void* hheap_alloc(Arena* arena, hheap* hh, int64 size) {
 	if (hh->first_free) {
-		void *p = hh->first_free;
-		hh->first_free = * (void **) p;
+		void* p = hh->first_free;
+		hh->first_free = * (void**)p;
 		return p;
 	} else {
 		if (hh->num_remaining_in_head_chunk == 0) {
@@ -1127,16 +1127,16 @@ void *hheap_alloc(Arena* arena, hheap *hh, int64 size) {
 			hh->num_remaining_in_head_chunk = count;
 		}
 		--hh->num_remaining_in_head_chunk;
-		return (char *) (hh->head) + sizeof(hheap_chunk) + size * hh->num_remaining_in_head_chunk;
+		return (char*)(hh->head) + sizeof(hheap_chunk) + size * hh->num_remaining_in_head_chunk;
 	}
 }
 
-void hheap_free(hheap *hh, void *p) {
-	*(void **) p = hh->first_free;
+void hheap_free(hheap* hh, void* p) {
+	*(void**)p = hh->first_free;
 	hh->first_free = p;
 }
 
-void hheap_cleanup(hheap *hh) {
+void hheap_cleanup(hheap* hh) {
 	hheap_chunk *c = hh->head;
 	while (c) {
 		hheap_chunk *n = c->next;
@@ -1151,15 +1151,15 @@ struct edge {
 
 
 struct active_edge {
-	active_edge *next;
+	active_edge* next;
 	float32 fx, fdx, fdy;
 	float32 direction;
 	float32 sy;
 	float32 ey;
 };
 
-active_edge *new_active(Arena* arena, hheap *hh, edge *e, int32 off_x, float32 start_point) {
-	active_edge *z = (active_edge *) hheap_alloc(arena, hh, sizeof(*z));
+active_edge* new_active(Arena* arena, hheap* hh, edge* e, int32 off_x, float32 start_point) {
+	active_edge* z = (active_edge* ) hheap_alloc(arena, hh, sizeof(*z));
 	float32 dxdy = (e->x1 - e->x0) / (e->y1 - e->y0);
 	ASSERT(z != NULL);
 	if (!z) return z;
@@ -1174,7 +1174,7 @@ active_edge *new_active(Arena* arena, hheap *hh, edge *e, int32 off_x, float32 s
 	return z;
 }
 
-void handle_clipped_edge(float32 *scanline, int32 x, active_edge *e, 
+void handle_clipped_edge(float32 *scanline, int32 x, active_edge* e, 
 								 float32 x0, float32 y0, float32 x1, float32 y1) {
 	if (y0 == y1) return;
 	ASSERT(y0 < y1);
@@ -1212,7 +1212,7 @@ void handle_clipped_edge(float32 *scanline, int32 x, active_edge *e,
 }
 
 void fill_active_edges_new(float32 *scanline, float32 *scanline_fill, 
-									int32 len, active_edge *e, float32 y_top) {
+									int32 len, active_edge* e, float32 y_top) {
 	float32 y_bottom = y_top+1;
 
 	while (e) {
@@ -1373,11 +1373,11 @@ void fill_active_edges_new(float32 *scanline, float32 *scanline_fill,
 }
 
 // directly AA rasterize edges w/o supersampling
-void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32 vsubsample, 
+void rasterize_sorted_edges(Arena* arena, Image* result, edge* e, int32 n, int32 vsubsample, 
 									 int32 off_x, int32 off_y)
 {
 	hheap hh = { 0, 0, 0 };
-	active_edge *active = NULL;
+	active_edge* active = NULL;
 	int32 y,j = 0, i;
 	float32 scanline_data[129], *scanline, *scanline2;
 
@@ -1397,7 +1397,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 		// find center of pixel for this scanline
 		float32 scan_y_top    = y + 0.0f;
 		float32 scan_y_bottom = y + 1.0f;
-		active_edge **step = &active;
+		active_edge* *step = &active;
 
 		memset(scanline , 0, result->width*sizeof(scanline[0]));
 		memset(scanline2, 0, (result->width+1)*sizeof(scanline[0]));
@@ -1405,7 +1405,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 		// update all active edges;
 		// remove all active edges that terminate before the top of this scanline
 		while (*step) {
-			active_edge * z = *step;
+			active_edge*  z = *step;
 			if (z->ey <= scan_y_top) {
 				*step = z->next; // delete from list
 				ASSERT(z->direction);
@@ -1419,7 +1419,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 		// insert all edges that start before the bottom of this scanline
 		while (e->y0 <= scan_y_bottom) {
 			if (e->y0 != e->y1) {
-				active_edge *z = new_active(arena, &hh, e, off_x, scan_y_top);
+				active_edge* z = new_active(arena, &hh, e, off_x, scan_y_top);
 				if (z != NULL) {
 					if (j == 0 && off_y != 0) {
 						if (z->ey < scan_y_top) {
@@ -1456,7 +1456,7 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 		// advance all the edges
 		step = &active;
 		while (*step) {
-			active_edge *z = *step;
+			active_edge* z = *step;
 			z->fx += z->fdx; // advance to position for current scanline
 			step = &((*step)->next); // advance through list
 		}
@@ -1470,13 +1470,13 @@ void rasterize_sorted_edges(Arena* arena, Image* result, edge *e, int32 n, int32
 
 #define COMPARE(a,b)  ((a)->y0 < (b)->y0)
 
-void sort_edges_ins_sort(edge *p, int32 n) {
+void sort_edges_ins_sort(edge* p, int32 n) {
 	int32 i,j;
 	for (i=1; i < n; ++i) {
 		edge t = p[i], *a = &t;
 		j = i;
 		while (j > 0) {
-			edge *b = &p[j-1];
+			edge* b = &p[j-1];
 			int32 c = COMPARE(a,b);
 			if (!c) break;
 			p[j] = p[j-1];
@@ -1487,7 +1487,7 @@ void sort_edges_ins_sort(edge *p, int32 n) {
 	}
 }
 
-void sort_edges_quicksort(edge *p, int32 n) {
+void sort_edges_quicksort(edge* p, int32 n) {
 	/* threshold for transitioning to insertion sort */
 	while (n > 12) {
 		edge t;
@@ -1548,17 +1548,17 @@ void sort_edges_quicksort(edge *p, int32 n) {
 	}
 }
 
-void sort_edges(edge *p, int32 n) {
+void sort_edges(edge* p, int32 n) {
 	sort_edges_quicksort(p, n);
 	sort_edges_ins_sort(p, n);
 }
 
-void rasterize(Arena* arena, Image* result, Point2 *pts, int32 *wcount, 
+void rasterize(Arena* arena, Image* result, Point2* pts, int32* wcount, 
 					int32 windings, float32 scale_x, float32 scale_y, 
 					float32 shift_x, float32 shift_y, 
 					int32 off_x, int32 off_y, int32 invert) {
 	float32 y_scale_inv = invert ? -scale_y : scale_y;
-	edge *e;
+	edge* e;
 	int32 n,i,j,k,m;
 	int32 vsubsample = 1;
 	// vsubsample should divide 255 evenly; otherwise we won't reach full opacity
@@ -1568,13 +1568,13 @@ void rasterize(Arena* arena, Image* result, Point2 *pts, int32 *wcount,
 	for (i = 0; i < windings; ++i)
 		n += wcount[i];
 
-	e = (edge *) ArenaAlloc(arena, sizeof(*e) * (n+1)); // add an extra one as a sentinel
+	e = (edge* ) ArenaAlloc(arena, sizeof(*e) * (n+1)); // add an extra one as a sentinel
 	if (e == 0) return;
 	n = 0;
 
 	m = 0;
 	for (i = 0; i < windings; ++i) {
-		Point2 *p = pts + m;
+		Point2* p = pts + m;
 		m += wcount[i];
 		j = wcount[i]-1;
 		for (k = 0; k < wcount[i]; j=k++) {
@@ -1603,14 +1603,14 @@ void rasterize(Arena* arena, Image* result, Point2 *pts, int32 *wcount,
 	rasterize_sorted_edges(arena, result, e, n, vsubsample, off_x, off_y);
 }
 
-void add_point(Point2 *points, int32 n, float32 x, float32 y) {
+void add_point(Point2* points, int32 n, float32 x, float32 y) {
 	if (!points) return; // during first pass, it's unallocated
 	points[n].x = x;
 	points[n].y = y;
 }
 
 // tessellate until threshold p is happy... @TODO warped to compensate for non-linear stretching
-int32 tesselate_curve(Point2 *points, int32 *num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 objspace_flatness_squared, int32 n) {
+int32 tesselate_curve(Point2* points, int32* num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 objspace_flatness_squared, int32 n) {
 	// midpoint
 	float32 mx = (x0 + 2*x1 + x2)/4;
 	float32 my = (y0 + 2*y1 + y2)/4;
@@ -1629,7 +1629,7 @@ int32 tesselate_curve(Point2 *points, int32 *num_points, float32 x0, float32 y0,
 	return 1;
 }
 
-void tesselate_cubic(Point2 *points, int32 *num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 x3, float32 y3, float32 objspace_flatness_squared, int32 n) {
+void tesselate_cubic(Point2* points, int32* num_points, float32 x0, float32 y0, float32 x1, float32 y1, float32 x2, float32 y2, float32 x3, float32 y3, float32 objspace_flatness_squared, int32 n) {
 	// @TODO this "flatness" calculation is just made-up nonsense that seems to work well enough
 	float32 dx0 = x1-x0;
 	float32 dy0 = y1-y0;
@@ -1671,8 +1671,8 @@ void tesselate_cubic(Point2 *points, int32 *num_points, float32 x0, float32 y0, 
 }
 
 // returns number of contours
-Point2 *FlattenCurves(Arena* arena, vertex *vertices, int32 num_verts, float32 objspace_flatness, int32 **contour_lengths, int32 *num_contours) {
-	Point2 *points = 0;
+Point2* FlattenCurves(Arena* arena, vertex *vertices, int32 num_verts, float32 objspace_flatness, int32* *contour_lengths, int32* num_contours) {
+	Point2* points = 0;
 	int32 num_points = 0;
 
 	float32 objspace_flatness_squared = objspace_flatness * objspace_flatness;
@@ -1686,7 +1686,7 @@ Point2 *FlattenCurves(Arena* arena, vertex *vertices, int32 num_verts, float32 o
 	*num_contours = n;
 	if (n == 0) return 0;
 
-	*contour_lengths = (int32 *) ArenaAlloc(arena, sizeof(**contour_lengths) * n);
+	*contour_lengths = (int32* ) ArenaAlloc(arena, sizeof(**contour_lengths) * n);
 
 	if (*contour_lengths == 0) {
 		*num_contours = 0;
@@ -1697,7 +1697,7 @@ Point2 *FlattenCurves(Arena* arena, vertex *vertices, int32 num_verts, float32 o
 	for (pass = 0; pass < 2; ++pass) {
 		float32 x = 0,y = 0;
 		if (pass == 1) {
-			points = (Point2 *) ArenaAlloc(arena, num_points * sizeof(points[0]));
+			points = (Point2* ) ArenaAlloc(arena, num_points * sizeof(points[0]));
 			if (points == NULL) goto error;
 		}
 		num_points = 0;
@@ -1752,8 +1752,8 @@ void Rasterize(Arena* arena, Image* result, float32 flatness_in_pixels, vertex *
 {
 	float32 scale            = scale_x > scale_y ? scale_y : scale_x;
 	int32 winding_count      = 0;
-	int32 *winding_lengths   = NULL;
-	Point2 *windings = FlattenCurves(arena, vertices, num_verts, flatness_in_pixels / scale, &winding_lengths, &winding_count);
+	int32* winding_lengths   = NULL;
+	Point2* windings = FlattenCurves(arena, vertices, num_verts, flatness_in_pixels / scale, &winding_lengths, &winding_count);
 	if (windings) {
 		rasterize(arena, result, windings, winding_lengths, winding_count, scale_x, scale_y, shift_x, shift_y, x_off, y_off, invert);
 	}

@@ -322,7 +322,7 @@ float64 ParseFloat64(String str) {
 
 /*
  * NOTE: I'm including the definition here so the StringBuilder can make use of it, 
- *       but the rest is in separate file.
+ *       but the rest is in a separate file.
  */
 
 struct StringNode {
