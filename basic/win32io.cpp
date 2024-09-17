@@ -9,7 +9,9 @@ HANDLE Win32OpenFile(LPCWSTR filePath) {
 		NULL  // template file 
 	); 
 	if (hFile == INVALID_HANDLE_VALUE) {
-		LOG("failed to open file");
+		DWORD error = GetLastError();
+		(void)error;
+		OutputDebugStringA("failed to open file\n");
 	}
 	return hFile;
 }
@@ -25,7 +27,9 @@ HANDLE Win32CreateFile(LPCWSTR filePath) {
 		NULL  // template file 
 	); 
 	if (hFile == INVALID_HANDLE_VALUE) {
-		LOG("failed to open file");
+		DWORD error = GetLastError();
+		(void)error;
+		OutputDebugStringA("failed to open file\n");
 	}
 	return hFile;
 }
@@ -33,7 +37,9 @@ HANDLE Win32CreateFile(LPCWSTR filePath) {
 DWORD Win32ReadFile(HANDLE hFile, LPVOID buffer, DWORD maxBytesToRead) {
 	DWORD bytesRead;
 	if (FALSE == ReadFile(hFile, buffer, maxBytesToRead, &bytesRead, 0)) {
-		LOG("failed to read file");
+		DWORD error = GetLastError();
+		(void)error;
+		OutputDebugStringA("failed to read file\n");
 	}
 	return bytesRead;
 }
@@ -41,7 +47,9 @@ DWORD Win32ReadFile(HANDLE hFile, LPVOID buffer, DWORD maxBytesToRead) {
 DWORD Win32WriteFile(HANDLE hFile, LPVOID buffer, DWORD maxBytesToWrite) {
 	DWORD bytesWritten;
 	if (FALSE == WriteFile(hFile, buffer, maxBytesToWrite, &bytesWritten, NULL)) {
-		LOG("failed to write to file");
+		DWORD error = GetLastError();
+		(void)error;
+		OutputDebugStringA("failed to write to file\n");
 	}
 	return bytesWritten;
 }

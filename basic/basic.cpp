@@ -4,7 +4,6 @@
 #  define COMPILER_CLANG 1
 #elif defined(_MSC_VER)
 #  define COMPILER_MSVC 1
-#  include <intrin.h>
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -19,16 +18,12 @@
 #  define _OS_UNIX 1
 #endif
 
-#include <memory.h>
-#include <immintrin.h>
-
-#include "numbers.cpp"
-#include "bits.cpp"
-#include "linkedlist.cpp"
-#include "string.cpp"
-
 #if defined(_OS_WINDOWS)
-#  include <Windows.h>
+#  define NOMINMAX
+#  include <windows.h>
+#  include <tmmintrin.h>
+#  include <wmmintrin.h>
+#  include <intrin.h>
 #elif defined(_OS_ANDROID)
 #  include <unistd.h>
 #  include <jni.h>
@@ -39,13 +34,19 @@
 #  include <unistd.h>
 #endif
 
+#include <memory.h>
+#include <immintrin.h>
+
 #define STRINGIFY2(x) #x
 #define STRINGIFY(x) STRINGIFY2(x)
+
+#define GLUE2(x, y) x##y
+#define GLUE(x, y) GLUE2(x, y)
 
 #if defined(DEBUG)
 #  define ASSERT(expression) 	do{if(!(expression)) {*(int32*)0 = 0;}}while(0)
 #else
-#  define ASSERT(expression)
+#  define ASSERT(expression)	(void)(expression)
 #endif
 
 #if defined(_OS_WINDOWS)
@@ -58,6 +59,7 @@
 
 #define HAS_FLAGS(all, flags) (((all) & (flags)) == (flags))
 
+// TODO: do something better here
 #ifndef LOG
 #  define LOG(...) 			do{}while(0)
 #  define FAIL(...)			0
@@ -65,6 +67,10 @@
 #  define FAIL(...)			(LOG(__VA_ARGS__), 0)
 #endif
 
+#include "numbers.cpp"
+#include "bits.cpp"
+#include "linkedlist.cpp"
+#include "string.cpp"
 #include "memory.cpp"
 #include "io.cpp"
 #include "time.cpp"

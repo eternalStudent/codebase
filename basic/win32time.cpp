@@ -11,8 +11,10 @@ struct {
 void Win32TimeInit() {     
 	stopwatch = {};                  
 	BOOL succeeded = QueryPerformanceFrequency(&stopwatch.frequency);            
-	if (!succeeded) {
-		LOG("failed querying performance frquency");
+	if (succeeded == FALSE) {
+		DWORD error = GetLastError();
+		(void)error;
+		OutputDebugStringA("failed querying performance frquency\n");
 	}  
 }
  

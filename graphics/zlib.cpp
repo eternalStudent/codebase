@@ -12,21 +12,6 @@ struct ZHuffman {
 	uint16 value[ZNSYMS];
 };
 
-int32 ReverseBits16(int32 n) {
-  n = ((n & 0xAAAA) >>  1) | ((n & 0x5555) << 1);
-  n = ((n & 0xCCCC) >>  2) | ((n & 0x3333) << 2);
-  n = ((n & 0xF0F0) >>  4) | ((n & 0x0F0F) << 4);
-  n = ((n & 0xFF00) >>  8) | ((n & 0x00FF) << 8);
-  return n;
-}
-
-int32 ReverseBits(int32 v, int32 bits) {
-	ASSERT(bits <= 16);
-	// to bit reverse n bits, reverse 16 and shift
-	// e.g. 11 bits, bit reverse and shift away 5
-	return ReverseBits16(v) >> (16 - bits);
-}
-
 int32 zbuild_huffman(ZHuffman* z, const byte* sizelist, int32 num) {
 	int32 i, k = 0;
 	int32 code, next_code[16], sizes[17];
@@ -99,8 +84,8 @@ byte zget8(ZBuf* z) {
 void fill_bits(ZBuf* z) {
 	do {
 		if (z->code_buffer >= (1U << z->num_bits)) {
-		  z->zbuffer = z->zbuffer_end;  /* treat this as EOF so we fail. */
-		  return;
+			z->zbuffer = z->zbuffer_end;  /* treat this as EOF so we fail. */
+			return;
 		}
 		z->code_buffer |= (uint32) zget8(z) << z->num_bits;
 		z->num_bits += 8;

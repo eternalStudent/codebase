@@ -462,7 +462,7 @@ D3D11Program CreateProgram(String hlsl, D3D11_INPUT_ELEMENT_DESC* desc, UINT num
 
 	ID3DBlob* vblob;
 	HRESULT hr = D3DCompile(hlsl.data, hlsl.length, NULL, NULL, NULL, "vs", "vs_5_0", flags, 0, &vblob, &error);
-	if (FAILED(hr)){
+	if (FAILED(hr)) {
 		const char* message = (const char*)error->GetBufferPointer();
 		OutputDebugStringA(message);
 		ASSERT(!"Failed to compile vertex shader!");
