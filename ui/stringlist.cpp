@@ -1,6 +1,18 @@
-StringList CreateStringList(String string, StringNode* node) {
-	*node = {string, NULL, NULL};
+StringList CreateStringList(String string, FixedSize* allocator) {
+	StringNode* node = (StringNode*)FixedSizeAlloc(allocator);
+	node->string = string;
 	return {node, node, string.length};
+}
+
+void DestroyStringList(StringList* list, FixedSize* allocator) {
+	StringNode* node = list->first;
+	while (node) {
+		StringNode* next = node->next;
+		FixedSizeFree(allocator, node);
+		node = next;
+	}
+	list->first = NULL;
+	list->last = NULL;
 }
 
 void StringListAppend(StringList* list, StringNode* node) {
@@ -15,6 +27,9 @@ ssize StringListCopy(StringList list, BigBuffer* buffer) {
 }
 
 String StringListToString(StringList list, BigBuffer* buffer) {
+	if (list.first == list.last)
+		return list.first->string;
+
 	byte* data = buffer->pos;
 	ssize length = StringListCopy(list, buffer);
 	buffer->pos += length;
@@ -22,6 +37,9 @@ String StringListToString(StringList list, BigBuffer* buffer) {
 }
 
 String StringListToTempString(StringList list, BigBuffer* buffer) {
+	if (list.first == list.last)
+		return list.first->string;
+
 	return {buffer->pos, StringListCopy(list, buffer)};
 }
 
@@ -242,11 +260,8 @@ void StringListFindWord(StringList list, StringListPos pos, StringListPos* start
 	*end = SL_END(list);
 }
 
-typedef StringNode* StringNodeAlloc();
-typedef void StringNodeFree(StringNode*);
-
 StringListPos StringListDelete(StringList* list, StringListPos tail, StringListPos head, 
-		StringNodeAlloc* alloc, StringNodeFree* free, BigBuffer* buffer) {
+		FixedSize* allocator, BigBuffer* buffer) {
 
 	if (tail.node == head.node && tail.index == head.index) {
 		if (StringListIsStart(head)) {
@@ -259,7 +274,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 				StringNode* next = head.node->next;
 				StringNode* prev = head.node->prev;
 				LINKEDLIST_REMOVE(list, head.node);
-				free(head.node);
+				FixedSizeFree(allocator, head.node);
 				if (next || !prev) {
 					head.node = next;
 					head.index = 1;
@@ -282,7 +297,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 			if (head.node->string.length == 1) {
 				StringNode* next = head.node->next;
 				LINKEDLIST_REMOVE(list, head.node);
-				free(head.node);
+				FixedSizeFree(allocator, head.node);
 				head.node = next;
 				head.index = 1;
 			}
@@ -300,7 +315,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 			}
 			else {
 				head.node->string.length = length1;
-				StringNode* node2 = alloc();
+				StringNode* node2 = (StringNode*)FixedSizeAlloc(allocator);
 				LINKEDLIST_ADD_AFTER(list, head.node, node2);
 				node2->string.data = head.node->string.data + head.index;
 				node2->string.length = length2;
@@ -332,7 +347,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 
 			if (startIndex == 0 && endIndex == string.length) {
 				LINKEDLIST_REMOVE(list, node);
-				free(node);
+				FixedSizeFree(allocator, node);
 			}
 			else if (startIndex == 0) {
 				node->string.data += endIndex;
@@ -343,7 +358,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 			}
 			else {
 				node->string.length = startIndex;
-				StringNode* node1 = alloc();
+				StringNode* node1 = (StringNode*)FixedSizeAlloc(allocator);
 				node1->string.data = string.data + endIndex;
 				node1->string.length = string.length - endIndex;
 				LINKEDLIST_ADD_AFTER(list, node, node1);
@@ -361,7 +376,7 @@ StringListPos StringListDelete(StringList* list, StringListPos tail, StringListP
 
 StringListPos StringListInsert(StringList* list, String newString, 
 		StringListPos tail, StringListPos head, 
-		StringNodeAlloc* alloc, StringNodeFree* free, BigBuffer* buffer) {
+		FixedSize* allocator, BigBuffer* buffer) {
 
 	if (!newString.length) 
 		return head;
@@ -369,10 +384,10 @@ StringListPos StringListInsert(StringList* list, String newString,
 	StringCopy(newString, buffer);
 	if (tail.node != head.node || tail.index != head.index) {
 		// TODO: if the selected length is smaller or equal to newString length, insert it in place.
-		head = StringListDelete(list, tail, head, alloc, free, buffer);
+		head = StringListDelete(list, tail, head, allocator, buffer);
 	}
 	if (head.node == NULL) {
-		StringNode* node = alloc();
+		StringNode* node = (StringNode*)FixedSizeAlloc(allocator);
 		LINKEDLIST_ADD(list, node);
 		node->string.data = buffer->pos;
 		node->string.length = newString.length;
@@ -384,7 +399,7 @@ StringListPos StringListInsert(StringList* list, String newString,
 			head.node->string.length += newString.length;
 		}
 	 	else {
-	 		StringNode* node = alloc();
+	 		StringNode* node = (StringNode*)FixedSizeAlloc(allocator);
 	 		LINKEDLIST_ADD_AFTER(list, head.node, node);
 	 		node->string.data = buffer->pos;
 	 		node->string.length = newString.length;
@@ -393,7 +408,7 @@ StringListPos StringListInsert(StringList* list, String newString,
 	 	}
 	}
 	else if (StringListIsStart(head)) {
-		StringNode* node = alloc();
+		StringNode* node = (StringNode*)FixedSizeAlloc(allocator);
 	 	LINKEDLIST_ADD_TO_START(list, node);
 		node->string.data = buffer->pos;
 		node->string.length = newString.length;
@@ -409,7 +424,7 @@ StringListPos StringListInsert(StringList* list, String newString,
 			head.node->string.length += newString.length;
 		}
 		else {
-			StringNode* node = alloc();
+			StringNode* node = (StringNode*)FixedSizeAlloc(allocator);
 			LINKEDLIST_ADD_AFTER(list, head.node, node);
 			node->string.data = buffer->pos;
 			node->string.length = newString.length;
@@ -422,11 +437,11 @@ StringListPos StringListInsert(StringList* list, String newString,
 		ssize length1 = head.index;
 		ssize length2 = string.length - length1;
 		head.node->string.length = length1;
-		StringNode* node1 = alloc();
+		StringNode* node1 = (StringNode*)FixedSizeAlloc(allocator);
 		LINKEDLIST_ADD_AFTER(list, head.node, node1);
 		node1->string.data = head.node->string.data + head.node->string.length;
 		node1->string.length = length2;
-		StringNode* node2 = alloc();
+		StringNode* node2 = (StringNode*)FixedSizeAlloc(allocator);
 		LINKEDLIST_ADD_AFTER(list, head.node, node2);
 		node2->string.data = buffer->pos;
 		node2->string.length = newString.length;

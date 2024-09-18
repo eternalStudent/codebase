@@ -38,9 +38,9 @@ FixedSize CreateFixedSize(ssize sizeofItem, ssize commitSize) {
 void Grow(FixedSize* allocator) {
 	OSCommit(allocator->buffer + allocator->capacity, allocator->commitSize);
 
-	allocator->next = allocator->buffer + allocator->capacity - allocator->sizeofItem;
+	allocator->next = allocator->buffer + allocator->capacity;
 
-	for (byte* buffer = allocator->buffer + allocator->capacity - allocator->sizeofItem; 
+	for (byte* buffer = allocator->buffer + allocator->capacity; 
 		 buffer + allocator->sizeofItem < allocator->buffer + allocator->capacity + allocator->commitSize; 
 		 buffer += allocator->sizeofItem) {
 

@@ -16,7 +16,7 @@ BigArray CreateBigArray(ssize commitSize) {
 	return arr;
 }
 
-void BigArrayAdd(BigArray* arr, void* data, ssize size) {
+void BigArrayPush(BigArray* arr, void* data, ssize size) {
 	while (arr->capacity < arr->size + size) {
 		OSCommit(arr->data + arr->capacity, arr->commitSize);
 		arr->capacity += arr->commitSize;
@@ -24,6 +24,15 @@ void BigArrayAdd(BigArray* arr, void* data, ssize size) {
 
 	memcpy(arr->data + arr->size, data, size);
 	arr->size += size;
+}
+
+void* BigArrayPop(BigArray* arr, ssize size) {
+	arr->size -= size;
+	return arr->data + arr->size;
+}
+
+void BigArrayClear(BigArray* arr) {
+	arr->size = 0;
 }
 
 void DestroyBigArray(BigArray* arr) {
@@ -59,14 +68,16 @@ void BigBufferEnsureCapacity(BigBuffer* buffer, ssize length) {
 	}
 }
 
-void BigBufferWrite(BigBuffer* buffer, byte* data, ssize length) {
+String BigBufferWrite(BigBuffer* buffer, byte* data, ssize length) {
 	BigBufferEnsureCapacity(buffer, length);
 	memcpy(buffer->pos, data, length);
+	String str = {buffer->pos, length};
 	buffer->pos += length;
+	return str;
 }
 
-void BigBufferWrite(BigBuffer* buffer, String str) {
-	BigBufferWrite(buffer, str.data, str.length);
+String BigBufferWrite(BigBuffer* buffer, String str) {
+	return BigBufferWrite(buffer, str.data, str.length);
 }
 
 // NOTE: same as BigBufferWrite, but does not update `pos`

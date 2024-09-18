@@ -1,57 +1,65 @@
 struct Arena {
 	byte* buffer;
-	ssize ptr;			// base-address realtive to the buffer
-	ssize capacity;
-	ssize last;
+	byte* pos;
+	byte* end;
 
+	byte* last;
+	
 	ssize commitSize;
 };
 
-Arena CreateArena(ssize commitSize = MB(1)) {
+Arena CreateArena(ssize commitSize = MB(1), ssize reserveSize = RESERVE_SIZE) {
 	Arena arena;
-	arena.ptr = 0;
-	arena.last = 0;
 	arena.buffer = (byte*)OSReserve(RESERVE_SIZE);
+	arena.pos = arena.buffer;
+	arena.last = arena.buffer;
 	OSCommit(arena.buffer, commitSize);
-	arena.capacity = commitSize;
+	arena.end = arena.buffer + commitSize;
 	arena.commitSize = commitSize;
 	return arena;
+}
+
+void ArenaEnsureCapacity(Arena* arena, ssize size) {
+	while (arena->end < arena->pos + size) {
+		OSCommit(arena->end, arena->commitSize);
+		arena->end += arena->commitSize;
+	}
 }
 
 byte* ArenaAlloc(Arena* arena, ssize size, int32 alignment = 0) {
 	ASSERT(0 <= size);
 
 	if (size == 0) 
-		return arena->buffer + arena->ptr;
+		return arena->pos;
 
 	int32 moveToAlign = 0;
 	if (alignment > 1) {
-		uint32 modulo = arena->ptr & (alignment - 1);
+		uint32 modulo = ((uint64)(arena->pos)) & (alignment - 1);
 		moveToAlign = alignment - modulo;
 	}
 
-	while (arena->capacity < arena->ptr + size + moveToAlign) {
-		OSCommit(arena->buffer + arena->capacity, arena->commitSize);
-		arena->capacity += arena->commitSize;
+	while (arena->end < arena->pos + size + moveToAlign) {
+		OSCommit(arena->end, arena->commitSize);
+		arena->end += arena->commitSize;
 	}
 
-	arena->last = arena->ptr;
-	arena->ptr += moveToAlign;
-	byte* data = arena->buffer + arena->ptr;
-	arena->ptr += size;
+	arena->last = arena->pos;
+	arena->pos += moveToAlign;
+	byte* data = arena->pos;
+	arena->pos += size;
 
 	return data;
 }
 
 void ArenaFreeAll(Arena* arena) {
-	arena->ptr = 0;
-	arena->last = 0;
+	arena->pos = arena->buffer;
+	arena->last = arena->buffer;
 }
 
 void ArenaReset(Arena* arena) {
-	memset(arena->buffer, 0, arena->ptr);
-	arena->ptr = 0;
-	arena->last = 0;
+	memset(arena->buffer, 0, arena->end - arena->pos);
+	arena->pos = arena->buffer;
+	arena->last = arena->buffer;
 }
 
 void* ArenaReAlloc(Arena* arena, void* oldData, ssize oldSize, ssize newSize) {
@@ -61,10 +69,10 @@ void* ArenaReAlloc(Arena* arena, void* oldData, ssize oldSize, ssize newSize) {
 	if (newSize <= oldSize)
 		return oldData;
 
-	if (oldData == arena->buffer + arena->last) {
-		while (arena->capacity < arena->last + newSize) {
-			OSCommit(arena->buffer + arena->capacity, arena->commitSize);
-		    arena->capacity += arena->commitSize;
+	if (oldData == arena->last) {
+		while (arena->end < arena->last + newSize) {
+			OSCommit(arena->end, arena->commitSize);
+			arena->end += arena->commitSize;
 		}
 		return oldData;
 	}
