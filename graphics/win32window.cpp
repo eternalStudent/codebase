@@ -543,7 +543,7 @@ BOOL Win32CopyToClipboard(String str) {
 	return TRUE;
 }
 
-BOOL Win32RequestClipboardData(void (*callback)(String)) {
+BOOL Win32RequestClipboardData(void* userdata, void (*callback)(void*, String)) {
 	if (!OpenClipboard(window.handle)) {
 		LOG("failed to open clipboard");
 		return FALSE;
@@ -564,6 +564,6 @@ BOOL Win32RequestClipboardData(void (*callback)(String)) {
 	}
 
 	CloseClipboard();
-	callback({data, length});
+	callback(userdata, {data, length});
 	return TRUE;
 }

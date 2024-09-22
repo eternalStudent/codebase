@@ -1830,6 +1830,8 @@ BakedFont STBBakeFont(STBFontInfo fontInfo, AtlasBitmap* atlas, float32 pixelSiz
 	}
 
 	font.height = pixelHeight;
+	font.ascent = pixelsPerDesignUnits*ascent;
+	font.descent = -1*pixelsPerDesignUnits*descent;
 	font.lineGap = pixelsPerDesignUnits*lineGap;
 	font.firstChar = firstChar;
 	font.lastChar = firstChar + codepointCount - 1;
@@ -1890,6 +1892,8 @@ BakedFont STBBakeFont(
 	}
 
 	font.height = pixelHeight;
+	font.ascent = pixelsPerDesignUnits*ascent;
+	font.descent = -1*pixelsPerDesignUnits*descent;
 	font.lineGap = pixelsPerDesignUnits*lineGap;
 	font.firstChar = 1;
 	font.lastChar = codepointCount;

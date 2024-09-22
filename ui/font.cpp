@@ -12,6 +12,8 @@ struct BakedGlyph {
 
 struct BakedFont {
 	float32 height;
+	float32 ascent;
+	float32 descent;
 	float32 lineGap;
 	int32 firstChar;
 	int32 lastChar;
@@ -36,7 +38,7 @@ AtlasBitmap CreateAtlasBitmap(int32 width, int32 height, byte* buffer) {
 	return atlas;
 }
 
-#if defined(_OS_WINDOWS)
+#if _OS_WINDOWS
 #  include "dwrite.cpp"
 #endif
 
@@ -51,7 +53,7 @@ Image GetImageFromFontAtlas(AtlasBitmap* atlas) {
 float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b) {
 	BakedGlyph glyph = font->glyphs[b - font->firstChar];
 	
-	float32 round_y = round(pos.y + (glyph.yoff + font->height));
+	float32 round_y = round(pos.y + glyph.yoff + font->ascent);
 	float32 round_x = round(pos.x + glyph.xoff);
 	
 	float32 width = (float32)(glyph.x1 - glyph.x0);
@@ -123,37 +125,40 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, String string,
 	return pos;
 }
 
-ssize GetCharIndex(BakedFont* font, String string, 
-				   float32 cursorx, float32 cursory,
-				   bool shouldWrap, float32 wrapX) {
+ssize GetCharIndex(Point2 cursor,
+				   BakedFont* font, String string, 
+				   bool shouldWrap, float32 x1) {
 
-	if (cursorx <= 2 && cursory <= 0) return 0;
-
-	float32 x = 0;
-	float32 y = 0;
+	Point2 pos = {};
 
 	bool prevCharWasWhiteSpace = false;
+	float32 initialX = pos.x;
+	float32 height = font->height;
+
 	for (ssize i = 0; i < string.length; i++) {
 		byte b = string.data[i];
 		bool whiteSpace = IsWhiteSpace(b);
 		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = GetWordWidth(font, string, i);
-			if (wrapX <= x + wordWidth) {
-				if (cursory <= y) return i;
-				y += font->height + font->lineGap;
-				x = 0;
-				if (cursorx <= x && cursory <= y) return i + 1;
+			if (x1 <= pos.x + wordWidth) {
+				if (InBounds(pos, {x1 - pos.x, font->height}, cursor))
+					return i;
+				pos.y += height + font->lineGap;
+				pos.x = initialX;
 			}
 		}
-		x += GetCharWidth(font, b);
-
 		if (b == 10) {
-			if (cursory <= y) return i + 1;
-			y += font->height + font->lineGap;
-			x = 0;
+			if (InBounds(pos, {x1 - pos.x, font->height}, cursor))
+				return i;
+			pos.y += font->height + font->lineGap;
+			pos.x = initialX;
 		}
-		if (cursorx <= x && cursory <= y) return i + 1;
-		
+		if (font->firstChar <= b && b <= font->lastChar) {
+			float32 width = font->glyphs[b - font->firstChar].xadvance;
+			if (InBounds(pos, {width, font->height}, cursor))
+				return i;
+			pos.x += width;
+		}
 		prevCharWasWhiteSpace = whiteSpace;
 	}
 
@@ -352,7 +357,6 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 
 	bool prevCharWasWhiteSpace = false;
 	float32 initialX = pos.x;
-	float32 height = font->height;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
 		for (ssize i = 0; i < string.length; i++) {
@@ -361,7 +365,7 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 				float32 wordWidth = GetWordWidth(font, {node, i});
 				if (wrapX <= pos.x + wordWidth) {
-					pos.y += height + font->lineGap;
+					pos.y += font->height + font->lineGap;
 					pos.x = initialX;
 				}
 			}
@@ -381,16 +385,15 @@ Point2 RenderText(Point2 pos, BakedFont* font, Color color, StringList list,
 	return pos;
 }
 
-StringListPos GetCharPos(BakedFont* font, StringList list, 
-						 float32 cursorx, float32 cursory,
-						 bool shouldWrap, float32 wrapX) {
+StringListPos GetCharPos(Point2 cursor, 
+						 BakedFont* font, StringList list, 
+						 bool shouldWrap, float32 x1) {
 
-	if (cursorx <= 2 && cursory <= 0) return {list.first, 0};
-
-	float32 x = 0;
-	float32 y = 0;
+	Point2 pos = {};
 
 	bool prevCharWasWhiteSpace = false;
+	float32 initialX = pos.x;
+	float32 height = font->height;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
 		for (ssize i = 0; i < string.length; i++) {
@@ -398,22 +401,26 @@ StringListPos GetCharPos(BakedFont* font, StringList list,
 			bool whiteSpace = IsWhiteSpace(b);
 			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 				float32 wordWidth = GetWordWidth(font, {node, i});
-				if (wrapX <= x + wordWidth) {
-					if (cursory <= y) return {node, i};
-					y += font->height + font->lineGap;
-					x = 0;
-					if (cursorx <= x && cursory <= y) return StringListPosInc({node, i});
+				if (x1 <= pos.x + wordWidth) {
+					if (InBounds(pos, {x1 - pos.x, font->height}, cursor))
+						return {node, i};
+					pos.y += height + font->lineGap;
+					pos.x = initialX;
+
 				}
 			}
-			x += GetCharWidth(font, b);
-
 			if (b == 10) {
-				if (cursory <= y) return StringListPosInc({node, i});
-				y += font->height + font->lineGap;
-				x = 0;
+				if (InBounds(pos, {x1 - pos.x, font->height}, cursor))
+					return {node, i};
+				pos.y += font->height + font->lineGap;
+				pos.x = initialX;
 			}
-			if (cursorx <= x && cursory <= y) return StringListPosInc({node, i});
-			
+			if (font->firstChar <= b && b <= font->lastChar) {
+				float32 width = font->glyphs[b - font->firstChar].xadvance;
+				if (InBounds(pos, {width, font->height}, cursor))
+					return {node, i};
+				pos.x += width;
+			}
 			prevCharWasWhiteSpace = whiteSpace;
 		}
 	}
@@ -531,8 +538,8 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 
 					if (!onEnd) {
 						selection.x = round(pos.x + startx);
-						selection.y = round(pos.y + y + 2);
-						Dimensions2 dim = {1, height + 2};
+						selection.y = round(pos.y + y);
+						Dimensions2 dim = {2, height};
 						GfxDrawSolidColorQuad(selection, dim, caretColor);
 					}
 
@@ -554,8 +561,8 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					if (wrapX <= x + wordWidth) {
 
 						selection.x = round(pos.x + startx);
-						selection.y = round(pos.y + y + 2);
-						Dimensions2 dim = {(x - startx), height + 2};
+						selection.y = round(pos.y + y);
+						Dimensions2 dim = {(x - startx), height};
 						GfxDrawSolidColorQuad(selection, dim, color);
 						startx = 0;
 
@@ -570,8 +577,8 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 				if (b == 10) {
 
 					selection.x = round(pos.x + startx);
-					selection.y = round(pos.y + y + 2);
-					Dimensions2 dim = {(x - startx), height + 2};
+					selection.y = round(pos.y + y);
+					Dimensions2 dim = {(x - startx), height};
 					GfxDrawSolidColorQuad(selection, dim, color);
 					startx = 0;
 					
@@ -589,8 +596,8 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 					if (wrapX <= x + wordWidth) {
 
 						selection.x = round(pos.x);
-						selection.y = round(pos.y + y + 2);
-						Dimensions2 dim = {x, height + 2};
+						selection.y = round(pos.y + y);
+						Dimensions2 dim = {x, height};
 						GfxDrawSolidColorQuad(selection, dim, color);
 
 						x = 0;
@@ -601,8 +608,8 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 				if (b == 10) {
 
 					selection.x = round(pos.x);
-					selection.y = round(pos.y + y + 2);
-					Dimensions2 dim = {x, height + 2};
+					selection.y = round(pos.y + y);
+					Dimensions2 dim = {x, height};
 					GfxDrawSolidColorQuad(selection, dim, color);
 
 					x = 0;
@@ -615,15 +622,15 @@ void RenderTextSelection(Point2 pos, BakedFont* font, Color color, StringList li
 		if (end.node == node) break;
 	}
 
-	selection.y = round(pos.y + y + 2);
+	selection.y = round(pos.y + y);
 	bool eq = StringListPosEquals(tail, head);
 	if (!eq) {
 		selection.x = round(pos.x + startx);
-		GfxDrawSolidColorQuad(selection, {(x - startx), height + 2}, color);
+		GfxDrawSolidColorQuad(selection, {(x - startx), height}, color);
 	}
 
 	if (onEnd || eq) {
 		selection.x = round(pos.x + x);
-		GfxDrawSolidColorQuad(selection, {1, height + 2}, caretColor);
+		GfxDrawSolidColorQuad(selection, {2, height}, caretColor);
 	}
 }

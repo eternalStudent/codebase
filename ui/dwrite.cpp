@@ -92,7 +92,6 @@ BakedFont DWriteBakeFont(
 		pixelsPerDesignUnits = emSize/fontMetrics.designUnitsPerEm;
 		height = pixelsPerDesignUnits*(fontMetrics.ascent + fontMetrics.descent);
 	}
-	FLOAT ascent = pixelsPerDesignUnits*fontMetrics.ascent;
 
 	COLORREF background = RGB(0, 0, 0);
 	COLORREF foreground = RGB(255, 255, 255);
@@ -100,6 +99,8 @@ BakedFont DWriteBakeFont(
 	BakedFont font;
 	font.firstChar = firstChar;
 	font.lastChar = firstChar + codepointCount - 1;
+	font.ascent = pixelsPerDesignUnits*fontMetrics.ascent;
+	font.descent = pixelsPerDesignUnits*fontMetrics.descent;
 	font.height = height;
 	font.lineGap = pixelsPerDesignUnits*fontMetrics.lineGap;
 
@@ -127,7 +128,7 @@ BakedFont DWriteBakeFont(
 
 		hr = dwrite.renderTarget->DrawGlyphRun(
 			0, 
-			ascent,
+			font.ascent,
 			DWRITE_MEASURING_MODE_NATURAL, 
 			&glyphRun, 
 			dwrite.renderingParams, 
@@ -179,7 +180,7 @@ BakedFont DWriteBakeFont(
 		ASSERT_HR(hr);
 
 		font.glyphs[i].xoff = (float32)boundingBox.left;
-		font.glyphs[i].yoff = (float32)boundingBox.top - (int32)ascent;
+		font.glyphs[i].yoff = (float32)boundingBox.top - (int32)font.ascent;
 		font.glyphs[i].x0 = (int16)atlas->x;
 		font.glyphs[i].y0 = (int16)atlas->y;
 		font.glyphs[i].x1 = (int16)atlas->x + (int16)glyphWidth;

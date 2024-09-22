@@ -1,4 +1,7 @@
 StringList CreateStringList(String string, FixedSize* allocator) {
+	if (!string.length)
+		return {};
+	
 	StringNode* node = (StringNode*)FixedSizeAlloc(allocator);
 	node->string = string;
 	return {node, node, string.length};
@@ -63,6 +66,21 @@ ssize StringListCopy(StringListPos start, StringListPos end, byte* buffer) {
 		if (node == end.node) break;
 	}
 	return ptr - buffer;
+}
+
+String StringListToTempString(StringListPos start, StringListPos end, BigBuffer* buffer) {
+	byte* ptr = buffer->pos;
+	for (StringNode* node = start.node; node != NULL; node = node->next) {
+		String string = node->string;
+		ssize startIndex = node == start.node ? start.index : 0;
+		ssize endIndex = node == end.node ? end.index : string.length;
+		ssize length = endIndex - startIndex;
+		BigBufferEnsureCapacity(buffer, length);
+		ptr += StringCopy({string.data + startIndex, length}, ptr);
+
+		if (node == end.node) break;
+	}
+	return {buffer->pos, ptr - buffer->pos};
 }
 
 bool StringListIsStart(StringListPos pos) {
@@ -231,7 +249,7 @@ StringListPos StringListGetLastPosOf(StringListPos start, StringListPos end, byt
 }
 
 void StringListFindWord(StringList list, StringListPos pos, StringListPos* start, StringListPos* end) {
-	*start = SL_START(list);
+	if (start) *start = SL_START(list);
 	bool afterPos = false;
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
@@ -240,8 +258,8 @@ void StringListFindWord(StringList list, StringListPos pos, StringListPos* start
 			bool alphaNumeric = 'a' <= b && b <= 'z' || 'A' <= b && b <= 'Z' || '0' <= b && b <= '9' || b == '_';
 			if (pos.node == node && pos.index == i) {
 				if (!alphaNumeric) {
-					*start = {node, i};
-					*end = {node, i + 1};
+					if (start) *start = {node, i};
+					if (end) *end = {node, i + 1};
 					return;
 				}
 				afterPos = true;
@@ -249,15 +267,15 @@ void StringListFindWord(StringList list, StringListPos pos, StringListPos* start
 			}
 
 			if (!afterPos && !alphaNumeric) {
-				*start = {node, i + 1};
+				if (start) *start = {node, i + 1};
 			}
 			if (afterPos && !alphaNumeric) {
-				*end = {node, i};
+				if (end) *end = {node, i};
 				return;
 			}
 		}
 	}
-	*end = SL_END(list);
+	if (end) *end = SL_END(list);
 }
 
 StringListPos StringListDelete(StringList* list, StringListPos tail, StringListPos head, 
