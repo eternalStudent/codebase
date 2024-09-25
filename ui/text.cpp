@@ -1,3 +1,9 @@
+/*
+ * TODO:
+ * 1. scroll
+ * 2. more text flags: numbers only/integer numbers only
+ */
+
 enum UITextFlags: uint32 {
 	UIText_SingleLine = (1 << 1),
 	UIText_Wrap       = (1 << 2),

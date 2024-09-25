@@ -47,6 +47,14 @@ struct D3D11SemiSphere {
 	Color color;
 };
 
+struct D3D11Wave {
+	Point2 pos0;
+	Point2 pos1;
+	float32 thickness;
+	float32 period;
+	Color color;
+};
+
 struct D3D11Program {
 	UINT stride;
 	ID3D11VertexShader* vshader;
@@ -90,6 +98,7 @@ struct {
 	D3D11Program imageProgram;
 	D3D11Program shadowProgram;
 	D3D11Program semiSphereProgram;
+	D3D11Program waveProgram;
 	D3D11Program* currentProgram;
 	
 	int32 quadCount;
@@ -448,6 +457,71 @@ R"STRING(
 	}				
 )STRING";
 
+static char waveCode[] = 
+"	#line " STRINGIFY(__LINE__) "\n"
+R"STRING(
+	struct VS_INPUT	{
+		float2 pos0 : POS0;
+		float2 pos1 : POS1;
+		float thickness : THICK;
+		float period : PERIOD;
+		float4 color : COLOR;	
+		uint vertexId : SV_VertexID;
+	};				
+					
+	struct PS_INPUT {
+		float4 pos : SV_POSITION;
+		float2 xy : XY;
+		float thickness : THICK;
+		float pixel : PIXEL;
+		float4 color : COLOR;
+	};				
+					
+	cbuffer cbuffer0 : register(b0) {
+		row_major float4x4 mvp;
+	}				
+					
+	PS_INPUT vs(VS_INPUT input) {
+		PS_INPUT output;
+		float2 pixel_poses[] = {
+			float2(input.pos0.x, input.pos1.y),
+			float2(input.pos0.x, input.pos0.y),
+			float2(input.pos1.x, input.pos1.y),
+			float2(input.pos1.x, input.pos0.y),
+		};			
+		float2 pixel_pos = pixel_poses[input.vertexId];
+		float4 pos = mul(mvp, float4(pixel_pos, 0, 1));
+		output.pos = pos;
+
+		float tau = 6.28318548;
+		float x1 = abs(input.pos1.x - input.pos0.x)*tau/input.period;
+
+		float2 xys[] = {
+			float2(0, 2),
+			float2(0, -2),
+			float2(x1, 2),
+			float2(x1, -2),
+		};
+		output.xy = xys[input.vertexId];
+		
+		output.pixel = 2/abs(input.pos1.y - input.pos0.y);
+		output.thickness = input.thickness;
+		output.color = input.color;
+		return output;
+	}							
+					
+	float4 ps(PS_INPUT input) : SV_TARGET	
+	{				
+		float value = sin(input.xy.x);
+		float dist = abs(value - input.xy.y) - input.thickness*input.pixel;
+		float a = 1 - smoothstep(-input.pixel, input.pixel, dist);
+
+		float4 color = input.color;
+		color.a *= a;
+		return color;
+	}				
+)STRING";
+
 // TODO: move some of this to d3d11.cpp
 D3D11Program CreateProgram(String hlsl, D3D11_INPUT_ELEMENT_DESC* desc, UINT numElements, UINT stride) {
 	UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
@@ -780,6 +854,18 @@ void D3D11UIInit(uint32 globalFlags) {
 
 		};
 		d3d11.semiSphereProgram = CreateProgram(STR(semiSphereCode), desc, ARRAYSIZE(desc), sizeof(D3D11SemiSphere));
+	}
+
+	{
+		D3D11_INPUT_ELEMENT_DESC desc[] =
+		{
+			{ "POS",     0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(D3D11Wave, pos0),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "POS",     1, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(D3D11Wave, pos1),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "THICK",   0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(D3D11Wave, thickness),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "PERIOD",  0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(D3D11Wave, period),     D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "COLOR",   0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(D3D11Wave, color),      D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+		};
+		d3d11.waveProgram = CreateProgram(STR(waveCode), desc, ARRAYSIZE(desc), sizeof(D3D11Wave));
 	}
 }
 
@@ -1250,6 +1336,27 @@ void D3D11UIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float3
 		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
 
 	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11SemiSphere), &semi, sizeof(D3D11SemiSphere));
+	d3d11.quadCount++;
+}
+
+void D3D11UIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
+	D3D11Wave wave = {
+		{pos.x, pos.y - dim.height},
+		{pos.x + dim.width, pos.y + dim.height},
+		thickness,
+		2.5f*dim.height,
+		color
+	};
+	if (d3d11.currentProgram != &d3d11.waveProgram) {
+		FlushVertices();
+		d3d11.currentProgram = &d3d11.waveProgram;
+		DisableMultiSample();
+	}
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Wave), &wave, sizeof(D3D11Wave));
 	d3d11.quadCount++;
 }
 
