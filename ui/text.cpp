@@ -69,11 +69,11 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 		if (text->isSelecting) {
 
 			UITextBox* textbox = text->active;
-			bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
-			float32 relx = cursor.x - textbox->x;
-			float32 rely = cursor.y - textbox->y;
-			
-			text->head = GetCharPos({relx, rely}, textbox->font, textbox->data, shouldWrap, textbox->width - textbox->pad.x);
+
+			if (InBounds(textbox->pos, textbox->dim, cursor)) {
+				bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
+				text->head = GetCharPos(cursor - textbox->pos, textbox->font, textbox->data, shouldWrap, textbox->width - textbox->pad.x);
+			}
 
 			OSSetCursorIcon(CUR_TEXT);
 			return true;
@@ -94,6 +94,7 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 				}
 			}
 
+			text->hover = NULL;
 			return false;
 		}
 	} break;
