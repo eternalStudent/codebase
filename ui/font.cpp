@@ -15,12 +15,17 @@ struct BakedFont {
 	float32 ascent;
 	float32 descent;
 	float32 lineGap;
+
+	// TODO: I'm not really using this for custom ranges
+	//       Let's rename/delete/replace
 	int32 firstChar;
 	int32 lastChar;
+
 	BakedGlyph glyphs[96];
 };
 
-// TODO: change byte* to byte[0]?
+// TODO: now that I have two method of allocating a region
+//       I should maybe rename this
 struct AtlasBitmap {
 	int32 width, height, x, y, bottom_y;
 	byte* data;
@@ -38,6 +43,8 @@ AtlasBitmap CreateAtlasBitmap(int32 width, int32 height, byte* buffer) {
 	return atlas;
 }
 
+#include "../graphics/region.cpp"
+
 #if _OS_WINDOWS
 #  include "dwrite.cpp"
 #endif
@@ -45,9 +52,27 @@ AtlasBitmap CreateAtlasBitmap(int32 width, int32 height, byte* buffer) {
 // TODO: add #if here
 #include "truetype.cpp"
 
+void FreeBakedFont(BakedFont* font, RegionNode* atlasRoot, FixedSize* nodeAllocator) {
+	for (int32 i = 0; i < 96; i++) {
+		BakedGlyph* glyph = font->glyphs + i;
+		Point2i pos0 = {glyph->x0 - 1, glyph->y0 - 1};
+		Point2i pos1 = {glyph->x1 - 1, glyph->y1 - 1};
+		Dimensions2i dim = pos1 - pos0;
+		if (dim.width & dim.height) {
+			dim = dim + Point2i{1, 1};
+			RegionNode* node = RegionGetByPosAndDim(atlasRoot, pos0, dim);
+			ASSERT(node);
+			RegionFree(node, nodeAllocator);
+		}
+	}
+}
 
 Image GetImageFromFontAtlas(AtlasBitmap* atlas) {
 	return Image{atlas->width, atlas->height, 1, atlas->data};
+}
+
+Image GetImageFromFontAtlas(Dimensions2i dim, byte* data) {
+	return Image{dim.width, dim.height, 1, data};
 }
 
 float32 RenderGlyph(Point2 pos, BakedFont* font, Color color, byte b) {

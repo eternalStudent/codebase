@@ -21,18 +21,28 @@ ID3D11ShaderResourceView* GenerateTexture(ID3D11Device1* device, Image image) {
 	desc.ArraySize         = 1;
 	desc.Format            = formats[image.channels - 1];
 	desc.SampleDesc.Count  = 1;
-	desc.Usage             = D3D11_USAGE_IMMUTABLE;
+	desc.Usage             = D3D11_USAGE_DEFAULT;
 	desc.BindFlags         = D3D11_BIND_SHADER_RESOURCE;
 
 	D3D11_SUBRESOURCE_DATA subResource = {};
 	subResource.pSysMem     = image.data;
-	subResource.SysMemPitch = image.width * image.channels;
+	subResource.SysMemPitch = image.width*image.channels;
 
-	ID3D11Texture2D* temp;
-	HRESULT hr = device->CreateTexture2D(&desc, &subResource, &temp);
-	ASSERT_HR(hr);
 	ID3D11ShaderResourceView* resource;
-	hr = device->CreateShaderResourceView(temp, NULL, &resource);
-	ASSERT_HR(hr);
+	{
+		ID3D11Texture2D* temp;
+		HRESULT hr = device->CreateTexture2D(&desc, &subResource, &temp);
+		ASSERT_HR(hr);
+		hr = device->CreateShaderResourceView(temp, NULL, &resource);
+		ASSERT_HR(hr);
+		temp->Release();
+	}
 	return resource;
+}
+
+void UpdateTexture(ID3D11DeviceContext1* context, ID3D11ShaderResourceView* texture, Image image) {
+	ID3D11Resource* resource;
+	texture->GetResource(&resource);
+
+	context->UpdateSubresource(resource, 0, NULL, image.data, image.width*image.channels, 0);
 }

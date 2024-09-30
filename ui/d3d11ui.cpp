@@ -62,7 +62,10 @@ struct D3D11Program {
 	ID3D11InputLayout* layout;
 
 	D3D11Texture texture;
-	Dimensions2 textureDim;
+	union {
+		Dimensions2 textureDim;
+		struct {float32 textureWidth, textureHeight;};
+	};
 };
 
 enum {
@@ -566,6 +569,10 @@ D3D11Texture D3D11GenerateTexture(Image image, int32 filter) {
 	return {resource, d3d11.samplers[filter]};
 }
 
+void D3D11UpdateTexture(D3D11Texture texture, Image image) {
+	UpdateTexture(d3d11.context, texture.resource, image);
+}
+
 void D3D11UIInit(uint32 globalFlags) {
 	HRESULT hr;
 
@@ -955,9 +962,17 @@ void D3D11UISetBackgroundColor(Color color) {
 }
 
 void D3D11UISetFontAtlas(Image image) {
-	// NOTE: Nearest works if this is a bit font, and also should work for regular font assuming no resizing
-	d3d11.glyphProgram.texture = D3D11GenerateTexture(image, D3D11_NEAREST);
-	d3d11.glyphProgram.textureDim = {(float32)image.dimensions.width, (float32)image.dimensions.height};
+	if (d3d11.glyphProgram.texture.resource) {
+		// TODO: let's assume this for now
+		ASSERT(d3d11.glyphProgram.textureWidth == (float32)image.dimensions.width);
+		ASSERT(d3d11.glyphProgram.textureHeight == (float32)image.dimensions.height);
+
+		D3D11UpdateTexture(d3d11.glyphProgram.texture, image);
+	}
+	else {
+		d3d11.glyphProgram.texture = D3D11GenerateTexture(image, D3D11_NEAREST);
+		d3d11.glyphProgram.textureDim = {(float32)image.dimensions.width, (float32)image.dimensions.height};
+	}
 }
 
 void FlushVertices() {

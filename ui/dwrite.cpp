@@ -22,7 +22,7 @@ void DWriteInit(UINT32 width, UINT32 height) {
 		gamma,
 		enhanced_contrast,
 		0,
-		DWRITE_PIXEL_GEOMETRY_RGB,
+		DWRITE_PIXEL_GEOMETRY_FLAT,
 		DWRITE_RENDERING_MODE_NATURAL,
 		&dwrite.renderingParams);
 	ASSERT_HR(hr);
@@ -64,6 +64,43 @@ IDWriteFontFace* DWriteLoadDefaultFont() {
 	return DWriteGetFontFace(filePath);
 }
 
+//----------------------------------
+
+void DWriteGetScaledFontMetrics(
+	IDWriteFontFace* fontFace, 
+	FLOAT pixelSize,
+	BOOL scaleForPixelHeight,
+
+	FLOAT* height,
+	FLOAT* ascent,
+	FLOAT* descent,
+	FLOAT* lineGap,
+	FLOAT* emSize,
+	FLOAT* pixelsPerDesignUnits) {
+
+	DWRITE_FONT_METRICS fontMetrics;
+	fontFace->GetMetrics(&fontMetrics);
+
+	if (scaleForPixelHeight) {
+		UINT16 heightInDesignUnits = fontMetrics.ascent + fontMetrics.descent;
+
+		*emSize = pixelSize*fontMetrics.designUnitsPerEm/heightInDesignUnits;
+		*pixelsPerDesignUnits = pixelSize/heightInDesignUnits;
+		*height = pixelSize;
+	}
+	else {
+		*emSize = (96.f/72.f)*pixelSize;
+		*pixelsPerDesignUnits = *emSize/fontMetrics.designUnitsPerEm;
+		*height = *pixelsPerDesignUnits*(fontMetrics.ascent + fontMetrics.descent);
+	}
+
+	*ascent = *pixelsPerDesignUnits*fontMetrics.ascent;
+	*descent = *pixelsPerDesignUnits*fontMetrics.descent;
+	*lineGap = *pixelsPerDesignUnits*fontMetrics.lineGap;
+}
+
+//-----------------------------------
+
 BakedFont DWriteBakeFont(
 	IDWriteFontFace* fontFace, 
 	AtlasBitmap* atlas, 
@@ -73,36 +110,22 @@ BakedFont DWriteBakeFont(
 	UINT32 codepointCount, 
 	int32 firstChar) {
 
-	ASSERT(codepointCount <= 96);
-	HRESULT hr;
-
-	// get some font metrics
-	DWRITE_FONT_METRICS fontMetrics;
-	fontFace->GetMetrics(&fontMetrics);
-
-	FLOAT emSize, height, pixelsPerDesignUnits;
-	if (scaleForPixelHeight) {
-		UINT16 heightInDesignUnits = fontMetrics.ascent + fontMetrics.descent;
-		emSize = pixelSize*fontMetrics.designUnitsPerEm/heightInDesignUnits;
-		pixelsPerDesignUnits = pixelSize/heightInDesignUnits;
-		height = pixelSize;
-	}
-	else {
-		emSize = (96.f/72.f)*pixelSize;
-		pixelsPerDesignUnits = emSize/fontMetrics.designUnitsPerEm;
-		height = pixelsPerDesignUnits*(fontMetrics.ascent + fontMetrics.descent);
-	}
-
-	COLORREF background = RGB(0, 0, 0);
-	COLORREF foreground = RGB(255, 255, 255);
-
 	BakedFont font;
 	font.firstChar = firstChar;
 	font.lastChar = firstChar + codepointCount - 1;
-	font.ascent = pixelsPerDesignUnits*fontMetrics.ascent;
-	font.descent = pixelsPerDesignUnits*fontMetrics.descent;
-	font.height = height;
-	font.lineGap = pixelsPerDesignUnits*fontMetrics.lineGap;
+
+	FLOAT emSize, pixelsPerDesignUnits;
+	DWriteGetScaledFontMetrics(fontFace, pixelSize, scaleForPixelHeight,
+		&font.height,
+		&font.ascent,
+		&font.descent,
+		&font.lineGap,
+		&emSize,
+		&pixelsPerDesignUnits);
+
+	COLORREF background = RGB(0, 0, 0);
+	COLORREF foreground = RGB(255, 255, 255);
+	HRESULT hr;
 
 	for (uint32 i = 0; i < codepointCount; i ++) {
 		UINT16 glyphId;
@@ -119,12 +142,12 @@ BakedFont DWriteBakeFont(
 			SelectObject(dc, original);
 		}
 		
-		DWRITE_GLYPH_RUN glyphRun = {0};
+		DWRITE_GLYPH_RUN glyphRun = {};
 		glyphRun.fontFace = fontFace;
 		glyphRun.fontEmSize = emSize;
 		glyphRun.glyphCount = 1;
 		glyphRun.glyphIndices = &glyphId;
-		RECT boundingBox = {0};
+		RECT boundingBox = {};
 
 		hr = dwrite.renderTarget->DrawGlyphRun(
 			0, 
@@ -145,7 +168,7 @@ BakedFont DWriteBakeFont(
 		
 		// Get the Bitmap
 		HBITMAP bitmap = (HBITMAP)GetCurrentObject(dc, OBJ_BITMAP);
-		DIBSECTION dib = {0};
+		DIBSECTION dib = {};
 		GetObject(bitmap, sizeof(dib), &dib);
 		
 		// copy and convert to single channel
@@ -218,6 +241,262 @@ BakedFont DWriteLoadAndBakeDefaultFont(AtlasBitmap* atlas, FLOAT pixelSize, BOOL
 	IDWriteFontFace* fontFace = DWriteLoadDefaultFont();
 	BakedFont font = DWriteBakeFont(fontFace, atlas, pixelSize, scaleForPixelHeight);
 	fontFace->Release();
+
+	return font;
+}
+
+//-----------------------------------------
+
+// TODO: having almost the same long method 3 times is not great...
+
+BakedFont DWriteBakeFont(
+	IDWriteFontFace* fontFace, 
+	byte* out,
+	RegionNode* atlasRoot, 
+	FixedSize* regionNodeAllocator,
+	FLOAT pixelSize,
+	BOOL scaleForPixelHeight) {
+
+	BakedFont font;
+	font.firstChar = 32;
+	font.lastChar = 127;
+
+	FLOAT emSize, pixelsPerDesignUnits;
+	DWriteGetScaledFontMetrics(fontFace, pixelSize, scaleForPixelHeight,
+		&font.height,
+		&font.ascent,
+		&font.descent,
+		&font.lineGap,
+		&emSize,
+		&pixelsPerDesignUnits);
+
+	COLORREF background = RGB(0, 0, 0);
+	COLORREF foreground = RGB(255, 255, 255);
+	HRESULT hr;
+
+	for (uint32 codepoint = 32; codepoint < 128; codepoint++) {
+		int32 i = codepoint - 32;
+
+		UINT16 glyphId;
+		hr = fontFace->GetGlyphIndices(&codepoint, 1, &glyphId);
+		ASSERT_HR(hr);
+
+		HDC dc = dwrite.renderTarget->GetMemoryDC();
+		{
+			HGDIOBJ original = SelectObject(dc, GetStockObject(DC_PEN));
+			SetDCPenColor(dc, background);
+			SelectObject(dc, GetStockObject(DC_BRUSH));
+			SetDCBrushColor(dc, background);
+			Rectangle(dc, 0, 0, 256, 256);
+			SelectObject(dc, original);
+		}
+		
+		DWRITE_GLYPH_RUN glyphRun = {};
+		glyphRun.fontFace = fontFace;
+		glyphRun.fontEmSize = emSize;
+		glyphRun.glyphCount = 1;
+		glyphRun.glyphIndices = &glyphId;
+		RECT boundingBox = {};
+
+		hr = dwrite.renderTarget->DrawGlyphRun(
+			0, 
+			font.ascent,
+			DWRITE_MEASURING_MODE_NATURAL, 
+			&glyphRun, 
+			dwrite.renderingParams, 
+			foreground, 
+			&boundingBox
+		);
+		ASSERT_HR(hr);
+
+		font.glyphs[i].xoff = (float32)boundingBox.left;
+		font.glyphs[i].yoff = (float32)boundingBox.top - (int32)font.ascent;
+
+		int32 glyphHeight = boundingBox.bottom - boundingBox.top;
+		int32 glyphWidth = boundingBox.right - boundingBox.left;
+
+		if (glyphWidth && glyphHeight) {
+
+			RegionNode* node = RegionAlloc(atlasRoot, regionNodeAllocator, {glyphWidth + 1, glyphHeight + 1});
+			if (node == NULL)
+				return font;
+			
+			// Get the Bitmap
+			HBITMAP bitmap = (HBITMAP)GetCurrentObject(dc, OBJ_BITMAP);
+			DIBSECTION dib = {};
+			GetObject(bitmap, sizeof(dib), &dib);
+			
+			// copy and convert to single channel
+			{
+				int32 in_pitch = dib.dsBm.bmWidthBytes;
+				int32 out_pitch = atlasRoot->width;
+
+				byte* in_data = (byte*)dib.dsBm.bmBits + in_pitch*(boundingBox.bottom - glyphHeight) + 4*boundingBox.left;
+				byte* out_data = out + node->x + 1 + out_pitch*(node->y + 1);
+
+				byte* in_line = in_data;
+				byte* out_line = out_data;
+				for (int32 y = 0; y < glyphHeight; y++) {
+					byte* in_pixel = in_line;
+					byte* out_pixel = out_line;
+					for (int32 x = 0; x < glyphWidth; x++) {
+						out_pixel[0] = in_pixel[0];
+						in_pixel += 4;
+						out_pixel++;
+					}
+					in_line += in_pitch;
+					out_line += out_pitch;
+				}
+			}
+
+			font.glyphs[i].x0 = (int16)node->x + 1;
+			font.glyphs[i].y0 = (int16)node->y + 1;
+			font.glyphs[i].x1 = (int16)node->x + 1 + (int16)glyphWidth;
+			font.glyphs[i].y1 = (int16)node->y + 1 + (int16)glyphHeight;
+		}
+		else {
+			font.glyphs[i].x0 = 0;
+			font.glyphs[i].y0 = 0;
+			font.glyphs[i].x1 = 0;
+			font.glyphs[i].y1 = 0;
+		}
+
+		DWRITE_GLYPH_METRICS glyphMetrics;
+		hr = fontFace->GetDesignGlyphMetrics(
+			&glyphId,
+			1, 
+			&glyphMetrics, 
+			FALSE);
+		ASSERT_HR(hr);
+
+		font.glyphs[i].xadvance = pixelsPerDesignUnits*glyphMetrics.advanceWidth;
+	}
+
+	return font;
+}
+
+BakedFont DWriteBakeFont(
+	IDWriteFontFace* fontFace, 
+	byte* out,
+	RegionNode* atlasRoot, 
+	FixedSize* regionNodeAllocator,
+	FLOAT pixelSize,
+	BOOL scaleForPixelHeight,
+	UINT32* codepoints, 
+	UINT32 codepointCount) {
+
+	BakedFont font;
+	font.firstChar = 1;
+	font.lastChar = codepointCount;
+
+	FLOAT emSize, pixelsPerDesignUnits;
+	DWriteGetScaledFontMetrics(fontFace, pixelSize, scaleForPixelHeight,
+		&font.height,
+		&font.ascent,
+		&font.descent,
+		&font.lineGap,
+		&emSize,
+		&pixelsPerDesignUnits);
+
+	COLORREF background = RGB(0, 0, 0);
+	COLORREF foreground = RGB(255, 255, 255);
+	HRESULT hr;
+
+	for (UINT32 i = 0; i < codepointCount; i++) {
+		UINT16 glyphId;
+		hr = fontFace->GetGlyphIndices(codepoints + i, 1, &glyphId);
+		ASSERT_HR(hr);
+
+		HDC dc = dwrite.renderTarget->GetMemoryDC();
+		{
+			HGDIOBJ original = SelectObject(dc, GetStockObject(DC_PEN));
+			SetDCPenColor(dc, background);
+			SelectObject(dc, GetStockObject(DC_BRUSH));
+			SetDCBrushColor(dc, background);
+			Rectangle(dc, 0, 0, 256, 256);
+			SelectObject(dc, original);
+		}
+		
+		DWRITE_GLYPH_RUN glyphRun = {};
+		glyphRun.fontFace = fontFace;
+		glyphRun.fontEmSize = emSize;
+		glyphRun.glyphCount = 1;
+		glyphRun.glyphIndices = &glyphId;
+		RECT boundingBox = {};
+
+		hr = dwrite.renderTarget->DrawGlyphRun(
+			0, 
+			font.ascent,
+			DWRITE_MEASURING_MODE_NATURAL, 
+			&glyphRun, 
+			dwrite.renderingParams, 
+			foreground, 
+			&boundingBox
+		);
+		ASSERT_HR(hr);
+
+		font.glyphs[i].xoff = (float32)boundingBox.left;
+		font.glyphs[i].yoff = (float32)boundingBox.top - (int32)font.ascent;
+
+		int32 glyphHeight = boundingBox.bottom - boundingBox.top;
+		int32 glyphWidth = boundingBox.right - boundingBox.left;
+
+		if (glyphWidth && glyphHeight) {
+
+			RegionNode* node = RegionAlloc(atlasRoot, regionNodeAllocator, {glyphWidth + 1, glyphHeight + 1});
+			if (node == NULL)
+				return font;
+			
+			// Get the Bitmap
+			HBITMAP bitmap = (HBITMAP)GetCurrentObject(dc, OBJ_BITMAP);
+			DIBSECTION dib = {};
+			GetObject(bitmap, sizeof(dib), &dib);
+			
+			// copy and convert to single channel
+			{
+				int32 in_pitch = dib.dsBm.bmWidthBytes;
+				int32 out_pitch = atlasRoot->width;
+
+				byte* in_data = (byte*)dib.dsBm.bmBits + in_pitch*(boundingBox.bottom - glyphHeight) + 4*boundingBox.left;
+				byte* out_data = out + node->x + 1 + out_pitch*(node->y + 1);
+
+				byte* in_line = in_data;
+				byte* out_line = out_data;
+				for (int32 y = 0; y < glyphHeight; y++) {
+					byte* in_pixel = in_line;
+					byte* out_pixel = out_line;
+					for (int32 x = 0; x < glyphWidth; x++) {
+						out_pixel[0] = in_pixel[0];
+						in_pixel += 4;
+						out_pixel++;
+					}
+					in_line += in_pitch;
+					out_line += out_pitch;
+				}
+			}
+
+			font.glyphs[i].x0 = (int16)node->x + 1;
+			font.glyphs[i].y0 = (int16)node->y + 1;
+			font.glyphs[i].x1 = (int16)node->x + 1 + (int16)glyphWidth;
+			font.glyphs[i].y1 = (int16)node->y + 1 + (int16)glyphHeight;
+		}
+		else {
+			font.glyphs[i].x0 = 0;
+			font.glyphs[i].y0 = 0;
+			font.glyphs[i].x1 = 0;
+			font.glyphs[i].y1 = 0;
+		}
+
+		DWRITE_GLYPH_METRICS glyphMetrics;
+		hr = fontFace->GetDesignGlyphMetrics(
+			&glyphId,
+			1, 
+			&glyphMetrics, 
+			FALSE);
+		ASSERT_HR(hr);
+
+		font.glyphs[i].xadvance = pixelsPerDesignUnits*glyphMetrics.advanceWidth;
+	}
 
 	return font;
 }
