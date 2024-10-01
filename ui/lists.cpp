@@ -8,6 +8,7 @@ struct UIList {
 
 	int32 count;
 	int32 selected;
+	int32 former;
 
 	float32 grabPos;
 	bool isDragging;
@@ -17,10 +18,10 @@ struct UIList {
 bool UIListProcessEvent(UIList* list, OSEvent event) {
 	if (!list->isVisible) return false;
 
-	Point2 cursor = {event.mouse.cursorPos.x + 0.5f, event.mouse.cursorPos.y + 0.5f};
-
 	switch (event.type) {
 	case Event_MouseMove : {
+		Point2 cursor = event.mouse.cursorPos + 0.5f;
+
 		if (list->isDragging) {
 			float32 thumbOffset = GetThumbOffset(list->count*list->rowHeight, list->height, list->scrollOffset);
 			float32 newThumbOffset = list->grabPos + cursor.y;
@@ -54,6 +55,8 @@ bool UIListProcessEvent(UIList* list, OSEvent event) {
 		return false;
 	} break;
 	case Event_MouseLeftButtonDown: {
+		Point2 cursor = event.mouse.cursorPos + 0.5f;
+
 		// TODO: both the thumbWidth and the thumbxOffset should not be hard coded
 		const float32 thumbWidth = 7;
 		const float32 thumbxOffset = 4;
@@ -66,6 +69,13 @@ bool UIListProcessEvent(UIList* list, OSEvent event) {
 
 			return true;
 		}
+
+		if (InBounds(list->pos, list->dim, cursor)) {
+			list->former = list->selected;
+			list->isVisible = false;
+
+			return false;
+		}
 	} break;
 	case Event_MouseLeftButtonUp: {
 		list->isDragging = false;
@@ -73,7 +83,7 @@ bool UIListProcessEvent(UIList* list, OSEvent event) {
 		return false;
 	} break;
 	case Event_MouseVerticalWheel: {
-		if (InBounds(list->pos, list->dim, cursor)) {
+		if (InBounds(list->pos, list->dim, event.mouse.cursorPos + 0.5f)) {
 			float32 maxScrollOffset = GetMaxScrollOffset(list->count*list->rowHeight, list->height);
 			float32 scrollOffset = list->scrollOffset - event.mouse.wheelDelta;
 			if (scrollOffset < 0)
@@ -115,6 +125,12 @@ bool UIListProcessEvent(UIList* list, OSEvent event) {
 					list->scrollOffset = minScroll;
 			}
 			return true;
+		} break;
+		case KEY_ENTER: {
+			list->former = list->selected;
+			list->isVisible = false;
+
+			return false;
 		} break;
 		}
 	} break;
