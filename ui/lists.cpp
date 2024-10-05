@@ -1,3 +1,7 @@
+/*
+ *  NOTE: for contextmenu, autocomplete, combobox and deopdown
+ */
+
 struct UIList {
 	union {
 		struct {Point2 pos; Dimensions2 dim;};
@@ -13,6 +17,14 @@ struct UIList {
 	float32 grabPos;
 	bool isDragging;
 	bool isVisible;
+};
+
+struct UIDropDown {
+	union {
+		struct {Point2 pos; Dimensions2 dim;};
+		struct {float32 x, y, width, height;};
+	};
+	UIList options;
 };
 
 bool UIListProcessEvent(UIList* list, OSEvent event) {
@@ -137,4 +149,18 @@ bool UIListProcessEvent(UIList* list, OSEvent event) {
 	}
 
 	return false;
+}
+
+bool UIDropDownProcessEvent(UIDropDown* dropdown, OSEvent event) {
+	if (event.type == Event_MouseLeftButtonDown) {
+
+		Point2 cursor = event.mouse.cursorPos + 0.5f;
+		if (InBounds(dropdown->pos, dropdown->dim, cursor)) {
+			dropdown->options.isVisible = !dropdown->options.isVisible;
+
+			return true;
+		}
+	}
+
+	return UIListProcessEvent(&dropdown->options, event);
 }

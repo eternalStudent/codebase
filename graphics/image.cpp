@@ -66,3 +66,42 @@ inline Color operator*(float32 a, Color c) {
 #define COLOR_MAGENTA	Color{1, 1, 0, 1}
 #define COLOR_WHITE		Color{1, 1, 1, 1}
 
+Color HSL(float32 h, float32 s, float32 l, float32 a = 1) {
+
+	float32 d = s*min(l, 1 - l);
+	if (d == 0) 
+		return {l, l, l, a};
+
+	float32 hh = 12*h;
+	// TODO: fmod, and saturate
+	if (hh <  2) return {l + d, 
+						 l - d*(1 - hh), 
+						 l - d, 
+						 a};
+
+	if (hh <  4) return {l - d*(-3 + hh),
+						 l + d,
+						 l - d,
+						 a};
+
+	if (hh <  6) return {l - d,
+						 l + d,
+						 l - d*(5 - hh), 
+						 a};
+
+	if (hh <  8) return {l - d,
+						 l - d*(-7 + hh),
+						 l + d, 
+						 a};
+
+	if (hh < 10) return {l - d*(9 - hh),
+						 l - d,
+						 l + d, 
+						 a};
+
+	             return {l + d,
+	             		 l - d, 
+	             		 l - d*(-11 + hh), 
+	             		 a};
+}
+

@@ -44,6 +44,8 @@ enum Quadrant {
 # define GfxDrawShadow				D3D11UIDrawShadow
 # define GfxDrawSemiSphere			D3D11UIDrawSemiSphere
 # define GfxDrawWave				D3D11UIDrawWave
+# define GfxDrawHueGrad				D3D11UIDrawHueGrad
+# define GfxDrawSLQuad				D3D11UIDrawSLQuad
 # define GfxCropScreen				D3D11UICropScreen
 # define GfxClearCrop				D3D11UIClearCrop
 #endif

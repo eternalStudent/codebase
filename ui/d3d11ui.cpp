@@ -55,6 +55,18 @@ struct D3D11Wave {
 	Color color;
 };
 
+struct D3D11Hue {
+	Point2 pos0;
+	Point2 pos1;
+	Point2 uv;
+};
+
+struct D3D11SLBox {
+	Point2 pos0;
+	Point2 pos1;
+	float32 hue;
+};
+
 struct D3D11Program {
 	UINT stride;
 	ID3D11VertexShader* vshader;
@@ -102,6 +114,8 @@ struct {
 	D3D11Program shadowProgram;
 	D3D11Program semiSphereProgram;
 	D3D11Program waveProgram;
+	D3D11Program hueProgram;
+	D3D11Program slProgram;
 	D3D11Program* currentProgram;
 	
 	int32 quadCount;
@@ -525,6 +539,134 @@ R"STRING(
 	}				
 )STRING";
 
+char hueCode[] = 
+"	#line " STRINGIFY(__LINE__) "\n"
+R"STRING(
+	struct VS_INPUT	{
+		float2 pos0 : POS0;
+		float2 pos1 : POS1;
+		float2 uv : UV;
+		uint vertexId : SV_VertexID;
+	};
+
+	struct PS_INPUT {
+		float4 pos : SV_POSITION;
+		float hue : HUE;
+	};	
+
+	cbuffer cbuffer0 : register(b0) {
+		row_major float4x4 mvp;
+	}
+
+	PS_INPUT vs(VS_INPUT input) {
+		PS_INPUT output;
+
+		float2 pixel_poses[] = {
+			float2(input.pos0.x, input.pos1.y),
+			float2(input.pos0.x, input.pos0.y),
+			float2(input.pos1.x, input.pos1.y),
+			float2(input.pos1.x, input.pos0.y),
+		};
+		float2 pixel_pos = pixel_poses[input.vertexId];
+		output.pos = mul(mvp, float4(pixel_pos, 0, 1));
+		
+		output.hue = (input.vertexId & 1) ? input.uv.x : input.uv.y;
+
+		return output;
+	}
+
+	float4 ps(PS_INPUT input) : SV_TARGET {				
+		float r = abs(input.hue * 6 - 3) - 1;
+		float g = 2 - abs(input.hue * 6 - 2);
+		float b = 2 - abs(input.hue * 6 - 4);
+		return saturate(float4(r, g, b, 1));
+	}
+)STRING";
+
+char slCode[] = 
+"	#line " STRINGIFY(__LINE__) "\n"
+R"STRING(
+	struct VS_INPUT	{
+		float2 pos0 : POS0;
+		float2 pos1 : POS1;
+		float hue : HUE;
+		uint vertexId : SV_VertexID;
+	};
+
+	struct PS_INPUT {
+		float4 pos : SV_POSITION;
+		float3 hsl : HSL;
+	};	
+
+	cbuffer cbuffer0 : register(b0) {
+		row_major float4x4 mvp;
+	}
+
+	PS_INPUT vs(VS_INPUT input) {
+		PS_INPUT output;
+
+		float2 pixel_poses[] = {
+			float2(input.pos0.x, input.pos1.y),
+			float2(input.pos0.x, input.pos0.y),
+			float2(input.pos1.x, input.pos1.y),
+			float2(input.pos1.x, input.pos0.y),
+		};
+		float2 pixel_pos = pixel_poses[input.vertexId];
+		output.pos = mul(mvp, float4(pixel_pos, 0, 1));
+		
+		output.hsl.x = input.hue;
+		output.hsl.y = (float)((input.vertexId & 2) >> 1);
+		output.hsl.z = (float)(input.vertexId & 1);
+
+		return output;
+	}
+
+	float4 ps(PS_INPUT input) : SV_TARGET {
+		float h = input.hsl.x;
+		float s = input.hsl.y;
+		float l = input.hsl.z;
+
+		float d = s*min(l, 1 - l);
+		if (d == 0) return float4(l, l, l, 1);
+
+		float hh = 12*h;
+
+		float r, g, b;
+		if (hh < 2) {
+			r = l + d;
+			g = l + d*(hh - 1);
+			b = l - d;
+		}
+		else if (hh < 4) {
+			r = l - d*(hh - 3);
+			g = l + d;
+			b = l - d;
+		}
+		else if (hh < 6) {
+			r = l - d;
+			g = l + d;
+			b = l + d*(hh - 5);
+		}
+		else if (hh < 8) {
+			r = l - d;
+			g = l - d*(hh - 7);
+			b = l + d;
+		}
+		else if (hh < 10) {
+			r = l + d*(hh - 9);
+			g = l - d;
+			b = l + d;
+		}
+		else {
+			r = l + d;
+			g = l - d;
+			b = l - d*(hh - 11);
+		}
+
+		return float4(r, g, b, 1);
+	}
+)STRING";
+
 // TODO: move some of this to d3d11.cpp
 D3D11Program CreateProgram(String hlsl, D3D11_INPUT_ELEMENT_DESC* desc, UINT numElements, UINT stride) {
 	UINT flags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_WARNINGS_ARE_ERRORS;
@@ -873,6 +1015,26 @@ void D3D11UIInit(uint32 globalFlags) {
 			{ "COLOR",   0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(D3D11Wave, color),      D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 		};
 		d3d11.waveProgram = CreateProgram(STR(waveCode), desc, ARRAYSIZE(desc), sizeof(D3D11Wave));
+	}
+
+	{
+		D3D11_INPUT_ELEMENT_DESC desc[] =
+		{
+			{ "POS"   , 0, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Hue, pos0), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "POS"   , 1, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Hue, pos1), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "UV"    , 0, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Hue, uv), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+		};
+		d3d11.hueProgram = CreateProgram(STR(hueCode), desc, ARRAYSIZE(desc), sizeof(D3D11Hue));
+	}
+
+	{
+		D3D11_INPUT_ELEMENT_DESC desc[] =
+		{
+			{ "POS"   , 0, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11SLBox, pos0), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "POS"   , 1, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11SLBox, pos1), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "HUE"   , 0, DXGI_FORMAT_R32_FLOAT, 		    0, offsetof(struct D3D11SLBox, hue), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+		};
+		d3d11.slProgram = CreateProgram(STR(slCode), desc, ARRAYSIZE(desc), sizeof(D3D11SLBox));
 	}
 }
 
@@ -1372,6 +1534,36 @@ void D3D11UIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color
 		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
 
 	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Wave), &wave, sizeof(D3D11Wave));
+	d3d11.quadCount++;
+}
+
+void D3D11UIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {
+	D3D11Hue hue = {pos0, pos1, uv};
+	if (d3d11.currentProgram != &d3d11.hueProgram) {
+		FlushVertices();
+		d3d11.currentProgram = &d3d11.hueProgram;
+		DisableMultiSample();
+	}
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Hue), &hue, sizeof(D3D11Hue));
+	d3d11.quadCount++;
+}
+
+void D3D11UIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
+	D3D11SLBox sl = {pos0, pos1, hue};
+	if (d3d11.currentProgram != &d3d11.slProgram) {
+		FlushVertices();
+		d3d11.currentProgram = &d3d11.slProgram;
+		DisableMultiSample();
+	}
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11SLBox), &sl, sizeof(D3D11SLBox));
 	d3d11.quadCount++;
 }
 
