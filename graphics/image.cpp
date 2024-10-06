@@ -105,3 +105,31 @@ Color HSL(float32 h, float32 s, float32 l, float32 a = 1) {
 	             		 a};
 }
 
+void ToHSL(Color color, float32* h, float32* s, float32* l) {
+	float32 maxC = max(max(color.r, color.g), color.b);
+	float32 minC = min(min(color.r, color.g), color.b);
+
+	*l = (maxC + minC) / 2;
+
+	if (maxC == minC) {
+	    *h = 0;
+	    *s = 0;
+	    return;
+	}
+
+	float32 d = maxC - minC;
+	*s = *l > 0.5f 
+		? d / (2 - maxC - minC) 
+		: d / (maxC + minC);
+		
+	if (maxC == color.r) { 
+		*h = (color.g - color.b) / d + (color.g < color.b ? 6 : 0); 
+	}
+	else if (maxC == color.g) { 
+		*h = (color.b - color.r) / d + 2; 
+	}
+	else {
+		*h = (color.r - color.g) / d + 4; 
+	} 
+	*h /= 6;
+}

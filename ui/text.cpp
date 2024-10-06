@@ -1,12 +1,8 @@
-/*
- * TODO:
- * 1. scroll
- * 2. more text flags: numbers only/integer numbers only
- */
-
+// TODO: should wrap is a separate concern than what input is allowed
 enum UITextFlags: uint32 {
 	UIText_SingleLine = (1 << 1),
 	UIText_Wrap       = (1 << 2),
+	UIText_DigitsOnly = (1 << 3),
 };
 
 struct UITextBox {
@@ -14,17 +10,18 @@ struct UITextBox {
 		struct {float32 x, y, width, height;};
 		struct {Point2 pos; Dimensions2 dim;};
 	};
-	Point2 pad;
 	Point2 scroll;
 
 	StringList data;
-	BakedFont* font;
 	UITextFlags flags;
 };
 
 struct UIText {
 	UITextBox* boxes;
 	int32 count;
+
+	BakedFont* font;
+	Point2 pad;
 
 	UITextBox* active;
 	UITextBox* hover;
@@ -33,14 +30,15 @@ struct UIText {
 	StringListPos head;
 	StringListPos tail;
 	StringListPos tors;
-	FixedSize allocator;
-	BigBuffer buffer;
+
+	FixedSize* allocator;
+	BigBuffer* buffer;
 };
 
 void CopySelectedTextToClipboard(UIText* text) {
 	String str = StringListPosCompare(text->tail, text->head)
-		? StringListToTempString(text->tail, text->head, &text->buffer)
-		: StringListToTempString(text->head, text->tail, &text->buffer);
+		? StringListToTempString(text->tail, text->head, text->buffer)
+		: StringListToTempString(text->head, text->tail, text->buffer);
 
 	OSCopyToClipboard(str);
 }
@@ -49,17 +47,18 @@ void DeleteSelectedText(UIText* text) {
 	UITextBox* textbox = text->active;
 	StringList* list = &textbox->data;
 	text->head = StringListDelete(list, text->tail, text->head, 
-		&text->allocator, &text->buffer);
+		text->allocator, text->buffer);
 	text->tail = text->head; 
 }
 
 void InsertText(void* data, String newString) {
 	UIText* text = (UIText*)data;
 	StringList* list = &text->active->data;
-	text->head = StringListInsert(list, newString, text->tail, text->head, &text->allocator, &text->buffer);
+	text->head = StringListInsert(list, newString, text->tail, text->head, text->allocator, text->buffer);
 	text->tail = text->head; 
 }
 
+// TODO: scroll!!!!!!!
 bool UITextProcessEvent(UIText* text, OSEvent event) {
 	switch (event.type) {
 
@@ -72,7 +71,7 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 
 			if (InBounds(textbox->pos, textbox->dim, cursor)) {
 				bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
-				text->head = GetCharPos(cursor - textbox->pos, textbox->font, textbox->data, shouldWrap, textbox->width - textbox->pad.x);
+				text->head = GetCharPos(cursor - textbox->pos, text->font, textbox->data, shouldWrap, textbox->width - text->pad.x);
 			}
 
 			OSSetCursorIcon(CUR_TEXT);
@@ -84,11 +83,11 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 				if (InBounds(textbox->pos, textbox->dim, event.mouse.cursorPos + 0.5f)) {
 
 					bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
-					float32 relx = cursor.x - (textbox->x + textbox->pad.x);
-					float32 rely = cursor.y - (textbox->y + textbox->pad.y);
+					float32 relx = cursor.x - (textbox->x + text->pad.x);
+					float32 rely = cursor.y - (textbox->y + text->pad.y);
 					
 					text->hover = textbox;
-					text->tors = GetCharPos({relx, rely}, textbox->font, textbox->data, shouldWrap, textbox->width - textbox->pad.x);
+					text->tors = GetCharPos({relx, rely}, text->font, textbox->data, shouldWrap, textbox->width - text->pad.x);
 					OSSetCursorIcon(CUR_TEXT);
 					return true;
 				}
@@ -197,10 +196,10 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 			}
 
 			bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
-			TextMetrics metrics = GetTextMetrics(textbox->font, textbox->data, text->head, shouldWrap, textbox->width - textbox->pad.x);
-			text->head = GetCharPos({metrics.x, metrics.y - 2*textbox->font->height},
-									textbox->font, textbox->data, 
-								  	shouldWrap, textbox->width - textbox->pad.x);
+			TextMetrics metrics = GetTextMetrics(text->font, textbox->data, text->head, shouldWrap, textbox->width - text->pad.x);
+			text->head = GetCharPos({metrics.x, metrics.y - 2*text->font->height},
+									text->font, textbox->data, 
+								  	shouldWrap, textbox->width - text->pad.x);
 
 			if (!event.keyboard.shiftIsDown)
 				text->tail = text->head;
@@ -213,10 +212,10 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 			}
 
 			bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
-			TextMetrics metrics = GetTextMetrics(textbox->font, textbox->data, text->head, shouldWrap, textbox->width - textbox->pad.x);
+			TextMetrics metrics = GetTextMetrics(text->font, textbox->data, text->head, shouldWrap, textbox->width - text->pad.x);
 			text->head = GetCharPos({metrics.x, metrics.y},
-									textbox->font, textbox->data, 
-								  	shouldWrap, textbox->width - textbox->pad.x);
+									text->font, textbox->data, 
+								  	shouldWrap, textbox->width - text->pad.x);
 
 			if (!event.keyboard.shiftIsDown)
 				text->tail = text->head;
@@ -296,16 +295,32 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 		UITextBox* textbox = text->active;
 
 		byte b = event.keyboard.character;
-		if (b == 10 && (textbox->flags & UIText_SingleLine)) {
+		if (!IsDigit(b) && (textbox->flags & UIText_DigitsOnly)) {
+			// nothing
+		}
+		else if (b == 10 && (textbox->flags & UIText_SingleLine)) {
 			// nothing
 		}
 		else {
 			text->head = StringListInsert(&textbox->data, {&b, 1}, text->tail, text->head, 
-				&text->allocator, &text->buffer);
+				text->allocator, text->buffer);
 			text->tail = text->head;
+			return true;
 		}
 	} break;
 	}
 
 	return false;
+}
+
+void UITextReplaceData(UIText* text, UITextBox* textbox, String data) {
+	StringListReplace(&textbox->data, data, text->allocator);
+}
+
+uint64 UITextGetUnsigned(UIText* text, UITextBox* textbox) {
+	if (textbox->data.length == 0)
+		return 0;
+
+	String data = StringListToTempString(textbox->data, text->buffer);
+	return ParseUInt64(data);
 }

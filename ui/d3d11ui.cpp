@@ -613,10 +613,17 @@ R"STRING(
 		};
 		float2 pixel_pos = pixel_poses[input.vertexId];
 		output.pos = mul(mvp, float4(pixel_pos, 0, 1));
+
+		float xInvStep = abs(input.pos1.x - input.pos0.x) - 1;
+		float yInvStep = abs(input.pos1.y - input.pos0.y) - 1;
 		
 		output.hsl.x = input.hue;
-		output.hsl.y = (float)((input.vertexId & 2) >> 1);
-		output.hsl.z = (float)(input.vertexId & 1);
+		output.hsl.y = input.vertexId & 2
+			? 1.f + (1/(2*xInvStep))
+			: 0.f - (1/(2*xInvStep));
+		output.hsl.z = input.vertexId & 1
+			? 1.f + (1/(2*yInvStep))
+			: 0.f - (1/(2*yInvStep));
 
 		return output;
 	}

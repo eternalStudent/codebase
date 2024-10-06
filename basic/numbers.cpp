@@ -140,6 +140,16 @@ inline float32 exp2(int32 exp) {
 	return cvt.f;
 }
 
+inline float32 saturate(float32 value) {
+	if (value < 0)
+		return 0;
+
+	if (value > 1)
+		return 1;
+	
+	return value;
+}
+
 #ifndef _MATH_ALREADY_DEFINED_
 
 inline float32 sqrt(float32 value) {

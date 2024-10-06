@@ -18,6 +18,31 @@ void DestroyStringList(StringList* list, FixedSize* allocator) {
 	list->last = NULL;
 }
 
+void StringListReplace(StringList* list, String string, FixedSize* allocator) {
+	if (string.length == 0 && list->length == 0) {
+		return;
+	}
+
+	if (string.length == 0) {
+		DestroyStringList(list, allocator);
+		*list = {};
+		return;
+	}
+
+	if (list->length == 0) {
+		*list = CreateStringList(string, allocator);
+		return;
+	}
+
+	StringNode* node = list->first->next;
+	while (node) {
+		StringNode* next = node->next;
+		FixedSizeFree(allocator, node);
+		node = next;
+	}
+	list->first->string = string;
+}
+
 void StringListAppend(StringList* list, StringNode* node) {
 	if (node->string.length == 0) return;
 	LINKEDLIST_ADD(list, node);
