@@ -73,36 +73,44 @@ Color HSL(float32 h, float32 s, float32 l, float32 a = 1) {
 		return {l, l, l, a};
 
 	float32 hh = 12*h;
-	// TODO: fmod, and saturate
-	if (hh <  2) return {l + d, 
-						 l - d*(1 - hh), 
-						 l - d, 
-						 a};
+	float32 r, g, b;
+	if (hh <  2) {
+		r = l + d;
+		g = l - d*(1 - hh); 
+		b = l - d;
+	}
 
-	if (hh <  4) return {l - d*(-3 + hh),
-						 l + d,
-						 l - d,
-						 a};
+	else if (hh <  4) {
+		r = l - d*(-3 + hh);
+		g = l + d;
+		b = l - d;
+	}
 
-	if (hh <  6) return {l - d,
-						 l + d,
-						 l - d*(5 - hh), 
-						 a};
+	else if (hh <  6) {
+		r = l - d;
+		g = l + d;
+		b = l - d*(5 - hh); 
+	}
 
-	if (hh <  8) return {l - d,
-						 l - d*(-7 + hh),
-						 l + d, 
-						 a};
+	else if (hh <  8) {
+		r = l - d;
+		g = l - d*(-7 + hh);
+		b = l + d;
+	}
 
-	if (hh < 10) return {l - d*(9 - hh),
-						 l - d,
-						 l + d, 
-						 a};
+	else if (hh < 10) {
+		r = l - d*(9 - hh);
+		g = l - d;
+		b = l + d; 
+	}
 
-	             return {l + d,
-	             		 l - d, 
-	             		 l - d*(-11 + hh), 
-	             		 a};
+	else {
+		r = l + d;
+	    g = l - d; 
+	    b = l - d*(-11 + hh);
+	}
+
+	return {saturate(r), saturate(g), saturate(b), a};
 }
 
 void ToHSL(Color color, float32* h, float32* s, float32* l) {
@@ -121,7 +129,7 @@ void ToHSL(Color color, float32* h, float32* s, float32* l) {
 	*s = *l > 0.5f 
 		? d / (2 - maxC - minC) 
 		: d / (maxC + minC);
-		
+
 	if (maxC == color.r) { 
 		*h = (color.g - color.b) / d + (color.g < color.b ? 6 : 0); 
 	}

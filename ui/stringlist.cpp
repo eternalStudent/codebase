@@ -40,7 +40,11 @@ void StringListReplace(StringList* list, String string, FixedSize* allocator) {
 		FixedSizeFree(allocator, node);
 		node = next;
 	}
-	list->first->string = string;
+	node = list->first;
+	node->next = NULL;
+	node->prev = NULL;
+	node->string = string;
+	*list = {node, node, string.length};
 }
 
 void StringListAppend(StringList* list, StringNode* node) {

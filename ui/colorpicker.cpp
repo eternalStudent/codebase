@@ -62,29 +62,45 @@ void UIColorPickerInit(UIColorPicker* picker, BakedFont* font, FixedSize* alloca
 
 	for (int32 i = 0; i < 6; i++) {
 		picker->boxes[i].flags = UIText_DigitsOnly;
-		
+
 		// TODO: not sure that I should set this here
 		picker->boxes[i].dim = {48, font->height + 4};
 	}
+}
+
+Color UIColorPickerGetColor(UIColorPicker* picker) {
+	return HSL(picker->h, picker->s, picker->l);
 }
 
 void UIColorPickerSetText(UIColorPicker* picker, Color rgb) {
 	ssize length;
 	UIText* text = &picker->text;
 
-	length = UnsignedToDecimal((int64)round(360*picker->h), picker->smallBuffer);
-	UITextReplaceData(text, text->boxes + 0, {picker->smallBuffer, length});
-	length = UnsignedToDecimal((int64)round(100*picker->s), picker->smallBuffer + 3);
-	UITextReplaceData(text, text->boxes + 1, {picker->smallBuffer + 3, length});
-	length = UnsignedToDecimal((int64)round(100*picker->l), picker->smallBuffer + 6);
-	UITextReplaceData(text, text->boxes + 2, {picker->smallBuffer + 6, length});
+	if (text->active != &picker->hText) {
+		length = UnsignedToDecimal((int64)round(360*picker->h), picker->smallBuffer);
+		UITextReplaceData(text, &picker->hText, {picker->smallBuffer, length});
+	}
+	if (text->active != &picker->sText) {
+		length = UnsignedToDecimal((int64)round(100*picker->s), picker->smallBuffer + 4);
+		UITextReplaceData(text, &picker->sText, {picker->smallBuffer + 4, length});
+	}
+	if (text->active != &picker->lText) {
+		length = UnsignedToDecimal((int64)round(100*picker->l), picker->smallBuffer + 8);
+		UITextReplaceData(text, &picker->lText, {picker->smallBuffer + 8, length});
+	}
 
-	length = UnsignedToDecimal((int64)round(255*rgb.r), picker->smallBuffer + 9);
-	UITextReplaceData(text, text->boxes + 3, {picker->smallBuffer + 9, length});
-	length = UnsignedToDecimal((int64)round(255*rgb.g), picker->smallBuffer + 12);
-	UITextReplaceData(text, text->boxes + 4, {picker->smallBuffer + 12, length});
-	length = UnsignedToDecimal((int64)round(255*rgb.b), picker->smallBuffer + 15);
-	UITextReplaceData(text, text->boxes + 5, {picker->smallBuffer + 15, length});
+	if (text->active != &picker->rText) {
+		length = UnsignedToDecimal((int64)round(255*rgb.r), picker->smallBuffer + 12);
+		UITextReplaceData(text, &picker->rText, {picker->smallBuffer + 12, length});
+	}
+	if (text->active != &picker->gText) {
+		length = UnsignedToDecimal((int64)round(255*rgb.g), picker->smallBuffer + 16);
+		UITextReplaceData(text, &picker->gText, {picker->smallBuffer + 16, length});
+	}
+	if (text->active != &picker->bText) {
+		length = UnsignedToDecimal((int64)round(255*rgb.b), picker->smallBuffer + 20);
+		UITextReplaceData(text, &picker->bText, {picker->smallBuffer + 20, length});
+	}
 }
 
 bool UIColorPickerProcessEvent(UIColorPicker* picker, OSEvent event) {
