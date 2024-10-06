@@ -117,6 +117,10 @@ bool UIColorPickerProcessEvent(UIColorPicker* picker, OSEvent event) {
 
 		UIColorPickerSetText(picker, rgb);
 
+		if (picker->mixer.active) {
+			text->active = NULL;
+		}
+
 		return true;
 	}
 
