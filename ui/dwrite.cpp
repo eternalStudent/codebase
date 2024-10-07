@@ -6,7 +6,7 @@ struct {
 	IDWriteBitmapRenderTarget* renderTarget;
 } dwrite;
 
-void DWriteInit(UINT32 width, UINT32 height) {
+void DWriteInit(UINT32 width, UINT32 height, BOOL linearRendering) {
 	HRESULT hr;
 
 	hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&dwrite.factory);
@@ -19,7 +19,7 @@ void DWriteInit(UINT32 width, UINT32 height) {
 	FLOAT gamma = baseRenderingParams->GetGamma();
 	FLOAT enhanced_contrast = baseRenderingParams->GetEnhancedContrast();
 	hr = dwrite.factory->CreateCustomRenderingParams(
-		gamma,
+		linearRendering ? 1 : gamma,
 		enhanced_contrast,
 		0,
 		DWRITE_PIXEL_GEOMETRY_FLAT,
@@ -75,6 +75,7 @@ void DWriteGetScaledFontMetrics(
 	FLOAT* ascent,
 	FLOAT* descent,
 	FLOAT* lineGap,
+	FLOAT* xHeight,
 	FLOAT* emSize,
 	FLOAT* pixelsPerDesignUnits) {
 
@@ -97,6 +98,7 @@ void DWriteGetScaledFontMetrics(
 	*ascent = *pixelsPerDesignUnits*fontMetrics.ascent;
 	*descent = *pixelsPerDesignUnits*fontMetrics.descent;
 	*lineGap = *pixelsPerDesignUnits*fontMetrics.lineGap;
+	*xHeight = *pixelsPerDesignUnits*fontMetrics.xHeight;
 }
 
 //-----------------------------------
@@ -120,6 +122,7 @@ BakedFont DWriteBakeFont(
 		&font.ascent,
 		&font.descent,
 		&font.lineGap,
+		&font.xHeight,
 		&emSize,
 		&pixelsPerDesignUnits);
 
@@ -267,6 +270,7 @@ BakedFont DWriteBakeFont(
 		&font.ascent,
 		&font.descent,
 		&font.lineGap,
+		&font.xHeight,
 		&emSize,
 		&pixelsPerDesignUnits);
 
@@ -395,6 +399,7 @@ BakedFont DWriteBakeFont(
 		&font.ascent,
 		&font.descent,
 		&font.lineGap,
+		&font.xHeight,
 		&emSize,
 		&pixelsPerDesignUnits);
 

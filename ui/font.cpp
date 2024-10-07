@@ -15,6 +15,7 @@ struct BakedFont {
 	float32 ascent;
 	float32 descent;
 	float32 lineGap;
+	float32 xHeight;
 
 	// TODO: I'm not really using this for custom ranges
 	//       Let's rename/delete/replace
