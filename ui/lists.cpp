@@ -1,5 +1,5 @@
 /*
- *  NOTE: for contextmenu, autocomplete, combobox and deopdown
+ *  NOTE: for contextmenu, autocomplete, combobox and dropdown
  */
 
 struct UIList {
@@ -12,6 +12,9 @@ struct UIList {
 
 	int32 count;
 	int32 selected;
+
+	// NOTE: this is the selected when using dropdown
+	// TODO: maybe come up with better names
 	int32 former;
 
 	float32 grabPos;
