@@ -106,8 +106,8 @@ Color HSL(float32 h, float32 s, float32 l, float32 a = 1) {
 
 	else {
 		r = l + d;
-	    g = l - d; 
-	    b = l - d*(-11 + hh);
+		g = l - d; 
+		b = l - d*(-11 + hh);
 	}
 
 	return {saturate(r), saturate(g), saturate(b), a};
@@ -120,9 +120,9 @@ void ToHSL(Color color, float32* h, float32* s, float32* l) {
 	*l = (maxC + minC) / 2;
 
 	if (maxC == minC) {
-	    *h = 0;
-	    *s = 0;
-	    return;
+		*h = 0;
+		*s = 0;
+		return;
 	}
 
 	float32 d = maxC - minC;

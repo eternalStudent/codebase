@@ -1,4 +1,6 @@
-// TODO: should wrap is a separate concern than what input is allowed
+// TODO: allow for cached font
+
+// TODO: wrap/no-wrap is a separate concern than what input is allowed
 enum UITextFlags: uint32 {
 	UIText_SingleLine = (1 << 1),
 	UIText_Wrap       = (1 << 2),
@@ -71,7 +73,7 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 
 			if (InBounds(textbox->pos, textbox->dim, cursor)) {
 				bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
-				text->head = GetCharPos(cursor - textbox->pos, text->font, textbox->data, shouldWrap, textbox->width - text->pad.x);
+				text->head = FontGetCharPos(cursor - textbox->pos, text->font, textbox->data, shouldWrap, textbox->width - text->pad.x);
 			}
 
 			OSSetCursorIcon(CUR_TEXT);
@@ -87,7 +89,7 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 					float32 rely = cursor.y - (textbox->y + text->pad.y);
 					
 					text->hover = textbox;
-					text->tors = GetCharPos({relx, rely}, text->font, textbox->data, shouldWrap, textbox->width - text->pad.x);
+					text->tors = FontGetCharPos({relx, rely}, text->font, textbox->data, shouldWrap, textbox->width - text->pad.x);
 					OSSetCursorIcon(CUR_TEXT);
 					return true;
 				}
@@ -197,7 +199,7 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 
 			bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
 			TextMetrics metrics = GetTextMetrics(text->font, textbox->data, text->head, shouldWrap, textbox->width - text->pad.x);
-			text->head = GetCharPos({metrics.x, metrics.y - 2*text->font->height},
+			text->head = FontGetCharPos({metrics.x, metrics.y - 2*text->font->height},
 									text->font, textbox->data, 
 								  	shouldWrap, textbox->width - text->pad.x);
 
@@ -213,7 +215,7 @@ bool UITextProcessEvent(UIText* text, OSEvent event) {
 
 			bool shouldWrap = (textbox->flags & UIText_Wrap) == UIText_Wrap;
 			TextMetrics metrics = GetTextMetrics(text->font, textbox->data, text->head, shouldWrap, textbox->width - text->pad.x);
-			text->head = GetCharPos({metrics.x, metrics.y},
+			text->head = FontGetCharPos({metrics.x, metrics.y},
 									text->font, textbox->data, 
 								  	shouldWrap, textbox->width - text->pad.x);
 

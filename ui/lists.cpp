@@ -163,6 +163,15 @@ bool UIDropDownProcessEvent(UIDropDown* dropdown, OSEvent event) {
 
 			return true;
 		}
+		
+		if (dropdown->options.isVisible 
+					&& 
+			!InBounds(dropdown->options.pos, dropdown->options.dim, cursor)) {
+
+			dropdown->options.isVisible = false;
+
+			return false;
+		}
 	}
 
 	return UIListProcessEvent(&dropdown->options, event);
