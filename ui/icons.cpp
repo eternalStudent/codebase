@@ -581,3 +581,7 @@ enum IconCodepoint : uint32 {
 	Icon_angle_up    = 61702,
 	Icon_angle_down  = 61703,
 };
+
+FontFace* FontLoadIconsFontFace() {
+	return FontLoadFontFaceFromMemory(icon_font_data, sizeof(icon_font_data));
+}
