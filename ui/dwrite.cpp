@@ -1,9 +1,87 @@
 #include <dwrite.h>
 
+
+struct InMemoryFontFileStream : IDWriteFontFileStream {
+
+	byte* data;
+	ssize size;
+
+	HRESULT ReadFileFragment(const void** fragmentStart,
+							 UINT64 fileOffset,
+							 UINT64 fragmentSize,
+							 void** fragmentContext) override {
+
+		*fragmentStart = data + fileOffset;
+
+		return S_OK;
+	}
+
+	void ReleaseFileFragment(void* fragmentContext) override {
+		// nothing
+	}
+
+	HRESULT GetFileSize(UINT64* fileSize) override {
+		*fileSize = size;
+		return S_OK;
+	}
+
+	HRESULT GetLastWriteTime(UINT64* lastWriteTime) override {
+		*lastWriteTime = 0;
+		return S_OK;
+	}
+
+	ULONG AddRef() override {
+		return 1;
+	}
+
+	HRESULT QueryInterface(REFIID riid, void** object) override {
+		return E_NOINTERFACE;
+	}
+
+	ULONG Release() override {
+		return 1;
+	}
+};
+
+struct InMemoryFontFileLoader : public IDWriteFontFileLoader {
+
+	InMemoryFontFileStream _fontFileStream;
+
+	InMemoryFontFileLoader(){}
+
+	HRESULT CreateStreamFromKey(const void* fontFileReferenceKey,
+								UINT32 fontFileReferenceKeySize,
+								IDWriteFontFileStream** fontFileStream) override {
+
+		*fontFileStream = &_fontFileStream;
+
+		return S_OK;
+	}
+
+	ULONG AddRef() override {
+		return 1;
+	}
+
+	HRESULT QueryInterface(REFIID riid, void** object) override {
+		return E_NOINTERFACE;
+	}
+
+	ULONG Release() override {
+		return 1;
+	}
+
+	// Custom implementation of placement new
+	inline void* operator new(size_t, void* ptr) noexcept {
+	    return ptr;
+	}
+};
+
 struct {
 	IDWriteFactory* factory;
 	IDWriteRenderingParams* renderingParams;
 	IDWriteBitmapRenderTarget* renderTarget;
+	InMemoryFontFileLoader* fontFileLoader;
+	byte fontFileLoader_bytes[sizeof(InMemoryFontFileLoader)];
 } dwrite;
 
 void DWriteInit(BOOL linearRendering) {
@@ -36,6 +114,10 @@ void DWriteInit(BOOL linearRendering) {
 	hr = gdiInterop->CreateBitmapRenderTarget(NULL, width, height, &dwrite.renderTarget);
 	ASSERT_HR(hr);
 
+	dwrite.fontFileLoader = new (dwrite.fontFileLoader_bytes) InMemoryFontFileLoader();
+	hr = dwrite.factory->RegisterFontFileLoader((IDWriteFontFileLoader*)dwrite.fontFileLoader);
+	ASSERT_HR(hr);
+
 	baseRenderingParams->Release();
 	gdiInterop->Release();
 }
@@ -64,6 +146,23 @@ IDWriteFontFace* DWriteLoadDefaultFontFace() {
 	COPY(L"\\Fonts\\consola.ttf", ptr);
 	
 	return DWriteLoadFontFace(filePath);
+}
+
+IDWriteFontFace* DWriteLoadFontFaceFromMemory(byte* buffer, ssize size) {
+	dwrite.fontFileLoader->_fontFileStream.data = buffer;
+	dwrite.fontFileLoader->_fontFileStream.size = size;
+
+	IDWriteFontFile* fontFile;
+	HRESULT hr = dwrite.factory->CreateCustomFontFileReference((void*)1337, 0, (IDWriteFontFileLoader*)dwrite.fontFileLoader, &fontFile);
+	ASSERT_HR(hr);
+	
+	IDWriteFontFace* fontFace;
+	hr = dwrite.factory->CreateFontFace(DWRITE_FONT_FACE_TYPE_TRUETYPE, 1, &fontFile, 0, DWRITE_FONT_SIMULATIONS_NONE, &fontFace);
+	ASSERT_HR(hr);
+
+	fontFile->Release();
+
+	return fontFace;
 }
 
 void DWriteGetScaledFontMetrics(

@@ -29,14 +29,15 @@ void GlyphCacheInit() {
 
 #if _OS_WINDOWS
 #  include "dwrite.cpp"
-#  define FontFace 		    		IDWriteFontFace
-#  define FontInit 					DWriteInit
-#  define FontLoadFontFace			DWriteLoadFontFace
-#  define FontLoadDefaultFontFace	DWriteLoadDefaultFontFace
-#  define FontGetGlyphIndex 		DWriteGetGlyphIndex
-#  define ScaledFont 				DWriteScaledFont
-#  define FontGetScaledFont			DWriteGetScaledFont
-#  define FontBakeGlyph 			DWriteBakeGlyph
+#  define FontFace 		    			IDWriteFontFace
+#  define FontInit 						DWriteInit
+#  define FontLoadFontFace				DWriteLoadFontFace
+#  define FontLoadDefaultFontFace		DWriteLoadDefaultFontFace
+#  define FontLoadFontFaceFromMemory 	DWriteLoadFontFaceFromMemory
+#  define FontGetGlyphIndex 			DWriteGetGlyphIndex
+#  define ScaledFont 					DWriteScaledFont
+#  define FontGetScaledFont				DWriteGetScaledFont
+#  define FontBakeGlyph 				DWriteBakeGlyph
 #else
 // TODO:
 #endif
@@ -109,6 +110,27 @@ float32 FontGetGlyphWidth(ScaledFont* font, uint32 codepoint) {
 float32 FontDrawGlyph(Point2 pos, CachedGlyph glyph, Color color) {
 
 	float32 round_y = round(pos.y + glyph.yoff);
+	float32 round_x = round(pos.x + glyph.xoff);
+	
+	float32 width = (float32)(glyph.x1 - glyph.x0);
+	float32 height = (float32)(glyph.y1 - glyph.y0);
+	pos = {round_x, round_y};
+	
+	Box2 crop = {
+		(float32)glyph.x0,
+		(float32)glyph.y0,
+		(float32)glyph.x1,
+		(float32)glyph.y1
+	};
+	
+	GfxDrawGlyph(pos, {width, height}, crop, color);
+	return glyph.xadvance;
+}
+
+float32 FontDrawGlyph(Point2 pos, ScaledFont* font, uint32 codepoint, Color color) {
+	CachedGlyph glyph = FontGetGlyph(font, codepoint);
+
+	float32 round_y = round(pos.y + glyph.yoff + font->ascent);
 	float32 round_x = round(pos.x + glyph.xoff);
 	
 	float32 width = (float32)(glyph.x1 - glyph.x0);

@@ -41,11 +41,12 @@ BakedAtlasBitmap CreateAtlasBitmap(int32 width, int32 height, byte* buffer) {
 
 #if _OS_WINDOWS
 #  include "dwrite.cpp"
-#  define FontFace 		    		IDWriteFontFace
-#  define FontInit 					DWriteInit
-#  define FontLoadFontFace			DWriteLoadFontFace
-#  define FontLoadDefaultFontFace	DWriteLoadDefaultFontFace
-#  define FontBakeFont				DWriteBakeFont
+#  define FontFace 		    			IDWriteFontFace
+#  define FontInit 						DWriteInit
+#  define FontLoadFontFace				DWriteLoadFontFace
+#  define FontLoadDefaultFontFace		DWriteLoadDefaultFontFace
+#  define FontLoadFontFaceFromMemory 	DWriteLoadFontFaceFromMemory
+#  define FontBakeFont					DWriteBakeFont
 #else
 // TODO:
 #endif
