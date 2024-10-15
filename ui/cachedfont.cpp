@@ -595,3 +595,88 @@ void FontDrawTextSelection(Point2 pos,
 		GfxDrawSolidColorQuad(selection, {2, font->height}, caretColor);
 	}
 }
+
+//-------------------------------------------------------
+
+bool IsStartOfLine(TextMetrics metrics, 
+				   ScaledFont* font,
+				   StringListPos start, 
+				   bool shouldWrap, 
+				   float32 x1) {
+
+	if (metrics.lastCharIsNewLine)
+		return true;
+	if (!shouldWrap || !metrics.lastCharIsWhiteSpace) 
+		return false;
+	String string = start.node->string;
+	uint32 codepoint;
+	UTF8Decode(string.data, string.data + string.length, &codepoint);
+	if (IsWhiteSpace(codepoint)) 
+		return false;
+	float32 wordWidth = FontGetWordWidth(font, start);
+	return x1 <= metrics.x + wordWidth;
+}
+
+TextMetrics NextTextMetrics(TextMetrics metrics, 
+							ScaledFont* font, 
+							StringListPos pos,
+							bool shouldWrap, 
+							float32 x1) {
+
+	if (metrics.lastCharIsNewLine) {
+		metrics.x = 0;
+		metrics.y += font->height + font->lineGap;
+	}
+	String string = pos.node->string;
+	uint32 codepoint;
+	UTF8Decode(string.data + pos.index, string.data + string.length, &codepoint);
+	bool whiteSpace = IsWhiteSpace(codepoint);
+	if (shouldWrap && metrics.lastCharIsWhiteSpace && !whiteSpace) {
+		float32 wordWidth = FontGetWordWidth(font, pos);
+		if (x1 <= metrics.x + wordWidth) {
+			metrics.maxx = MAX(metrics.maxx, metrics.x);
+			metrics.x = 0;
+			metrics.y += font->height + font->lineGap;
+		}
+	}
+	metrics.x += FontGetGlyphWidth(font, codepoint);
+	metrics.maxx = MAX(metrics.x, metrics.maxx);
+	metrics.lastCharIsNewLine = codepoint == 10;
+	metrics.lastCharIsWhiteSpace = whiteSpace;
+	return metrics;
+}
+
+TextMetrics GetTextMetrics(ScaledFont* font, 
+						   StringList list, 
+						   StringListPos end, 
+						   bool shouldWrap = false, 
+						   float32 x1 = 0) {
+	
+	TextMetrics metrics = {};
+	metrics.y = font->height;
+
+	if (list.length == 0) return metrics;
+
+	LINKEDLIST_FOREACH(&list, StringNode, node) {
+		String string = node->string;
+		byte* dataEnd = node == end.node ? string.data + end.index : string.data + string.length;
+		uint32 codepoint;
+		ssize bytesToEncode;
+		for (byte* data = string.data; data < dataEnd; data += bytesToEncode) {
+			bytesToEncode = UTF8Decode(data, dataEnd, &codepoint);
+			metrics = NextTextMetrics(metrics, font, {node, data - string.data}, shouldWrap, x1);
+		}
+		if (node == end.node) break;
+	}
+
+	return metrics;
+}
+
+TextMetrics GetTextMetrics(ScaledFont* font, 
+						   StringList list, 
+						   bool shouldWrap = false, 
+						   float32 x1 = 0) {
+
+	if (list.length == 0) return {};
+	return GetTextMetrics(font, list, {list.last, list.last->string.length}, shouldWrap, x1);
+}

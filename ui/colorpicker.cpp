@@ -38,7 +38,13 @@ struct UIColorPicker {
 	byte smallBuffer[24];
 };
 
-void UIColorPickerInit(UIColorPicker* picker, BakedFont* font, FixedSize* allocator, BigBuffer* bigBuffer) {
+void UIColorPickerInit(UIColorPicker* picker, 
+#if FONT_CACHED
+	ScaledFont* font,
+#else
+	BakedFont* font, 
+#endif
+	FixedSize* allocator, BigBuffer* bigBuffer) {
 	memset(picker, 0, sizeof(UIColorPicker));
 	picker->mixer.handles = picker->handles;
 	picker->mixer.boundaries = picker->boundaries;

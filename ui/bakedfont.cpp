@@ -544,19 +544,6 @@ void FontDrawTextSelection(Point2 pos,
 	}
 }
 
-//---------------------------------------
-
-struct TextMetrics {
-	union {
-		struct {float32 x, y;};
-		Point2 pos;
-	};
-
-	float32 maxx;
-	bool lastCharIsWhiteSpace;
-	bool lastCharIsNewLine;
-};
-
 //-----------------------------------------------
 
 bool IsStartOfLine(TextMetrics metrics, 

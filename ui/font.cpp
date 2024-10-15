@@ -1,3 +1,14 @@
+struct TextMetrics {
+	union {
+		struct {float32 x, y;};
+		Point2 pos;
+	};
+
+	float32 maxx;
+	bool lastCharIsWhiteSpace;
+	bool lastCharIsNewLine;
+};
+
 #if FONT_BAKED
 #  include "bakedfont.cpp"
 #endif

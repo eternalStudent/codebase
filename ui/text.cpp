@@ -22,7 +22,11 @@ struct UIText {
 	UITextBox* boxes;
 	int32 count;
 
+#if FONT_CACHED
+	ScaledFont* font;
+#elif FONT_BAKED
 	BakedFont* font;
+#endif
 	Point2 pad;
 
 	UITextBox* active;
