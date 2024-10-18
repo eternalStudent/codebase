@@ -6,8 +6,8 @@ struct CachedGlyph {
 	float32 xoff, yoff, xadvance;
 };
 
-// TODO: is 1103 large enough?
-#define GLYPH_CACHE_SIZE 1103
+// TODO: is 10103 large enough?
+#define GLYPH_CACHE_SIZE 10103
 static CachedGlyph glyphTable[GLYPH_CACHE_SIZE];
 
 struct {

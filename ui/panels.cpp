@@ -87,80 +87,78 @@ struct UIPanelManager {
 	FixedSize allocator;
 };
 
-void UIPanelSplit(FixedSize* allocator, UIPanel* parent, UIAlignement align, float32 splitPoint) {
-	parent->a = (UIPanel*)FixedSizeAlloc(allocator);
-	parent->b = (UIPanel*)FixedSizeAlloc(allocator);
-	parent->align = align;
-	parent->splitPoint = splitPoint;
-	parent->a->parent = parent;
-	parent->b->parent = parent;
+void UIPanelSplit(UIPanelManager* manager, UIPanel* oldParent, UIAlignement align, float32 splitPoint) {
+	FixedSize* allocator = &manager->allocator;
+	UIPanel* newParent = (UIPanel*)FixedSizeAlloc(allocator);
+	newParent->a = (UIPanel*)FixedSizeAlloc(allocator);
+	newParent->b = oldParent;
+	newParent->align = align;
+	newParent->splitPoint = splitPoint;
+	newParent->pos = oldParent->pos;
+	newParent->dim = oldParent->dim;
 
-	parent->b->data = parent->data;
-	parent->data = NULL;
-	parent->b->tabs = parent->tabs;
-	parent->b->scroll = parent->scroll;
-	LINKEDLIST_FOREACH(&(parent->b->tabs), UIPanel, tab) tab->parent = parent->b;
-}
-
-void UIPanelSplit(FixedSize* allocator, UIPanel* parent, UIAlignement align, UIPanel* panel) {
-	float32 dim = align == Align_Left || align == Align_Right ? panel->width : panel->height;
-	float32 parentDim = align == Align_Left || align == Align_Right ? parent->width : parent->height;
-
-	UIPanel* b = (UIPanel*)FixedSizeAlloc(allocator);	
-	if (parent->align == Align_Unaligned) {
-		b->data = parent->data;
-		parent->data = NULL;
-		b->tabs = parent->tabs;
-		b->scroll = parent->scroll;
-		LINKEDLIST_FOREACH(&(b->tabs), UIPanel, tab) tab->parent = b;
+	UIPanel* grandParent = oldParent->parent;
+	if (grandParent) {
+		if (grandParent->a == oldParent) grandParent->a = newParent;
+		else                             grandParent->b = newParent;
 	}
 	else {
-		b->align = parent->align;
-		b->splitPoint = parent->splitPoint;
-		b->data = parent->data;
-		b->tabs = parent->tabs;
-		b->scroll = parent->scroll;
-		LINKEDLIST_FOREACH(&(b->tabs), UIPanel, tab) tab->parent = b;
-		b->a = parent->a;
-		b->b = parent->b;
-		b->a->parent = b;
-		b->b->parent = b;
+		manager->root = newParent;
 	}
+	newParent->parent = grandParent;
 
-	parent->a = panel;
-	parent->b = b;
-	parent->splitPoint = MIN(dim, parentDim/2);
-	parent->a->parent = parent;
-	parent->b->parent = parent;
-	parent->align = align;
+	newParent->a->parent = newParent;
+	newParent->b->parent = newParent;
 }
 
-void UIPanelUndock(FixedSize* allocator, UIPanel* panel) {
+void UIPanelSplit(UIPanelManager* manager, UIPanel* oldParent, UIAlignement align, UIPanel* panel) {
+	FixedSize* allocator = &manager->allocator;
+	float32 dim = align == Align_Left || align == Align_Right ? panel->width : panel->height;
+	float32 parentDim = align == Align_Left || align == Align_Right ? oldParent->width : oldParent->height;
+	float32 splitPoint = min(dim, parentDim/2);
+
+	UIPanel* newParent = (UIPanel*)FixedSizeAlloc(allocator);
+	newParent->a = panel;
+	newParent->b = oldParent;
+	newParent->align = align;
+	newParent->splitPoint = splitPoint;
+	newParent->pos = oldParent->pos;
+	newParent->dim = oldParent->dim;
+
+	UIPanel* grandParent = oldParent->parent;
+	if (grandParent) {
+		if (grandParent->a == oldParent) grandParent->a = newParent;
+		else                             grandParent->b = newParent;
+	}
+	else {
+		manager->root = newParent;
+	}
+	newParent->parent = grandParent;
+
+	newParent->a->parent = newParent;
+	newParent->b->parent = newParent;
+}
+
+void UIPanelUndock(UIPanelManager* manager, UIPanel* panel) {
+	FixedSize* allocator = &manager->allocator;
 	UIPanel* parent = panel->parent;
 
 	if (parent->align != Align_Unaligned) {
 		UIPanel* sibling = parent->a == panel ? parent->b : parent->a;
-		if (sibling->align == Align_Unaligned) {
-			parent->align = Align_Unaligned;
-			parent->data = sibling->data;
-			parent->tabs = sibling->tabs;
-			parent->scroll = sibling->scroll;
-			LINKEDLIST_FOREACH(&(parent->tabs), UIPanel, tab) tab->parent = parent;
-			sibling->data = NULL;
-			parent->a = NULL;
-			parent->b = NULL;	
+		UIPanel* grand = parent->parent;
+		if (grand) {
+			if (grand->a == parent) grand->a = sibling;
+			else                    grand->b = sibling;
+			sibling->parent = grand;
 		}
 		else {
-			parent->align = sibling->align;
-			parent->splitPoint = sibling->splitPoint;
-			parent->a = sibling->a;
-			parent->b = sibling->b;
-			parent->a->parent = parent;
-			parent->b->parent = parent;
+			manager->root = sibling;
+			sibling->parent = NULL;
 		}
-
 		panel->parent = NULL;
-		FixedSizeFree(allocator, sibling);
+		sibling->pos = parent->pos;
+		sibling->dim = parent->dim;
+		FixedSizeFree(allocator, parent);
 	}
 	else {
 		LINKEDLIST_REMOVE(&(parent->tabs), panel);
@@ -174,24 +172,46 @@ void UIPanelUndock(FixedSize* allocator, UIPanel* panel) {
 
 		if (parent->tabs.count == 1) {
 			UIPanel* first = parent->tabs.first;
-			parent->data = first->data;
 			LINKEDLIST_REMOVE(&(parent->tabs), first);
-			if (parent->tabs.selected == first) parent->tabs.selected = parent->tabs.last;
-			FixedSizeFree(allocator, first);
+			parent->tabs.count = 0;
+			
+			UIPanel* grand = parent->parent;
+			if (grand) {
+				if (grand->a == parent) grand->a = first;
+				else                    grand->b = first;
+				first->parent = grand;
+			}
+			else {
+				manager->root = first;
+				first->parent = NULL;
+			}
+			FixedSizeFree(allocator, parent);
 		}
 	}
 }
 
-void UIPanelAddTab(FixedSize* allocator, UIPanel* panel, UIPanel* tab) {
+void UIPanelAddTab(UIPanelManager* manager, UIPanel* panel, UIPanel* tab) {
+	FixedSize* allocator = &manager->allocator;
 	if (!panel->tabs.first) {
-		UIPanel* first = (UIPanel*)FixedSizeAlloc(allocator);
-		LINKEDLIST_ADD(&(panel->tabs), first);
-		first->data = panel->data;
-		first->tabs = panel->tabs;
-		first->scroll = panel->scroll;
-		first->parent = panel;
-		panel->data = NULL;
-		panel->tabs.count = 1;
+		UIPanel* oldParent = panel;
+		UIPanel* newParent = (UIPanel*)FixedSizeAlloc(allocator);
+		UIPanel* grand = oldParent->parent;
+		if (grand) {
+			if (grand->a == oldParent) grand->a = newParent;
+			else                       grand->b = newParent;
+			newParent->parent = grand;    
+		}
+		else {
+			manager->root = newParent;
+			newParent->parent = NULL;
+		}
+		LINKEDLIST_ADD(&(newParent->tabs), panel);
+		newParent->tabs.count = 1;
+		newParent->align = Align_Unaligned;
+		newParent->pos = oldParent->pos;
+		newParent->dim = oldParent->dim;
+		panel->parent = newParent;
+		panel = newParent;
 	}
 
 	LINKEDLIST_ADD(&(panel->tabs), tab);
@@ -226,7 +246,7 @@ bool UIPanelsProcessEvent(UIPanelManager* manager, OSEvent event) {
 			if (manager->state == UIPS_Drag) {
 
 				if (panel->parent) {
-					UIPanelUndock(&manager->allocator, panel);
+					UIPanelUndock(manager, panel);
 					LINKEDLIST_ADD(&(manager->floating), panel);
 				}
 				panel->pos = manager->grabPos + cursor;
@@ -331,13 +351,13 @@ bool UIPanelsProcessEvent(UIPanelManager* manager, OSEvent event) {
 
 			else if (manager->hover == UIPH_Closing) {
 				if (panel->parent) {
-					UIPanelUndock(&manager->allocator, panel);
+					UIPanelUndock(manager, panel);
 				}
 				else {
 					LINKEDLIST_REMOVE(&(manager->floating), panel);
 				}
 				manager->active = NULL;
-				FixedSizeFree(&manager->allocator,panel);
+				FixedSizeFree(&manager->allocator, panel);
 
 				return true;
 			}
@@ -373,11 +393,11 @@ bool UIPanelsProcessEvent(UIPanelManager* manager, OSEvent event) {
 					if (dockPanel != panel && dock != Align_Unaligned) {
 						if (dock == Align_Center) {
 							LINKEDLIST_REMOVE(&(manager->floating), panel);
-							UIPanelAddTab(&manager->allocator, dockPanel, panel);
+							UIPanelAddTab(manager, dockPanel, panel);
 						}
 						else {
 							LINKEDLIST_REMOVE(&(manager->floating), panel);
-							UIPanelSplit(&manager->allocator, dockPanel, dock, panel);
+							UIPanelSplit(manager, dockPanel, dock, panel);
 						}
 					}
 				}
