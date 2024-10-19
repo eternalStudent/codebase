@@ -6,7 +6,7 @@ struct UIColorPicker {
 	bool isVisible;
 	UISliderMixer mixer;
 	UIText text;
-	float32 h, s, l;
+	float32 h, s, l, a;
 	float32 hInvStep, sInvStep, lInvStep;
 
 	// NOTE: extra allocated memory
@@ -22,17 +22,19 @@ struct UIColorPicker {
 		};
 	};
 	union {
-		Box2 handles[2];
+		Box2 handles[3];
 		struct {
 			Box2 hHandls;
 			Box2 slHandle;
+			Box2 aHandle;
 		};
 	};
 	union {
-		Box2 boundaries[2];
+		Box2 boundaries[3];
 		struct {
 			Box2 hBoundaries;
 			Box2 slBoundaries;
+			Box2 aBoundaries;
 		};
 	};
 	byte smallBuffer[24];
@@ -48,7 +50,7 @@ void UIColorPickerInit(UIColorPicker* picker,
 	memset(picker, 0, sizeof(UIColorPicker));
 	picker->mixer.handles = picker->handles;
 	picker->mixer.boundaries = picker->boundaries;
-	picker->mixer.count = 2;
+	picker->mixer.count = 3;
 	picker->text.buffer = bigBuffer;
 	picker->text.allocator = allocator;
 	picker->text.boxes = picker->boxes;
@@ -58,6 +60,7 @@ void UIColorPickerInit(UIColorPicker* picker,
 	picker->h = 0.5f;
 	picker->s = 0.5f;
 	picker->l = 0.5f;
+	picker->a = 1.0f;
 	picker->hText.data = CreateStringList(STR("180"), allocator);
 	picker->sText.data = CreateStringList(STR("50"), allocator);
 	picker->lText.data = CreateStringList(STR("50"), allocator);
@@ -72,7 +75,7 @@ void UIColorPickerInit(UIColorPicker* picker,
 }
 
 Color UIColorPickerGetColor(UIColorPicker* picker) {
-	return HSL(picker->h, picker->s, picker->l);
+	return HSL(picker->h, picker->s, picker->l, picker->a);
 }
 
 void UIColorPickerSetText(UIColorPicker* picker, UITextBox* box, float32 value, ssize bufferOffset) {
@@ -93,10 +96,11 @@ void UIColorPickerSetText(UIColorPicker* picker, Color rgb) {
 	UIColorPickerSetText(picker, &picker->bText, 255*rgb.b, 20);
 }
 
-void UIColorPickerSetHSL(UIColorPicker* picker, float32 h, float32 s, float32 l) {
+void UIColorPickerSetHSL(UIColorPicker* picker, float32 h, float32 s, float32 l, float32 a = 1) {
 	picker->h = saturate(h);
 	picker->s = saturate(s);
 	picker->l = saturate(l);
+	picker->a = a;
 
 	Color rgb = HSL(picker->h, picker->s, picker->l);
 			
@@ -105,6 +109,7 @@ void UIColorPickerSetHSL(UIColorPicker* picker, float32 h, float32 s, float32 l)
 
 void UIColorPickerSetRGB(UIColorPicker* picker, Color rgb) {
 	ToHSL(rgb, &picker->h, &picker->s, &picker->l);
+	picker->a = rgb.a;
 
 	UIColorPickerSetText(picker, rgb);
 }
@@ -119,6 +124,7 @@ bool UIColorPickerProcessEvent(UIColorPicker* picker, OSEvent event) {
 		picker->h = (picker->mixer.handles[0].y0 - picker->mixer.boundaries[0].y0)/picker->hInvStep;
 		picker->s = (picker->mixer.handles[1].x0 - picker->mixer.boundaries[1].x0)/picker->sInvStep;
 		picker->l = 1 - (picker->mixer.handles[1].y0 - picker->mixer.boundaries[1].y0)/picker->lInvStep;
+		picker->a = (picker->mixer.handles[2].y0 - picker->mixer.boundaries[2].y0)/picker->hInvStep;
 		Color rgb = HSL(picker->h, picker->s, picker->l);
 
 		UIColorPickerSetText(picker, rgb);
