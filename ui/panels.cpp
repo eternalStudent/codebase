@@ -218,6 +218,8 @@ void UIPanelAddTab(UIPanelManager* manager, UIPanel* panel, UIPanel* tab) {
 	tab->parent = panel;
 	panel->tabs.selected = tab;
 	panel->tabs.count++;
+	tab->pos = panel->pos;
+	tab->dim = panel->dim;
 }
 
 UIPanel* UIPanelGetPanelByPosition(UIPanel* panel, Point2 cursor) {

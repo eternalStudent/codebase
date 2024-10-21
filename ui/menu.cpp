@@ -1,5 +1,8 @@
 struct UIMenuItem {
-	Box2i hitBox;
+	union {
+		struct {float32 x, y, width, height;};
+		struct {Point2 pos; Dimensions2 dim;};
+	};
 	UIMenuItem* parent;
 	UIMenuItem* children;
 	UIMenuItem* opened;
@@ -13,14 +16,14 @@ struct UIMenu {
 	UIMenuItem* clicked;
 };
 
-UIMenuItem* GetMenuItemByPosition(UIMenuItem* parent, Point2i pos) {
+UIMenuItem* GetMenuItemByPosition(UIMenuItem* parent, Point2 cursor) {
 	for (int32 i = 0; i < parent->count; i++) {
 		UIMenuItem* item = parent->children + i;
-		if (InBounds(item->hitBox, pos))
+		if (InBounds(item->pos, item->dim, cursor))
 			return item;
 	}
 	if (parent->opened) {
-		return GetMenuItemByPosition(parent->opened, pos);
+		return GetMenuItemByPosition(parent->opened, cursor);
 	}
 	return NULL;
 }
@@ -44,7 +47,7 @@ bool UIMenuProcessEvent(OSEvent event, UIMenu* menu) {
 	switch (event.type) {
 
 	case Event_MouseMove: {
-		Point2i cursor = event.mouse.cursorPos;
+		Point2 cursor = event.mouse.cursorPos + 0.5f;
 		menu->hovered = GetMenuItemByPosition(&menu->root, cursor);
 		if (menu->hovered) {
 

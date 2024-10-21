@@ -142,8 +142,8 @@ void ToHSL(Color color, float32* h, float32* s, float32* l) {
 	*h /= 6;
 }
 
-Color HSL(uint32 h, uint32 s, uint32 l) {
-	return HSL(h/360.f, s/100.f, l/100.f);
+Color HSL(uint32 h, uint32 s, uint32 l, float32 a = 1) {
+	return HSL(h/360.f, s/100.f, l/100.f, a);
 }
 
 Color sRGB(uint32 r, uint32 g, uint32 b) {

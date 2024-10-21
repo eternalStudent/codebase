@@ -51,6 +51,7 @@ bool UIListProcessEvent(UIList* list, OSEvent event) {
 				list->scrollOffset = scrollOffset;
 			}
 
+			OSSetCursorIcon(CUR_ARROW);
 			return true;
 		}
 
@@ -64,6 +65,7 @@ bool UIListProcessEvent(UIList* list, OSEvent event) {
 				}
 			}
 
+			OSSetCursorIcon(CUR_ARROW);
 			return true;
 		}
 
