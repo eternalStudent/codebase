@@ -18,10 +18,14 @@ enum Quadrant {
 # define GfxDrawHorizontalGradQuad	OpenGLUIDrawHorizontalGradQuad
 # define GfxDrawSphere				OpenGLUIDrawSphere
 # define GfxDrawGlyph				OpenGLUIDrawGlyph
+# define GfxDrawImage				OpenGLUIDrawImage
 # define GfxDrawLine				OpenGLUIDrawLine
 # define GfxDrawCurve				OpenGLUIDrawCurve
 # define GfxDrawShadow				OpenGLUIDrawShadow
 # define GfxDrawSemiSphere			OpenGLUIDrawSemiSphere
+# define GfxDrawWave				OpenGLUIDrawWave
+# define GfxDrawHueGrad				OpenGLUIDrawHueGrad
+# define GfxDrawSLQuad				OpenGLUIDrawSLQuad
 # define GfxCropScreen				OpenGLUICropScreen
 # define GfxClearCrop				OpenGLUIClearCrop
 

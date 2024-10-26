@@ -1177,45 +1177,6 @@ void FlushVertices() {
 	d3d11.quadCount = 0;
 }
 
-void DrawQuad(D3D11Quad quad) {
-	if (d3d11.currentProgram != &d3d11.quadProgram) {
-		FlushVertices();
-		d3d11.currentProgram = &d3d11.quadProgram;
-		DisableMultiSample();
-	}
-
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Quad), &quad, sizeof(D3D11Quad));
-	d3d11.quadCount++;
-}
-
-void D3D11UIDrawImage(D3D11Texture image, Point2 pos, Point2 dim) {
-	FlushVertices();
-	DisableMultiSample();
-	PixelSpaceYIsDown();
-
-	d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-	D3D11Rectangle rect = {pos, pos+dim};
-	memcpy((byte*)d3d11.mapped.pData, &rect, sizeof(D3D11Rectangle));
-	d3d11.context->Unmap((ID3D11Resource*)d3d11.vbuffer, 0);
-
-	// Input Assembler
-	d3d11.context->IASetInputLayout(d3d11.imageProgram.layout);
-	d3d11.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	UINT stride = d3d11.imageProgram.stride;
-	UINT offset = 0;
-	d3d11.context->IASetVertexBuffers(0, 1, &d3d11.vbuffer, &stride, &offset);
-
-	d3d11.context->VSSetShader(d3d11.imageProgram.vshader, NULL, 0);
-	d3d11.context->PSSetShader(d3d11.imageProgram.pshader, NULL, 0);
-	d3d11.context->PSSetShaderResources(0, 1, &image.resource);
-	d3d11.context->PSSetSamplers(0, 1, &image.sampler);
-
-	d3d11.context->DrawInstanced(4, 1, 0, 0);
-}
-
 void OSD3D11SwapBuffers() {
 	HRESULT hr = d3d11.swapChain->Present(1, 0);
 	if (hr == DXGI_STATUS_OCCLUDED) {
@@ -1230,6 +1191,20 @@ void D3D11UIEndDrawing() {
 	FlushVertices();
 
 	OSD3D11SwapBuffers();
+}
+
+void DrawQuad(D3D11Quad quad) {
+	if (d3d11.currentProgram != &d3d11.quadProgram) {
+		FlushVertices();
+		d3d11.currentProgram = &d3d11.quadProgram;
+		DisableMultiSample();
+	}
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Quad), &quad, sizeof(D3D11Quad));
+	d3d11.quadCount++;
 }
 
 void D3D11UIDrawSolidColorQuad(
@@ -1403,6 +1378,31 @@ void D3D11UIDrawOutlineQuad(Box2 box, float32 cornerRadius, float32 thickness, C
 	};
 
 	DrawQuad(quad);
+}
+
+void D3D11UIDrawImage(D3D11Texture image, Point2 pos, Point2 dim) {
+	FlushVertices();
+	DisableMultiSample();
+	PixelSpaceYIsDown();
+
+	d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+	D3D11Rectangle rect = {pos, pos+dim};
+	memcpy((byte*)d3d11.mapped.pData, &rect, sizeof(D3D11Rectangle));
+	d3d11.context->Unmap((ID3D11Resource*)d3d11.vbuffer, 0);
+
+	// Input Assembler
+	d3d11.context->IASetInputLayout(d3d11.imageProgram.layout);
+	d3d11.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	UINT stride = d3d11.imageProgram.stride;
+	UINT offset = 0;
+	d3d11.context->IASetVertexBuffers(0, 1, &d3d11.vbuffer, &stride, &offset);
+
+	d3d11.context->VSSetShader(d3d11.imageProgram.vshader, NULL, 0);
+	d3d11.context->PSSetShader(d3d11.imageProgram.pshader, NULL, 0);
+	d3d11.context->PSSetShaderResources(0, 1, &image.resource);
+	d3d11.context->PSSetSamplers(0, 1, &image.sampler);
+
+	d3d11.context->DrawInstanced(4, 1, 0, 0);
 }
 
 void D3D11UIDrawSphere(Point2 center, float32 radius, Color color, float32 borderThickness, Color borderColor) {
