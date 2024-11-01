@@ -115,10 +115,12 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 	}
 	float32 t = 0;
 
+	float32 radius;
 	{
-		float32 radius = walks->length + half >= maxRadius
+		float32 minLength = MIN(walks->length, 0.5f*walks[1].length);
+		radius = minLength + half >= maxRadius
 			? maxRadius
-			: walks->length + half;
+			: minLength + half;
 
 		float32 length = walks->length + half - radius;
 		t += length/totalLength;
@@ -131,20 +133,18 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 	for (int32 i = 1; i < count; i++) {
 		Walk* walk = walks + i;
 
-		float32 radius, length;
+		float32 nextRadius, length;
 		if (i == count - 1) {
-			radius = walk->length + half >= maxRadius
-				? maxRadius
-				: walk->length + half;
-
 			length = walk->length + half - radius;
+			nextRadius = 0;
 		}
 		else {
-			radius = walk->length + thickness >= 2*maxRadius
+			float32 minLength = MIN(0.5f*walk->length, 0.5f*walks[i + 1].length);
+			nextRadius = minLength + half >= maxRadius
 				? maxRadius
-				: walk->length + thickness - maxRadius;
+				: minLength + half;
 
-			length = walk->length + thickness - maxRadius - radius;
+			length = walk->length + thickness - nextRadius - radius;
 		}
 
 		Color c0 = (1 - t)*color0 + t*color1;
@@ -221,6 +221,7 @@ void GfxDrawPath(Point2 start, Walk* walks, int32 count, float32 maxRadius, floa
 		pos = GfxDrawStraightLine(pos, walk->dir, length, thickness, c0, c1);
 
 		prev = walk->dir;
+		radius = nextRadius;
 	}
 }
 
