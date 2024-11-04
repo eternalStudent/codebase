@@ -6,8 +6,8 @@ struct CachedGlyph {
 	float32 xoff, yoff, xadvance;
 };
 
-// TODO: is 10103 large enough?
-#define GLYPH_CACHE_SIZE 10103
+// TODO: is 108,631 large enough?
+#define GLYPH_CACHE_SIZE 108631
 static CachedGlyph glyphTable[GLYPH_CACHE_SIZE];
 
 struct {
@@ -65,6 +65,24 @@ Image FontGetImageFromAtlas(Dimensions2i dim, byte* data) {
 	return Image{dim.width, dim.height, 1, data};
 }
 
+void FontReleaseCachedGlyph(CachedGlyph* glyph) {
+	Point2i pos0 = {glyph->x0 - 1, glyph->y0 - 1};
+	Point2i pos1 = {glyph->x1 - 1, glyph->y1 - 1};
+	Dimensions2i dim = pos1 - pos0;
+	if (dim.width & dim.height) {
+		dim = dim + Point2i{1, 1};
+		RegionNode* node = RegionGetByPosAndDim(glyphCache.atlasRoot, pos0, dim);
+		if (node) {
+			RegionFree(node, &glyphCache.regionNodeAllocator);
+		}
+		else {
+			__debugbreak();
+		}
+	}
+
+	glyph->isTaken = false;
+}
+
 CachedGlyph FontGetGlyph(ScaledFont* font, uint32 codepoint) {
 	uint16 glyphId = FontGetGlyphIndex(font->face, codepoint);
 
@@ -77,15 +95,8 @@ CachedGlyph FontGetGlyph(ScaledFont* font, uint32 codepoint) {
 		if (glyph->id == glyphId)
 			return *glyph;
 
-		Point2i pos0 = {glyph->x0 - 1, glyph->y0 - 1};
-		Point2i pos1 = {glyph->x1 - 1, glyph->y1 - 1};
-		Dimensions2i dim = pos1 - pos0;
-		if (dim.width & dim.height) {
-			dim = dim + Point2i{1, 1};
-			RegionNode* node = RegionGetByPosAndDim(glyphCache.atlasRoot, pos0, dim);
-			ASSERT(node);
-			RegionFree(node, &glyphCache.regionNodeAllocator);
-		}
+		GfxFlush();
+		FontReleaseCachedGlyph(glyph);
 	}
 
 	glyph->isTaken = true;

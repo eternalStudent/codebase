@@ -753,7 +753,7 @@ void OpenGLUIBeginDrawing() {
 	opengl.quadCount = 0;
 }
 
-void FlushVertices() {
+void OpenGLUIFlush() {
 	if (!opengl.currentProgram || !opengl.quadCount) return;
 
 	glUseProgram(opengl.currentProgram->handle);
@@ -799,13 +799,13 @@ void FlushVertices() {
 }
 
 void OpenGLUIEndDrawing() {
-	FlushVertices();
+	OpenGLUIFlush();
 	OSOpenGLSwapBuffers();
 }
 
 void DrawQuad(OpenGLQuad quad) {
 	if (opengl.currentProgram != &opengl.quadProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.quadProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
@@ -1009,7 +1009,7 @@ void OpenGLUIDrawSphere(Point2 center, float32 radius, Color color, float32 bord
 
 // TESTME!
 void GfxDrawImage(Point2 pos, Dimensions2 dim, GLuint texture, Box2 crop) {
-	FlushVertices();
+	OpenGLUIFlush();
 	glUseProgram(opengl.imageProgram.handle);
 	glDisable(GL_MULTISAMPLE);
 
@@ -1044,7 +1044,7 @@ void GfxDrawImage(Point2 pos, Dimensions2 dim, GLuint texture, Box2 crop) {
 
 void OpenGLUIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 	if (opengl.currentProgram != &opengl.glyphProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.glyphProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
@@ -1063,7 +1063,7 @@ void OpenGLUIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 
 void OpenGLUIDrawLine(Point2 p0, Point2 p1, float32 thick, Color color) {
 	if (opengl.currentProgram != &opengl.segmentProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.segmentProgram;
 		glEnable(GL_MULTISAMPLE);
 	}
@@ -1088,7 +1088,7 @@ void OpenGLUIDrawLine(Point2 p0, Point2 p1, float32 thick, Color color) {
 
 void OpenGLUIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick, Color color) {
 	if (opengl.currentProgram != &opengl.segmentProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.segmentProgram;
 		glEnable(GL_MULTISAMPLE);
 	}
@@ -1123,7 +1123,7 @@ void OpenGLUIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick
 
 void OpenGLUIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offset, float32 blur, Color color) {
 	if (opengl.currentProgram != &opengl.shadowProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.shadowProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
@@ -1142,7 +1142,7 @@ void OpenGLUIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float
 	uint32 quadrants[] = {1, 3, 2, 0}; //?
 
 	if (opengl.currentProgram != &opengl.semiSphereProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.semiSphereProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
@@ -1162,7 +1162,7 @@ void OpenGLUIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color colo
 		color
 	};
 	if (opengl.currentProgram != &opengl.waveProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.waveProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
@@ -1174,7 +1174,7 @@ void OpenGLUIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color colo
 void OpenGLUIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {
 	OpenGLHue hue = {pos0, pos1, uv};
 	if (opengl.currentProgram != &opengl.hueProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.hueProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
@@ -1186,7 +1186,7 @@ void OpenGLUIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {
 void OpenGLUIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
 	OpenGLSLBox sl = {pos0, pos1, hue};
 	if (opengl.currentProgram != &opengl.slProgram) {
-		FlushVertices();
+		OpenGLUIFlush();
 		opengl.currentProgram = &opengl.slProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
@@ -1196,11 +1196,11 @@ void OpenGLUIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
 }
 
 void OpenGLUICropScreen(int32 x, int32 y, int32 width, int32 height) {
-	FlushVertices();
+	OpenGLUIFlush();
 	glScissor(x, opengl.dim.height - y - height, width, height);
 }
 
 void OpenGLUIClearCrop() {
-	FlushVertices();
+	OpenGLUIFlush();
 	glScissor(0, 0, opengl.dim.width, opengl.dim.height);
 }

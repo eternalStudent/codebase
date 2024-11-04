@@ -1144,7 +1144,7 @@ void D3D11UISetFontAtlas(Image image) {
 	}
 }
 
-void FlushVertices() {
+void D3D11UIFlush() {
 	if (!d3d11.quadCount) return;
 
 	d3d11.context->Unmap((ID3D11Resource*)d3d11.vbuffer, 0);
@@ -1188,14 +1188,14 @@ void OSD3D11SwapBuffers() {
 }
 
 void D3D11UIEndDrawing() {
-	FlushVertices();
+	D3D11UIFlush();
 
 	OSD3D11SwapBuffers();
 }
 
 void DrawQuad(D3D11Quad quad) {
 	if (d3d11.currentProgram != &d3d11.quadProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.quadProgram;
 		DisableMultiSample();
 	}
@@ -1381,7 +1381,7 @@ void D3D11UIDrawOutlineQuad(Box2 box, float32 cornerRadius, float32 thickness, C
 }
 
 void D3D11UIDrawImage(D3D11Texture image, Point2 pos, Point2 dim) {
-	FlushVertices();
+	D3D11UIFlush();
 	DisableMultiSample();
 	PixelSpaceYIsDown();
 
@@ -1427,7 +1427,7 @@ void D3D11UIDrawSphere(Point2 center, float32 radius, Color color, float32 borde
 
 void D3D11UIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 	if (d3d11.currentProgram != &d3d11.glyphProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.glyphProgram;
 		DisableMultiSample();
 	}
@@ -1449,7 +1449,7 @@ void D3D11UIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 
 void D3D11UIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick, Color color) {
 	if (d3d11.currentProgram != &d3d11.segmentProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.segmentProgram;
 		EnableMultiSample();
 	}
@@ -1487,7 +1487,7 @@ void D3D11UIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick,
 
 void D3D11UIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offset, float32 blur, Color color) {
 	if (d3d11.currentProgram != &d3d11.shadowProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.shadowProgram;
 		DisableMultiSample();
 	}
@@ -1509,7 +1509,7 @@ void D3D11UIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float3
 	uint32 quadrants[] = {0, 2, 3, 1};
 
 	if (d3d11.currentProgram != &d3d11.semiSphereProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.semiSphereProgram;
 		DisableMultiSample();
 	}
@@ -1532,7 +1532,7 @@ void D3D11UIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color
 		color
 	};
 	if (d3d11.currentProgram != &d3d11.waveProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.waveProgram;
 		DisableMultiSample();
 	}
@@ -1547,7 +1547,7 @@ void D3D11UIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color
 void D3D11UIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {
 	D3D11Hue hue = {pos0, pos1, uv};
 	if (d3d11.currentProgram != &d3d11.hueProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.hueProgram;
 		DisableMultiSample();
 	}
@@ -1562,7 +1562,7 @@ void D3D11UIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {
 void D3D11UIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
 	D3D11SLBox sl = {pos0, pos1, hue};
 	if (d3d11.currentProgram != &d3d11.slProgram) {
-		FlushVertices();
+		D3D11UIFlush();
 		d3d11.currentProgram = &d3d11.slProgram;
 		DisableMultiSample();
 	}
@@ -1575,7 +1575,7 @@ void D3D11UIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
 }
 
 void D3D11UICropScreen(LONG left, LONG top, LONG width, LONG height) {
-	FlushVertices();
+	D3D11UIFlush();
 
 	D3D11_RECT rect = {};
 	rect.left = left;

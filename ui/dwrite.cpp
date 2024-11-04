@@ -208,12 +208,29 @@ UINT16 DWriteGetGlyphIndex(IDWriteFontFace* face, UINT32 codepoint) {
 	return glyphId;
 }
 
-HDC DWriteRasterizeGlyph(IDWriteFontFace* face, float32 emSize, float32 ascent, UINT16 glyphId, RECT* boundingBox) {
-	// TODO: switch to IDWriteGlyphRunAnalysis::CreateAlphaTexture ?
-	//       see here: https://github.com/google/skia/blob/main/src/ports/SkScalerContext_win_dw.cpp
+// NOTE: this is a bit more than rasterizing, this is actually rendering to an image
+HDC DWriteRasterizeGlyph(IDWriteFontFace* face, FLOAT emSize, FLOAT ascent, UINT16 glyphId, RECT* boundingBox) {
+	
+	DWRITE_GLYPH_RUN glyphRun = {};
+	glyphRun.fontFace = face;
+	glyphRun.fontEmSize = emSize;
+	glyphRun.glyphCount = 1;
+	glyphRun.glyphIndices = &glyphId;
+
+	// NOTE: first call to get the bounding box
+	COLORREF foreground = RGB(255, 255, 255);
+	HRESULT hr = dwrite.renderTarget->DrawGlyphRun(
+		0, 
+		ascent,
+		DWRITE_MEASURING_MODE_NATURAL, 
+		&glyphRun, 
+		dwrite.renderingParams, 
+		foreground, 
+		boundingBox
+	);
+	ASSERT_HR(hr);
 
 	COLORREF background = RGB(0, 0, 0);
-	COLORREF foreground = RGB(255, 255, 255);
 	HDC dc = dwrite.renderTarget->GetMemoryDC();
 	{
 		HGDIOBJ original = SelectObject(dc, GetStockObject(DC_PEN));
@@ -223,26 +240,17 @@ HDC DWriteRasterizeGlyph(IDWriteFontFace* face, float32 emSize, float32 ascent, 
 		Rectangle(dc, 0, 0, 256, 256);
 		SelectObject(dc, original);
 	}
-	
-	DWRITE_GLYPH_RUN glyphRun = {};
-	glyphRun.fontFace = face;
-	glyphRun.fontEmSize = emSize;
-	glyphRun.glyphCount = 1;
-	glyphRun.glyphIndices = &glyphId;
 
-	// TODO: lhecker warns against this
-	//       >> don't set your baselineOriginY to the upper most bound. 
-	//       >> that's the ascentOriginY if anything
-    //       >> I do recommend using the baseline as the base for your glyph coordinates, 
-    //       >> because glyphs can be arbitrarily tall and that makes it easier to reason about it 
-	HRESULT hr = dwrite.renderTarget->DrawGlyphRun(
-		0, 
+	// NOTE: second call to not draw out of bitmap
+	RECT rect;
+	hr = dwrite.renderTarget->DrawGlyphRun(
+		(FLOAT)-boundingBox->left, 
 		ascent,
 		DWRITE_MEASURING_MODE_NATURAL, 
 		&glyphRun, 
 		dwrite.renderingParams, 
 		foreground, 
-		boundingBox
+		&rect
 	);
 	ASSERT_HR(hr);
 
@@ -257,12 +265,12 @@ void DWriteCopyToAtlas(HDC dc, int32 outPitch, byte* outData, RECT boundingBox) 
 	
 	int32 inPitch = dib.dsBm.bmWidthBytes;
 	byte* inData = (byte*)dib.dsBm.bmBits;
-	for (int32 inY = MAX(0, boundingBox.top), outY = 0; 
+	for (int32 inY = boundingBox.top, outY = 0; 
 		 inY < boundingBox.bottom; 
 		 inY++, outY++) {
 
-		for (int32 inX = MAX(0, boundingBox.left), outX = 0; 
-			 inX < boundingBox.right; 
+		for (int32 inX = 0, outX = 0; 
+			 inX < boundingBox.right - boundingBox.left; 
 			 inX++, outX++) {
 
 			outData[outPitch*outY + outX] = inData[inPitch*inY + 4*inX];

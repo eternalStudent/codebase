@@ -44,3 +44,22 @@ ssize UTF8Decode(byte* data, byte* end, uint32* codepoint) {
 inline bool IsWhiteSpace(uint32 codepoint) {
 	return (9 <= codepoint && codepoint <= 13 || codepoint == 32);
 }
+
+// TODO: UTF8 to UTF16
+ssize ASCIIToUTF16(String str, byte* buffer, bool nullTerminate = false) {
+	uint16* ptr = (uint16*)buffer;
+
+	for (ssize i = 0; i < str.length; i++) {
+		*ptr = (uint16)str.data[i];
+		ptr++;
+	}
+
+	if (nullTerminate) {
+		*ptr = 0;
+	}
+
+	ssize length = 2*str.length;
+	if (nullTerminate) length += 2;
+
+	return length;
+}

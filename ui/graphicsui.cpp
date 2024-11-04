@@ -12,6 +12,7 @@ enum Quadrant {
 # define GfxEndDrawing				OpenGLUIEndDrawing
 # define GfxSetBackgroundColor		OpenGLUISetBackgroundColor
 # define GfxSetFontAtlas			OpenGLUISetFontAtlas
+# define GfxFlush                   OpenGLUIFlush
 # define GfxDrawSolidColorQuad		OpenGLUIDrawSolidColorQuad
 # define GfxDrawOutlineQuad			OpenGLUIDrawOutlineQuad
 # define GfxDrawVerticalGradQuad	OpenGLUIDrawVerticalGradQuad
@@ -36,6 +37,7 @@ enum Quadrant {
 # define GfxEndDrawing				D3D11UIEndDrawing
 # define GfxSetBackgroundColor		D3D11UISetBackgroundColor
 # define GfxSetFontAtlas			D3D11UISetFontAtlas
+# define GfxFlush                   D3D11UIFlush
 # define GfxDrawSolidColorQuad		D3D11UIDrawSolidColorQuad
 # define GfxDrawOutlineQuad			D3D11UIDrawOutlineQuad
 # define GfxDrawVerticalGradQuad	D3D11UIDrawVerticalGradQuad

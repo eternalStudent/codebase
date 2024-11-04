@@ -43,8 +43,12 @@
 #define GLUE2(x, y) x##y
 #define GLUE(x, y) GLUE2(x, y)
 
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+# define __debugbreak() __builtin_trap()
+#endif
+
 #if defined(DEBUG)
-#  define ASSERT(expression) 	do{if(!(expression)) {*(int32*)0 = 0;}}while(0)
+#  define ASSERT(expression) 	do{if(!(expression)) {__debugbreak();}}while(0)
 #else
 #  define ASSERT(expression)	(void)(expression)
 #endif
@@ -53,7 +57,7 @@
 #  define ASSERT_HR(hr) ASSERT(SUCCEEDED(hr))
 #endif
 
-#if !defined(COMPILER_MSVC)
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
 #  define alignof	__alignof__
 #endif
 
