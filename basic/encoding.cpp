@@ -46,7 +46,7 @@ inline bool IsWhiteSpace(uint32 codepoint) {
 }
 
 // TODO: UTF8 to UTF16
-ssize ASCIIToUTF16(String str, byte* buffer, bool nullTerminate = false) {
+ssize ASCIIToUTF16(String str, byte* buffer) {
 	uint16* ptr = (uint16*)buffer;
 
 	for (ssize i = 0; i < str.length; i++) {
@@ -54,12 +54,37 @@ ssize ASCIIToUTF16(String str, byte* buffer, bool nullTerminate = false) {
 		ptr++;
 	}
 
-	if (nullTerminate) {
-		*ptr = 0;
+	return 2*str.length;
+}
+
+ssize CodepointToUTF8(uint32 codepoint, byte* buffer) {
+	if (codepoint < 0x80) {
+		buffer[0] = (byte)codepoint;
+		return 1;
 	}
 
-	ssize length = 2*str.length;
-	if (nullTerminate) length += 2;
+	if (codepoint < 0x0800) {
+		// 0000,0xxx,yyyy,zzzz ==>
+		// 110x,xxyy,10yy,zzzz
+		buffer[0] = 0xC0 | (byte)((codepoint & 0x07C0) >> 6);
+		buffer[1] = 0x80 | (byte)(codepoint & 0x003F);
+		return 2;
+	}
 
-	return length;
+	if (codepoint < 0x010000) {
+		// 0000,0000, wwww,xxxx, yyyy,zzzz ==>
+		// 1110,wwww, 10xx,xxyy, 10yy,zzzz
+		buffer[0] = 0xE0 | (byte)((codepoint & 0xF000) >> 12);
+		buffer[1] = 0x80 | (byte)((codepoint & 0x0FC0) >> 6);
+		buffer[2] = 0x80 | (byte)(codepoint & 0x003F);
+		return 3;
+	}
+
+	// 0000,0000, 000u,vvvv, wwww,xxxx, yyyy,zzzz ==>
+	// 1111,0uvv, 10vv,wwww, 10xx,xxyy, 10yy,zzzz
+	buffer[0] = 0xF0 | (byte)((codepoint & 0x1C0000) >> 18);
+	buffer[1] = 0x80 | (byte)((codepoint & 0x03F000) >> 12);
+	buffer[2] = 0x80 | (byte)((codepoint & 0x000FC0) >> 6);
+	buffer[3] = 0x80 | (byte)(codepoint & 0x00003F);
+	return 4;
 }

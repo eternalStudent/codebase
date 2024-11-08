@@ -40,7 +40,7 @@ ssize UnsignedToHex(uint64 number, byte* str) {
 	str[numberOfDigits] = 0;
 	while (index + 1) {
 		uint32 digit = (number >> (index * 4)) & 0xf;
-		str[numberOfDigits - index - 1] = digit <= 9 ? '0' + (char)digit : ('a' - 10) + (char)digit;
+		str[numberOfDigits - index - 1] = digit <= 9 ? '0' + (byte)digit : ('a' - 10) + (byte)digit;
 		index--;
 	}
 	return numberOfDigits;
@@ -120,13 +120,29 @@ ssize FloatToDecimal(float64 number, int64 precision, byte* str) {
 
 #define COPY(source, dest) (memcpy(dest, source, sizeof(source)-1), sizeof(source)-1)
 
-inline ssize BoolToAnsi(bool b, byte* str){
+inline ssize BoolToAnsi(bool b, byte* str) {
 	if (b) {
 		return COPY("true", str);
 	}
 	else {
 		return COPY("false", str);
 	}
+}
+
+ssize ToUpperHex(byte b, byte* buffer) {
+	byte nibble = (b & 0xF0) >> 4;
+	buffer[0] = nibble <= 9 ? '0' + nibble : ('A' - 10) + nibble;
+	nibble = b & 0xF;
+	buffer[1] = nibble <= 9 ? '0' + nibble : ('A' - 10) + nibble;
+	return 2;
+}
+
+ssize ToLowerHex(byte b, byte* buffer) {
+	byte nibble = (b & 0xF0) >> 4;
+	buffer[0] = nibble <= 9 ? '0' + nibble : ('a' - 10) + nibble;
+	nibble = b & 0xF;
+	buffer[1] = nibble <= 9 ? '0' + nibble : ('a' - 10) + nibble;
+	return 2;
 }
 
 // Length-based
@@ -256,23 +272,72 @@ void StringFindWord(String string, ssize index, ssize* start, ssize* end) {
 uint64 ParseUInt64(String str) {
 	uint64 result = 0;
 	for (ssize i = 0; i < str.length; i++) {
-		char c = str.data[i];
+		byte c = str.data[i];
 		result *= 10;
 		result += c-'0';
 	}
 	return result;
 }
 
+bool TryParseUInt64(String str, uint64* result) {
+	if (str.length > 20)
+		return false;
+
+	*result = 0;
+	for (ssize i = 0; i < str.length; i++) {
+		byte c = str.data[i];
+		if (!IsDigit(c))
+			return false;
+
+		if (i == 19 &&  (*result > 1844674407370955161
+							||
+						(*result == 1844674407370955161 && c > '5'))) {
+
+			return false;
+		}
+
+		*result *= 10;
+		*result += c-'0';
+	}
+	return true;
+}
+
+// TODO: add TryParse variations
 int64 ParseInt64(String str) {
 	return str.data[0] == '-' 
 		? - (int64)ParseUInt64({str.data+1, str.length-1})
 		: (int64)ParseUInt64(str); 
 }
 
+bool TryParseInt64(String str, int64* result) {
+	if (str.data[0] == '-') {
+		uint64 value;
+		if (!TryParseUInt64({str.data+1, str.length-1}, &value))
+			return false;
+
+		if (value > 9223372036854775808)
+			return false;
+
+		*result = - (int64)value;
+	}
+	else {
+		uint64 value;
+		if (!TryParseUInt64(str, &value))
+			return false;
+
+		if (value > 9223372036854775807)
+			return false;
+
+		*result = (int64)value;
+	}
+
+	return true;
+}
+
 uint64 ParseHex64(String str) {
 	uint64 result = 0;
 	for (ssize i = 0; i < str.length; i++) {
-		char c = str.data[i];
+		byte c = str.data[i];
 		result <<= 4;
 		if (IsDigit(c))
 			result += c-'0';
@@ -284,14 +349,92 @@ uint64 ParseHex64(String str) {
 	return result;
 }
 
+bool TryParseHexDigit(byte digit, byte* result) {
+	if ('0' <= digit && digit <= '9') {
+		*result = digit - '0';
+		return true;
+	}
+
+	if ('a' <= digit && digit <= 'f') {
+		*result = digit - 'a' + 10;
+		return true;
+	}
+
+	if ('A' <= digit && digit <= 'F') {
+		*result = digit - 'A' + 10;
+		return true;
+	}
+
+	return false;
+}
+
+bool TryParseHex64(String str, uint64* result) {
+	if (str.length > 16)
+		return false;
+
+	*result = 0;
+	for (ssize i = 0; i < str.length; i++) {
+		byte c = str.data[i];
+		byte nibble;
+		if (TryParseHexDigit(c, &nibble)) {
+			*result <<= 4;
+			*result |= nibble;
+		}
+		else {
+			return false;
+		}
+	}
+	return true;
+}
+
+bool TryParseHex32(String str, uint32* result) {
+	if (str.length > 8)
+		return false;
+
+	uint64 value64;
+	if (TryParseHex64(str, &value64)) {
+		*result = (uint32)value64;
+		return true;
+	}
+
+	return false;
+}
+
+uint64 ParseBinary64(String str) {
+	uint64 result = 0;
+	for (ssize i = 0; i < str.length; i++) {
+		byte c = str.data[i];
+		result <<= 1;
+		if (c == '1') result |= 1;
+	}
+	return result;
+}
+
+bool TryParseBinary64(String str, uint64* result) {
+	if (str.length > 64)
+		return false;
+
+	*result = 0;
+	for (ssize i = 0; i < str.length; i++) {
+		byte c = str.data[i];
+		if (c != '0' && c != '1')
+			return false;
+
+		*result <<= 1;
+		if (c == '1') *result |= 1;
+	}
+	return true;
+}
+
+// TODO: add TryParse variation
 float64 ParseFloat64(String str) {
 	float64 result = 0.0;
 	ssize start = str.data[0] == '-' ? 1 : 0;
 	bool radix = false;
 	float64 term = 1.0;
 	for (ssize i = start; i < str.length; i++) {
-		char c = str.data[i];
-		char digit = c-'0';
+		byte c = str.data[i];
+		byte digit = c-'0';
 		if (c == '.') {
 			radix = true;
 			continue;     
@@ -373,10 +516,12 @@ struct StringBuilder {
 		return concat;
 	}
 
-	StringBuilder operator()(byte ch) {
+	StringBuilder operator()(byte ch, char f = 'c') {
 		StringBuilder concat = *this;
-		*(concat.ptr) = ch;
-		concat.ptr++;
+		if (f == 'c') *(concat.ptr++) = ch;
+		if (f == 'd') concat.ptr += UnsignedToDecimal((uint64)ch, concat.ptr);
+		if (f == 'h' || f == 'x') concat.ptr += ToLowerHex(ch, concat.ptr);
+		if (f == 'H' || f == 'X') concat.ptr += ToUpperHex(ch, concat.ptr);
 		return concat;
 	}
 

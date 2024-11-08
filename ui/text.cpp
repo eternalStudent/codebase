@@ -1,5 +1,3 @@
-// TODO: allow for cached font
-
 // TODO: wrap/no-wrap is a separate concern than what input is allowed
 enum UITextFlags: uint32 {
 	UIText_SingleLine = (1 << 1),

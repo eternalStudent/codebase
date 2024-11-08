@@ -1131,6 +1131,8 @@ void D3D11UISetBackgroundColor(Color color) {
 }
 
 void D3D11UISetFontAtlas(Image image) {
+	if (!d3d11.device) return;
+	
 	if (d3d11.glyphProgram.texture.resource) {
 		// TODO: let's assume this for now
 		ASSERT(d3d11.glyphProgram.textureWidth == (float32)image.dimensions.width);
