@@ -45,18 +45,6 @@ inline bool IsWhiteSpace(uint32 codepoint) {
 	return (9 <= codepoint && codepoint <= 13 || codepoint == 32);
 }
 
-// TODO: UTF8 to UTF16
-ssize ASCIIToUTF16(String str, byte* buffer) {
-	uint16* ptr = (uint16*)buffer;
-
-	for (ssize i = 0; i < str.length; i++) {
-		*ptr = (uint16)str.data[i];
-		ptr++;
-	}
-
-	return 2*str.length;
-}
-
 ssize CodepointToUTF8(uint32 codepoint, byte* buffer) {
 	if (codepoint < 0x80) {
 		buffer[0] = (byte)codepoint;
@@ -87,4 +75,142 @@ ssize CodepointToUTF8(uint32 codepoint, byte* buffer) {
 	buffer[2] = 0x80 | (byte)((codepoint & 0x000FC0) >> 6);
 	buffer[3] = 0x80 | (byte)(codepoint & 0x00003F);
 	return 4;
+}
+
+ssize CodepointToUTF16(uint32 codepoint, byte* buffer) {
+	uint16* bufferW = (uint16*)buffer;
+	if (codepoint < 0x10000) {
+		*bufferW = (uint16)codepoint;
+		return 2;
+	}
+
+	uint32 u = codepoint - 0x10000;
+	bufferW[0] = 0xD800 | (uint16)((u & 0x0FFC00) >> 10);
+	bufferW[1] = 0xDC00 | (uint16)(u & 0x0003FF);
+	return 4;
+}
+
+ssize UTF8ToUTF16(String str, byte* buffer) {
+	ssize total = 0;
+	ssize length;
+	uint32 codepoint;
+	for (byte* ptr = str.data; ptr < str.data + str.length; ptr += length) {
+		length = UTF8Decode(ptr, str.data + str.length, &codepoint);
+		total += CodepointToUTF16(codepoint, buffer + total);
+	}
+
+	return total;
+}
+
+// Escaping
+//------------
+
+bool IsEnclosing(byte b) {
+	return b == '\"' || b == '\'' || b == '`';
+}
+
+ssize ParseString(String string, byte* buffer) {
+	byte enclosing = string.data[0];
+
+	if (!IsEnclosing(enclosing)) {
+		// NOTE: assume verbatims
+		memcpy(buffer, string.data, string.length);
+		return string.length;
+	}
+
+	ssize length = 0;
+	for (ssize i = 1; i < string.length; i++) {
+		byte b = string.data[i];
+		if (b == enclosing) {
+			break;
+		}
+
+		if (b == '\\') {
+			i++;
+			b = string.data[i];
+			switch (b) {
+			case 'a': {buffer[length++] = 7;} break;
+			case 'b': {buffer[length++] = 8;} break;
+			case 't': {buffer[length++] = 9;} break;
+			case 'n': {buffer[length++] = 10;} break;
+			case 'v': {buffer[length++] = 11;} break;
+			case 'f': {buffer[length++] = 12;} break;
+			case 'r': {buffer[length++] = 13;} break;
+			case 'e': {buffer[length++] = 27;} break;
+			case 'x': {
+				byte nibble1;
+				if (TryParseHexDigit(string.data[i + 1], &nibble1)) {
+					byte nibble2;
+					if (TryParseHexDigit(string.data[i + 1], &nibble2)) {
+						i += 2;
+						buffer[length++] = (nibble1 << 4) | nibble2;
+					}
+					else {
+						i++;
+						buffer[length++] = nibble1;
+					}
+				}
+				else {
+					buffer[length++] = 'x';
+				}
+			} break;
+			case 'u': {
+				uint32 codepoint;
+				if (TryParseHex32({string.data + i + 1, 4}, &codepoint)) {
+					length += CodepointToUTF8(codepoint, buffer + length);
+					i += 4;
+				}
+				else {
+					buffer[length++] = 'u';
+				}
+			} break;
+			case 'U': {
+				uint32 codepoint;
+				if (TryParseHex32({string.data + i + 1, 8}, &codepoint)) {
+					length += CodepointToUTF8(codepoint, buffer + length);
+					i += 8;
+				}
+				else {
+					buffer[length++] = 'U';
+				}
+			} break;
+			}
+		}
+		else {
+			buffer[length++] = b;
+		}
+	}
+
+	return length;
+}
+
+ssize EscapeString(String string, byte enclosing, byte* buffer) {
+	buffer[0] = enclosing;
+	ssize length = 1;
+	static byte symbols[] = {'a', 'b', 't', 'n', 'v', 'f', 'r'};
+	for (ssize i = 0; i < string.length; i++) {
+		byte b = string.data[i];
+		if (7 <= b && b <= 13) {
+			buffer[length++] = '\\';
+			buffer[length++] = symbols[b - 7];	
+		}
+		else if (b == 27) {
+			buffer[length++] = '\\';
+			buffer[length++] = 'e';
+		} 
+		else if (b == enclosing) {
+			buffer[length++] = '\\';
+			buffer[length++] = b;
+		}
+		else if (32 <= b && b <= 126) {
+			buffer[length++] = b;
+		}
+		else {
+			buffer[length++] = '\\';
+			buffer[length++] = 'x';
+			length += ToLowerHex(b, buffer + length);
+		}
+	}
+	buffer[length++] = enclosing;
+	return length;
 }

@@ -136,7 +136,21 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			return TRUE;
 		} break;
 		case WM_KEYUP: {
+			WORD vkCode = LOWORD(wParam);
+			WORD keyFlags = HIWORD(lParam);
+			WORD scanCode = LOBYTE(keyFlags);
+			BOOL isExtendedKey = (keyFlags & KF_EXTENDED) == KF_EXTENDED; // extended-key flag, 1 if scancode has 0xE0 prefix
+			if (isExtendedKey)
+				scanCode = MAKEWORD(scanCode, 0xE0);
 
+			OSEvent event;
+			event.type = Event_KeyboardKeyUp;
+			event.time = GetMessageTime();
+			event.keyboard.vkCode = vkCode;
+			event.keyboard.scanCode = scanCode;
+			event.keyboard.ctrlIsDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+			event.keyboard.shiftIsDown = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+			Win32EnqueueEvent(event);
 		} break;
 		case WM_CHAR: {
 			// NOTE: yeah... only ASCII plz...
@@ -156,22 +170,26 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			if (window.iconSet) SetCursor(window.cursors[window.icon]);
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
+			WORD flags = LOWORD(wParam);
 
 			OSEvent event;
 			event.type = Event_MouseMove;
 			event.time = GetMessageTime();
 			event.mouse.cursorPos = {x, y};
+			event.mouse.ctrlIsDown = (flags & MK_CONTROL) == MK_CONTROL;
 			Win32EnqueueEvent(event);
 		} break;
 		case WM_LBUTTONDOWN : {
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
 			LONG time = GetMessageTime();
+			WORD flags = LOWORD(wParam);
 
 			OSEvent event;
 			event.type = Event_MouseLeftButtonDown;
 			event.time = time;
 			event.mouse.cursorPos = {x, y};
+			event.mouse.ctrlIsDown = (flags & MK_CONTROL) == MK_CONTROL;
 			Win32EnqueueEvent(event);
 			
 			if (!PtInRect(&window.clickRect, {x, y}) || (UINT)(time - window.timeLastClicked) > GetDoubleClickTime()) {

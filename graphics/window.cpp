@@ -18,6 +18,7 @@ enum : uint32 {
 
 	Event_KeyboardPress,
 	Event_KeyboardChar,
+	Event_KeyboardKeyUp,
 
 	Event_count
 };

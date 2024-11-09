@@ -17,6 +17,18 @@ inline Point2 operator*(float32 a, Point2 p) {
 	return {a*p.x, a*p.y};
 }
 
+inline Point2 ceil(Point2 p) {
+	return {ceil(p.x), ceil(p.y)};
+}
+
+inline Point2 floor(Point2 p) {
+	return {floor(p.x), floor(p.y)};
+}
+
+inline Point2 round(Point2 p) {
+	return {round(p.x), round(p.y)};
+}
+
 inline Point2 Lerp(float32 t, Point2 p0, Point2 p1) {
 	return (1-t)*p0 + t*p1;
 }
