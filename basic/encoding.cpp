@@ -174,6 +174,9 @@ ssize ParseString(String string, byte* buffer) {
 					buffer[length++] = 'U';
 				}
 			} break;
+			default: {
+				buffer[length++] = b;
+			} break;
 			}
 		}
 		else {

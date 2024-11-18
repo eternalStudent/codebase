@@ -53,6 +53,11 @@ bool UISliderProcessEvent(UISlider* slider, OSEvent event) {
 			OSSetCursorIcon(CUR_ARROW);
 			return true;
 		}
+		else if (InBounds(slider->boundaries, cursor)) {
+
+			OSSetCursorIcon(CUR_ARROW);
+			return true;
+		}
 		else {
 			slider->isActive = false;
 
@@ -152,6 +157,16 @@ bool UISliderMixerProcessEvent(UISliderMixer* mixer, OSEvent event) {
 
 			if (InBounds(handle, cursor)) {
 				mixer->active = i + 1;
+
+				OSSetCursorIcon(CUR_ARROW);
+				return true;	
+			}
+		}
+
+		for (int32 i = 0; i < mixer->count; i++) {
+			Box2 bounds = mixer->boundaries[i];
+
+			if (InBounds(bounds, cursor)) {
 
 				OSSetCursorIcon(CUR_ARROW);
 				return true;	
