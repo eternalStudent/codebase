@@ -69,7 +69,7 @@ void FontReleaseCachedGlyph(CachedGlyph* glyph) {
 	Point2i pos0 = {glyph->x0 - 1, glyph->y0 - 1};
 	Point2i pos1 = {glyph->x1 - 1, glyph->y1 - 1};
 	Dimensions2i dim = pos1 - pos0;
-	if (dim.width & dim.height) {
+	if (dim.width && dim.height) {
 		dim = dim + Point2i{1, 1};
 		RegionNode* node = RegionGetByPosAndDim(glyphCache.atlasRoot, pos0, dim);
 		if (node) {

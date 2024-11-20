@@ -111,6 +111,10 @@ inline Box2 GetBounds(Point2 pos, Dimensions2 dim) {
 	return {pos.x, pos.y, pos.x + dim.width, pos.y + dim.height};
 }
 
+inline Box2 GetIntersection(Box2 a, Box2 b) {
+	return {MAX(a.x0, b.x0), MAX(a.y0, b.y0), MIN(a.x1, b.x1), MIN(a.y1, b.y1)};
+}
+
 union Box2i {
 	struct {Point2i p0, p1;};
 	struct {int32 x0, y0, x1, y1;};
