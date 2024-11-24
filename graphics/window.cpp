@@ -20,6 +20,8 @@ enum : uint32 {
 	Event_KeyboardChar,
 	Event_KeyboardKeyUp,
 
+	Event_Custom,
+
 	Event_count
 };
 
@@ -42,6 +44,10 @@ struct KeyboardEvent {
 	bool shiftIsDown;
 };
 
+struct CustomEvent {
+	opaque64 data;
+};
+
 struct OSEvent {
 	uint32 type; 
 	int32 time;
@@ -49,6 +55,7 @@ struct OSEvent {
 		WindowEvent window;
 		MouseEvent mouse;
 		KeyboardEvent keyboard;
+		CustomEvent custom;
 	};
 };
 
@@ -134,6 +141,7 @@ enum : uint32 {
 #  define OSCopyToClipboard 		Win32CopyToClipboard
 #  define OSRequestClipboardData	Win32RequestClipboardData
 
+#  define OSEnqueueEvent			Win32EnqueueEvent
 #  define OSPollEvent				Win32PollEvent
 #endif
 

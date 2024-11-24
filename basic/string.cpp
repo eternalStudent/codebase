@@ -566,11 +566,19 @@ struct StringBuilder {
 		return concat;
 	}
 
-	StringBuilder operator()(uint64 i, char f = 'd') {
+	StringBuilder operator()(uint64 i, char f = 'd', ssize pad = 0) {
 		StringBuilder concat = *this;
-		if (f == 'd') concat.ptr += UnsignedToDecimal(i, concat.ptr);
-		if (f == 'b') concat.ptr += UnsignedToBinary(i, concat.ptr);
-		if (f == 'x') concat.ptr += UnsignedToHex(i, concat.ptr);
+		ssize length = 0;
+		if (f == 'd') length = UnsignedToDecimal(i, concat.ptr);
+		if (f == 'b') length = UnsignedToBinary(i, concat.ptr);
+		if (f == 'x') length = UnsignedToHex(i, concat.ptr);
+		if (pad > length) {
+			ssize diff = pad - length;
+			memmove(concat.ptr + diff, concat.ptr, length);
+			memset(concat.ptr, '0', diff);
+			length = pad;
+		}
+		concat.ptr += length;
 		return concat;
 	}
 

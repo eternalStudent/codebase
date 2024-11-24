@@ -79,14 +79,14 @@ BOOL Win32EnterFullScreen() {
 
 void Win32EnqueueEvent(OSEvent event) {
 	window.queue.table[window.queue.writeIndex & EVENT_QUEUE_MASK] = event;
-	_WriteBarrier();
+	MemoryBarrier();
 	window.queue.writeIndex++;
 }
 
 BOOL Win32PollEvent(OSEvent* event) {
 	if (window.queue.readIndex == window.queue.writeIndex) return FALSE;
 	*event = window.queue.table[window.queue.readIndex & EVENT_QUEUE_MASK];
-	_ReadWriteBarrier();
+	MemoryBarrier();
 	window.queue.readIndex++;
 	return TRUE;
 }
