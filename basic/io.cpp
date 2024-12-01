@@ -10,6 +10,7 @@
 #  define OSGetFileSize 		Win32GetFileSize
 #  define OSCloseFile   		CloseHandle
 #  define OSFileExists			PathFileExistsW
+#  define OSRenameExtension		PathRenameExtensionW
 #  define OSGetDefaultFontFile	Win32GetDefaultFontFile
 #  define OSCreateChildProcess  Win32CreateChildProcess
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)

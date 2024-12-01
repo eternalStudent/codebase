@@ -770,6 +770,8 @@ void OpenGLUIFlush() {
 	}
 	PixelSpaceYIsDown(opengl.currentProgram->handle);
 
+	// TODO: do I need to generate and delete buffers every frame?
+	//       Or can I do it once?
 	GLuint buffer;
 	glGenBuffers(1, &buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, buffer);
@@ -794,6 +796,7 @@ void OpenGLUIFlush() {
 	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, opengl.quadCount);
 	glBindVertexArray(0);
 	glDeleteVertexArrays(1, &vertexArray);
+	glDeleteBuffers(1, &buffer);
 
 	opengl.quadCount = 0;
 }

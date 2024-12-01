@@ -21,12 +21,13 @@ struct {
 	RECT clickRect;
 	LONG timeLastClicked;
 
-	BOOL iconSet;
-	int32 icon;
+	int32 notMoveCount;
 
 	HCURSOR cursors[CUR_COUNT];
 
 	EventQueue queue;
+
+	WNDPROC proc;
 } window;
 
 HWND Win32GetWindowHandle() {
@@ -92,6 +93,12 @@ BOOL Win32PollEvent(OSEvent* event) {
 }
 
 LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LPARAM lParam) {
+
+	if (window.proc) {
+		LRESULT result = window.proc(handle, message, wParam, lParam);
+		if (result) return result;
+	}
+
 	switch (message) {
 		case WM_DESTROY: {
 			window.destroyed = true;
@@ -166,8 +173,9 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			}
 		} break;
 
+		#define MOUSE_NOT_MOVE_TIMER_ID		1337
+
 		case WM_MOUSEMOVE: {
-			if (window.iconSet) SetCursor(window.cursors[window.icon]);
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
 			WORD flags = LOWORD(wParam);
@@ -178,7 +186,32 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			event.mouse.cursorPos = {x, y};
 			event.mouse.ctrlIsDown = (flags & MK_CONTROL) == MK_CONTROL;
 			Win32EnqueueEvent(event);
+
+			// creates an event if the mouse did not move for a second.
+			// this kills previous timer with the same id
+			// so as long as the mouse move within that time frame
+			// the WM_TIMER will not be triggered
+			SetTimer(handle, MOUSE_NOT_MOVE_TIMER_ID, 1000, NULL);
+			window.notMoveCount = 0;
 		} break;
+
+		case WM_TIMER: {
+			if (wParam == MOUSE_NOT_MOVE_TIMER_ID) {
+				POINT p;
+				GetCursorPos(&p);
+				ScreenToClient(window.handle, &p);
+
+				OSEvent event;
+				event.type = Event_MouseNotMove;
+				event.time = GetMessageTime();
+				event.mouse.cursorPos = {p.x, p.y};
+				event.mouse.notMoveCount = ++window.notMoveCount;
+				Win32EnqueueEvent(event);
+			}
+		} break;
+
+		#undef MOUSE_NOT_MOVE_TIMER_ID
+
 		case WM_LBUTTONDOWN : {
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
@@ -209,7 +242,8 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 				event.type = Event_MouseTripleClick;
 				Win32EnqueueEvent(event);
 			}
-			
+
+			SetCapture(handle);
 		} break;
 		case WM_LBUTTONUP : {
 			LONG x = GET_X_LPARAM(lParam);
@@ -221,6 +255,8 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			event.time = time;
 			event.mouse.cursorPos = {x, y};
 			Win32EnqueueEvent(event);
+
+			ReleaseCapture();
 		} break;
 		case WM_RBUTTONDOWN : {
 			window.clickCount = 0;
@@ -274,6 +310,19 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			event.mouse.cursorPos = {p.x, p.y};
 			event.mouse.wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
 			event.mouse.ctrlIsDown = (flags & MK_CONTROL) == MK_CONTROL;
+			Win32EnqueueEvent(event);
+		} break;
+		case WM_CONTEXTMENU : {
+			LONG x = GET_X_LPARAM(lParam);
+			LONG y = GET_Y_LPARAM(lParam);
+			POINT p = {x, y};
+			ScreenToClient(handle, &p);
+			LONG time = GetMessageTime();
+
+			OSEvent event;
+			event.type = Event_MouseContextMenu;
+			event.time = time;
+			event.mouse.cursorPos = {p.x, p.y};
 			Win32EnqueueEvent(event);
 		} break;
 	}
@@ -383,7 +432,6 @@ WNDCLASSEXW CreateWindowClass() {
 	windowClass.lpszClassName = L"WindowClass";
 	ATOM atom = RegisterClassExW(&windowClass);
 	ASSERT(atom);
-	(void)atom;
 
 	return windowClass;
 }
@@ -469,11 +517,6 @@ void Win32ProcessWindowEvents() {
 
 void Win32SetCursorIcon(int32 icon) {
 	SetCursor(window.cursors[icon]);
-}
-
-void Win32SetWindowCursorIcon(int32 icon) {
-	window.iconSet = TRUE;
-	window.icon = icon;
 }
 
 HANDLE Win32OpenFileDialog(WCHAR* path, DWORD maxPathLength) {

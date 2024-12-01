@@ -67,52 +67,58 @@ HANDLE Win32GetDefaultFontFile() {
 	return Win32OpenFile(filePath);
 }
 
-// TODO: I also need to output the process handle
-//       use GetExitCodeProcess to know if the process is still active
+enum CreateProcessFlags {
+	CPF_None  = 0,
+	CPF_Debug = 1
+};
+
 // NOTE: https://learn.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
-HANDLE Win32CreateChildProcess(LPWSTR cmd) {
+void Win32CreateChildProcess(LPWSTR cmd, CreateProcessFlags creationFlags, 
+							 HANDLE* outReadHandle = NULL,
+							 HANDLE* processHandle = NULL,
+							 HANDLE* outWriteHandle = NULL,
+							 HANDLE* threadHandle = NULL) {
+
 	HANDLE readHandle = NULL;
 	HANDLE writeHandle = NULL;
-	SECURITY_ATTRIBUTES attributes;
 
-	// Set the bInheritHandle flag so pipe handles are inherited. 
+	// NOTE: Set the bInheritHandle flag so pipe handles are inherited. 
+	SECURITY_ATTRIBUTES attributes;
 	attributes.nLength = sizeof(SECURITY_ATTRIBUTES);
 	attributes.bInheritHandle = TRUE;
 	attributes.lpSecurityDescriptor = NULL;
 
-	// Create a pipe for the child process's STDOUT. 
 	ASSERT(CreatePipe(&readHandle, &writeHandle, &attributes, 0));
 
-	// Ensure the read handle to the pipe for STDOUT is not inherited.
+	// NOTE: Ensure the read handle to the pipe for STDOUT is not inherited.
 	ASSERT(SetHandleInformation(readHandle, HANDLE_FLAG_INHERIT, 0));
 	 
-	// Set up members of the STARTUPINFO structure. 
-	// This structure specifies the STDIN and STDOUT handles for redirection.
-	STARTUPINFOW siStartInfo = {};
-	siStartInfo.cb = sizeof(STARTUPINFO);
-	siStartInfo.hStdError = writeHandle;
-	siStartInfo.hStdOutput = writeHandle;
-	siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
+	STARTUPINFOW si = {};
+	si.cb = sizeof(STARTUPINFOW);
+	si.hStdError = writeHandle;
+	si.hStdOutput = writeHandle;
+	si.dwFlags |= STARTF_USESTDHANDLES;
 
-	PROCESS_INFORMATION piProcInfo = {};
+	PROCESS_INFORMATION pi = {};
+
+	DWORD dwCreationFlags = 0;
+	if ( (creationFlags&CPF_Debug) != 0 ) dwCreationFlags |= DEBUG_ONLY_THIS_PROCESS;
 	 
-	// Create the child process. 	
 	ASSERT(CreateProcessW(
-		NULL,          // application name
-		cmd,     	   // command line 
-		NULL,          // process security attributes 
-		NULL,          // primary thread security attributes 
-		TRUE,          // handles are inherited 
-		0,             // creation flags 
-		NULL,          // use parent's environment 
-		NULL,          // use parent's current directory 
-		&siStartInfo,  // STARTUPINFO pointer 
-		&piProcInfo    // receives PROCESS_INFORMATION 
+		NULL,		// application name
+		cmd, 
+		NULL,		// process security attributes 
+		NULL,		// primary thread security attributes 
+		TRUE,		// handles are inherited 
+		dwCreationFlags,
+		NULL,		// use parent's environment 
+		NULL,		// use parent's current directory 
+		&si, 		// STARTUPINFO pointer 
+		&pi  		// receives PROCESS_INFORMATION 
 	));
 
-	CloseHandle(piProcInfo.hProcess);
-	CloseHandle(piProcInfo.hThread);	
-	CloseHandle(writeHandle);
-
-	return readHandle;
+	if (outReadHandle ) *outReadHandle  = readHandle ; else CloseHandle(readHandle );
+	if (outWriteHandle) *outWriteHandle = writeHandle; else CloseHandle(writeHandle);
+	if (processHandle ) *processHandle  = pi.hProcess; else CloseHandle(pi.hProcess);
+	if (threadHandle  ) *threadHandle   = pi.hThread ; else CloseHandle(pi.hThread );
 }
