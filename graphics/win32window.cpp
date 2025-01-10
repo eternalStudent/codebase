@@ -16,6 +16,7 @@ struct {
 
 	Dimensions2i dim;
 	BOOL destroyed;
+	Point2i cursor;
 
 	int32 clickCount;
 	RECT clickRect;
@@ -178,6 +179,9 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 		case WM_MOUSEMOVE: {
 			LONG x = GET_X_LPARAM(lParam);
 			LONG y = GET_Y_LPARAM(lParam);
+			if (window.cursor.x == x && window.cursor.y == y)
+				break;
+
 			WORD flags = LOWORD(wParam);
 
 			OSEvent event;
@@ -186,6 +190,7 @@ LRESULT CALLBACK MainWindowCallback(HWND handle, UINT message, WPARAM wParam, LP
 			event.mouse.cursorPos = {x, y};
 			event.mouse.ctrlIsDown = (flags & MK_CONTROL) == MK_CONTROL;
 			Win32EnqueueEvent(event);
+			window.cursor = event.mouse.cursorPos;
 
 			// creates an event if the mouse did not move for a second.
 			// this kills previous timer with the same id

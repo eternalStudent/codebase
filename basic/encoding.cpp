@@ -77,6 +77,21 @@ ssize CodepointToUTF8(uint32 codepoint, byte* buffer) {
 	return 4;
 }
 
+ssize GetUTF8Length(uint32 codepoint) {
+	if (codepoint < 0x80) {
+		return 1;
+	}
+
+	if (codepoint < 0x0800) {
+		return 2;
+	}
+
+	if (codepoint < 0x010000) {
+		return 3;
+	}
+	return 4;
+}
+
 ssize CodepointToUTF16(uint32 codepoint, byte* buffer) {
 	uint16* bufferW = (uint16*)buffer;
 	if (codepoint < 0x10000) {
@@ -109,6 +124,8 @@ bool IsEnclosing(byte b) {
 	return b == '\"' || b == '\'' || b == '`';
 }
 
+// TODO: bound checks!! return -1 on error? return best effort? 
+//                      return bool and add another out param?
 ssize ParseString(String string, byte* buffer) {
 	byte enclosing = string.data[0];
 
@@ -181,6 +198,72 @@ ssize ParseString(String string, byte* buffer) {
 		}
 		else {
 			buffer[length++] = b;
+		}
+	}
+
+	return length;
+}
+
+// TODO: bound checks!! return -1 on error? Or return bool and add out param?
+ssize GetUTF8Length(String string) {
+	byte enclosing = string.data[0];
+
+	if (!IsEnclosing(enclosing)) {
+		return string.length;
+	}
+
+	ssize length = 0;
+	for (ssize i = 1; i < string.length; i++) {
+		byte b = string.data[i];
+		if (b == enclosing) {
+			break;
+		}
+
+		if (b == '\\') {
+			i++;
+			b = string.data[i];
+			switch (b) {
+			case 'x': {
+				if (IsHexDigit(string.data[i + 1])) {
+					i++;
+					if (IsHexDigit(string.data[i + 1]))
+						i++;
+				}
+				length++;
+			} break;
+			case 'u': {
+				// TODO: don't actually have to parse the codepoint
+				//       if (first byte is greater than 0) => 3
+				//       if (second byte is 8 or greater) => 3
+				//       if (second byte is greater than 0) => 2
+				//       if (thrid byte is greater than 8) => 2
+				//       else 1
+				uint32 codepoint;
+				if (TryParseHex32({string.data + i + 1, 4}, &codepoint)) {
+					length += GetUTF8Length(codepoint);
+					i += 4;
+				}
+				else {
+					length++;
+				}
+			} break;
+			case 'U': {
+				uint32 codepoint;
+				if (TryParseHex32({string.data + i + 1, 8}, &codepoint)) {
+					length += GetUTF8Length(codepoint);
+					i += 8;
+				}
+				else {
+					length++;
+				}
+			} break;
+			default: {
+				length++;
+			} break;
+			}
+		}
+		else {
+			length++;
 		}
 	}
 

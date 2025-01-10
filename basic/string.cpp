@@ -504,6 +504,15 @@ struct StringBuilder {
 		return concat;
 	}
 
+	StringBuilder operator()(char* str) {
+		StringBuilder concat = *this;
+		if (str == NULL)
+			return concat;
+		
+		for (; *str; str++, concat.ptr++) *(concat.ptr) = *str;
+		return concat;
+	}
+
 	StringBuilder operator()(String string) {
 		StringBuilder concat = *this;
 		concat.ptr += StringCopy(string, concat.ptr);
