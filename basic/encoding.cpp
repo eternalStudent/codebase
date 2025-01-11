@@ -92,6 +92,24 @@ ssize GetUTF8Length(uint32 codepoint) {
 	return 4;
 }
 
+ssize UTF16Decode(uint16* data, uint16* end, uint32* codepoint) {
+	if (data == end)
+		return 0;
+
+	if (data[0] < 0x10000) {
+		*codepoint = (uint32)data[0];
+		return 2;
+	}
+
+	if (data + 1 == end)
+		return 0;
+
+	uint32 ls = (uint32)(data[0] & 0x03FF);
+	uint32 ms = (uint32)(data[1] & 0x03FF);
+	*codepoint = ((ms << 10) | ls) + 0x10000;
+	return 4;
+}
+
 ssize CodepointToUTF16(uint32 codepoint, byte* buffer) {
 	uint16* bufferW = (uint16*)buffer;
 	if (codepoint < 0x10000) {
@@ -100,8 +118,8 @@ ssize CodepointToUTF16(uint32 codepoint, byte* buffer) {
 	}
 
 	uint32 u = codepoint - 0x10000;
-	bufferW[0] = 0xD800 | (uint16)((u & 0x0FFC00) >> 10);
-	bufferW[1] = 0xDC00 | (uint16)(u & 0x0003FF);
+	bufferW[0] = 0xDC00 | (uint16)(u & 0x0003FF);
+	bufferW[1] = 0xD800 | (uint16)((u & 0x0FFC00) >> 10);
 	return 4;
 }
 
@@ -112,6 +130,18 @@ ssize UTF8ToUTF16(String str, byte* buffer) {
 	for (byte* ptr = str.data; ptr < str.data + str.length; ptr += length) {
 		length = UTF8Decode(ptr, str.data + str.length, &codepoint);
 		total += CodepointToUTF16(codepoint, buffer + total);
+	}
+
+	return total;
+}
+
+ssize UTF16ToUTF8(String16 str, byte* buffer) {
+	ssize total = 0;
+	ssize length;
+	uint32 codepoint;
+	for (uint16* ptr = str.data; ptr < str.data + str.length; ptr += length) {
+		length = UTF16Decode(ptr, str.data + str.length, &codepoint);
+		total += CodepointToUTF8(codepoint, buffer + total);
 	}
 
 	return total;
