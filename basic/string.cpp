@@ -426,7 +426,6 @@ bool TryParseBinary64(String str, uint64* result) {
 	return true;
 }
 
-// TODO: add TryParse variation
 float64 ParseFloat64(String str) {
 	float64 result = 0.0;
 	ssize start = str.data[0] == '-' ? 1 : 0;
@@ -453,6 +452,88 @@ float64 ParseFloat64(String str) {
 		}
 		else {
 			result *= 10.0;
+			result += digit;
+		}
+	}
+	if (start == 1) result = -result;
+	return result;
+}
+
+bool TryParseFloat64(String str, float64* result) {
+	*result = 0.0;
+	ssize start = str.data[0] == '-' ? 1 : 0;
+	bool radix = false;
+	float64 term = 1.0;
+	for (ssize i = start; i < str.length; i++) {
+		byte c = str.data[i];
+		if (c == '.') {
+			if (radix) 
+				return false;
+
+			radix = true;
+			continue;     
+		}
+		if (c == 'e' || c == 'E') {
+			String exp;
+			ssize j = str.data[i+1] == '+' ? i+2 : i+1;
+			exp.data = &str.data[j];
+			exp.length = str.length - j;
+			int64 exp64;
+			if (!TryParseInt64(exp, &exp64))
+				return false;
+
+			if (exp64 > MAX_INT32 || exp64 < MIN_INT32)
+				return false;
+
+			*result *= pow10((int32)exp64);
+			break;
+		}
+
+		if (c < '0' || c > '9')
+			return false;
+
+		byte digit = c - '0';
+
+		if (radix) {
+			term *= 10.0;
+			*result += digit/term;
+		}
+		else {
+			*result *= 10.0;
+			*result += digit;
+		}
+	}
+	if (start == 1) *result = -(*result);
+	return true;
+}
+
+// TODO: add TryParse variation
+float32 ParseFloat32(String str) {
+	float32 result = 0.0f;
+	ssize start = str.data[0] == '-' ? 1 : 0;
+	bool radix = false;
+	float32 term = 1.0f;
+	for (ssize i = start; i < str.length; i++) {
+		byte c = str.data[i];
+		byte digit = c-'0';
+		if (c == '.') {
+			radix = true;
+			continue;     
+		}
+		if (c == 'e' || c == 'E') {
+			String exp;
+			ssize j = str.data[i+1] == '+' ? i+2 : i+1;
+			exp.data = &str.data[j];
+			exp.length = str.length - j;
+			result *= (float32)pow10((int32)ParseInt64(exp));
+			break;
+		}
+		if (radix) {
+			term *= 10.0f;
+			result += digit/term;
+		}
+		else {
+			result *= 10.0f;
 			result += digit;
 		}
 	}
@@ -534,9 +615,10 @@ struct StringBuilder {
 		return concat;
 	}
 
-	StringBuilder operator()(char ch) {
+	StringBuilder operator()(char ch, char f = 'a') {
 		StringBuilder concat = *this;
-		*(concat.ptr) = (byte)ch;
+		if (f == 'a' || (32 <= ch && ch <= 126)) *(concat.ptr) = (byte)ch;
+		else *(concat.ptr) = '.';
 		concat.ptr++;
 		return concat;
 	}
@@ -592,6 +674,12 @@ struct StringBuilder {
 	}
 
 	StringBuilder operator()(float32 f, int32 precision) {
+		StringBuilder concat = *this;
+		concat.ptr += FloatToDecimal(f, precision, concat.ptr);
+		return concat;
+	}
+
+	StringBuilder operator()(float64 f, int32 precision) {
 		StringBuilder concat = *this;
 		concat.ptr += FloatToDecimal(f, precision, concat.ptr);
 		return concat;
