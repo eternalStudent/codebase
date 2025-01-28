@@ -60,6 +60,36 @@ ssize UnsignedToDecimal(uint64 number, byte* str) {
 	return numberOfDigits;
 }
 
+ssize UnsignedToDecimal(uint64 high, uint64 low, byte* str) {
+	if (high == 0)
+		return UnsignedToDecimal(low, str);
+
+	// get the last decimal digit
+	uint64 high_r = high % 10;
+	high = high / 10;
+	uint64 last;
+	low = udiv(high_r, low, 10, &last);
+
+	byte* ptr = str;
+	if (high == 0) {
+		ptr += UnsignedToDecimal(low, ptr);
+	}
+	else {
+		uint64 remainder;
+		uint64 quotient = udiv(high, low, 10000000000000000000, &remainder);
+		ptr += UnsignedToDecimal(quotient, ptr);
+		ssize length = UnsignedToDecimal(remainder, ptr);
+		if (length < 19) {
+			ssize diff = 19 - length;
+			memmove(ptr + diff, ptr, length);
+			memset(ptr, '0', diff);
+		}
+		ptr += 19;
+	}
+	*(ptr++) = (byte)last + '0';
+	return ptr - str;
+}
+
 ssize SignedToDecimal(int64 number, byte* str) {
 	if (number < 0) {
 		*str = '-';

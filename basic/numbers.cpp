@@ -78,6 +78,45 @@ uint64 power(uint32 base, uint32 exponent) {
 	return result;
 }
 
+uint64 uadd(uint64 a, uint64 b, byte* carry) {
+	uint64 c;
+	*carry = _addcarry_u64(0, a, b, &c);
+	return c;
+}
+
+uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder) {
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+	uint64 quotient;
+	uint64 rem;
+
+	asm("divq %4"
+	    : "=a"(quotient), "=d"(*rem)
+	    : "d"(high), "a"(low), "r"(divisor));
+
+	*remainder = rem;
+
+	return quotient;
+#elif defined(COMPILER_MSVC)
+	return _udiv128(high, low, divisor, remainder);
+#endif
+}
+
+uint64 umul(uint64 a, uint64 b, uint64 *high_c) {
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+	__uint128_t product = (__uint128_t)a * (__uint128_t)b;
+	*high_c = product >> 64;
+	return product;
+#elif defined(COMPILER_MSVC)
+	return _umul128(a, b, high_c);
+#endif
+}
+
+uint64 umul(uint64 high_a, uint64 low_a, uint64 b, uint64 *high_c) {
+	uint64 low_c = umul(low_a, b, high_c);
+	*high_c += high_a*b;
+	return low_c;
+}
+
 // Signed
 //--------
 
@@ -93,6 +132,18 @@ typedef ptrdiff_t ssize;
 #define MAX_INT16 0x7fff
 #define MAX_INT32 0x7fffffff
 #define MAX_INT64 0x7fffffffffffffffll
+
+inline int32 min(int32 a, int32 b) {
+	return a < b ? a : b;
+}
+
+inline int32 max(int32 a, int32 b) {
+	return a < b ? b : a;
+}
+
+inline int32 sign(int32 i) {
+	return (0 < i) - (i < 0);
+}
 
 inline int64 min(int64 a, int64 b) {
 	return a < b ? a : b;
