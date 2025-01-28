@@ -316,18 +316,22 @@ bool UIPanelsProcessEvent(UIPanelManager* manager, OSEvent event) {
 			}
 
 			else if (manager->hover == UIPH_Header) {
-				manager->state = UIPS_Drag;
+				if (panel != manager->root) {
+					manager->state = UIPS_Drag;
 
-				if (!panel->parent) // floating
-					LINKEDLIST_MOVE_TO_LAST(&(manager->floating), panel);
-				else if (panel->parent->align == Align_Unaligned) {
-					panel->parent->tabs.selected = panel;
-					panel->pos = panel->parent->pos;
+					if (!panel->parent) // floating
+						LINKEDLIST_MOVE_TO_LAST(&(manager->floating), panel);
+					else if (panel->parent->align == Align_Unaligned) {
+						panel->parent->tabs.selected = panel;
+						panel->pos = panel->parent->pos;
+					}
+
+					manager->grabPos = panel->pos - cursor;
+
+					return true;
 				}
-
-				manager->grabPos = panel->pos - cursor;
-
-				return true;
+				
+				return false;
 			}
 
 			else if (manager->hover == UIPH_Splitter) {
