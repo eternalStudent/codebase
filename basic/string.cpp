@@ -98,54 +98,247 @@ ssize SignedToDecimal(int64 number, byte* str) {
 	return UnsignedToDecimal((uint32)number, str);
 }
 
-ssize FloatToDecimal(float32 number, int64 precision, byte* str) {
+static int32 bitIndexToExp[53] = {
+	55, 54, 53, 53, 52, 52, 52, 51, 51, 50, 50, 
+	49, 49, 49, 48, 48, 47, 47, 46, 46, 46, 45, 45, 
+	44, 44, 43, 43, 43, 42, 42, 41, 41, 40, 40, 40, 
+	39, 39, 38, 38, 37, 37, 37, 36, 36, 35, 35, 
+	34, 34, 34, 33, 33, 32, 32
+};
 
-	// output integer part
-	int64 integer = (int64)number;
-	number -= (float32)integer;
-	ssize count = SignedToDecimal(integer, str);
-	if (!precision) return count;
+static struct {uint64 high, low;} powersOf5[24] = {
+	{0x4ee, 0x2d6d415b85acef81},
+	{0x18a6, 0xe32246c99c60ad85},
+	{0x7b42, 0x6fab61f00de36399},
+	{0x2684c, 0x2e58e9b04570f1fd},
+	{0xc097c, 0xe7bc90715b34b9f1},
+	{0x3c2f70, 0x86aed236c807a1b5},
+	{0x12ced32, 0xa16a1b11e8262889},
+	{0x5e0a1fd, 0x2712875988becaad},
+	{0x1d6329f1, 0xc35ca4bfabb9f561},
+	{0x92efd1b8, 0xd0cf37be5aa1cae5},
+	{0x2deaf189c, 0x140c16b7c528f679},
+	{0xe596b7b0c, 0x643c7196d9ccd05d},
+	{0x47bf19673d, 0xf52e37f2410011d1},
+	{0x166bb7f0435, 0xc9e717bb45005915},
+	{0x701a97b150c, 0xf18376a85901bd69},
+	{0x23084f676940, 0xb7915149bd08b30d},
+	{0xaf298d050e43, 0x95d69670b12b7f41},
+	{0x36bcfc1194751, 0xed30f03375d97c45},
+	{0x111b0ec57e6499, 0xa1f4b1014d3f6d59},
+	{0x558749db77f700, 0x29c77506823d22bd},
+	{0x1aba4714957d300, 0xd0e549208b31adb1},
+	{0x85a36366eb71f04, 0x147a6da2b7f86475},
+	{0x29c30f1029939b14, 0x6664242d97d9f649},
+	{0xd0cf4b50cfe20765, 0xfff4b4e3f741cf6d},
+};
 
-	// output fraction part
-	str += count;
-	*str = '.';
-	str++;
-	count += precision + 1;
-	while (precision) {
-		number *= 10.0f;
-		int64 digit = (int64)number;
-		*str = (byte)('0' + digit);
-		number -= (float32)digit;
-		str++;
-		precision--;
+ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
+	if (m2 == 0) {
+		buffer[0] = '0';
+		buffer[1] = '.';
+		buffer[2] = '0';
+		return 3;
 	}
-	*str = 0;
-	return count;
+
+	uint32 p = (uint32)precision;
+	byte* ptr = buffer;
+
+	int32 trailingZeroes = (int32)LowBit(m2);
+	m2 >>= trailingZeroes;
+	e2 += trailingZeroes;
+
+	int32 highBit = (int32)HighBit(m2, 0);
+	ASSERT(highBit <= 52);
+	bool hasWhole = 0 <= e2 || -e2 <= highBit;
+	if (hasWhole) {
+		bool wholeFitsIn128 = highBit + 1 + e2 <= 128;
+		if (wholeFitsIn128) {
+			uint64 high = 0;
+			uint64 low = 0;
+			if (e2 < 0) {
+				low = m2 >> -e2;
+			}
+			else if (e2 == 0) {
+				low = m2;
+			}
+			else /*(e2 > 0)*/ {
+				low = (e2 < 64) ? m2 << e2 : 0;
+				high = (e2 < 64) ? m2 >> (64 - e2) : m2 << (e2 - 64);
+			}
+			ptr += UnsignedToDecimal(high, low, ptr);
+		}
+		else {
+			// TODO:
+			ASSERT(0);
+		}
+	} else {
+		*(ptr++) = '0';
+	}
+
+	*(ptr++) = '.';
+
+	bool hasFraction = e2 < 0;
+	if (hasFraction) {
+		int32 denominatorExp = -e2;
+		if (denominatorExp < 64) {
+			uint64 denominator = 1ull << denominatorExp;
+			uint64 numerator = m2 & (denominator - 1);
+
+			for (uint32 digits = 0; numerator && digits < p; digits++) {
+				uint64 high;
+				numerator = umul(numerator, 10, &high);
+				uint64 digit = udiv(high, numerator, denominator, &numerator);
+				*(ptr++) = (byte)digit + '0';
+			}
+		}
+		else {
+			ASSERT(!hasWhole);
+			ptr -= 2;
+
+			// we need to either multiply m2 by 5, or shift it by 1, -e2 times
+			// start by multiplying m2 by 5^n, where n can be determined by the high-bit
+			int32 e10 = bitIndexToExp[highBit];
+			if (e10 > -e2) e10 = -e2;
+			uint64 high;
+			uint64 low = umul(powersOf5[e10 - 32].high, powersOf5[e10 - 32].low, m2, &high);
+			
+			// we already multipled by 5 e10 times, so we don't start with 0
+			for (int32 i = e10; i < -e2; i++) {
+				// if we can safely multiply by 5, then this is our preference
+				if (high < 3689348814741910323) {
+					low = umul(high, low, 5, &high);
+					e10++;
+				}
+				else {
+					low >>= 1;
+					low |= ((high & 1) << 63);
+					high >>= 1;
+				}
+			}
+
+			// TODO: remove trailing zeroes
+			ssize length = UnsignedToDecimal(high, low, ptr);
+			int32 exp = e10 - (int32)length + 1;
+			if (length - 2 > p) length = p + 2;
+			memmove(ptr + 1, ptr, length);
+			ptr[1] = '.';
+			ptr += length + 1;
+			*(ptr++) = 'e';
+			*(ptr++) = '-';
+
+			ptr += UnsignedToDecimal(exp, ptr);
+		}
+	}
+	else {
+		*(ptr++) = '0';
+	}
+
+	return ptr - buffer;
 }
 
-ssize FloatToDecimal(float64 number, int64 precision, byte* str) {
+ssize Float32ToDecimal(uint32 value, int32 precision, byte* buffer) {
+	uint32 exp  = (value & 0x7F800000) >> 23;
+	uint32 sign = (value & 0x80000000) >> 31;
+	uint64 significand = (value & 0x7FFFFF);
 
-	// output integer part
-	int64 integer = (int64)number;
-	number -= (float64)integer;
-	ssize count = SignedToDecimal(integer, str);
-	if (!precision) return count;
+	if (exp == 0xFF) {
+		if (significand) {
+			buffer[0] = 'N';
+			buffer[1] = 'a';
+			buffer[2] = 'N';
+			return 3;
+		}
+		
+		if (sign) {
+			buffer[0] = '-';
+			buffer[1] = 'i';
+			buffer[2] = 'n';
+			buffer[3] = 'f';
+			return 4;
+		}
 
-	// output fraction part
-	str += count;
-	*str = '.';
-	str++;
-	count += precision + 1;
-	while (precision) {
-		number *= 10.0f;
-		int64 digit = (int64)number;
-		*str = (byte)('0' + digit);
-		number -= (float64)digit;
-		str++;
-		precision--;
+		else {
+			buffer[0] = 'i';
+			buffer[1] = 'n';
+			buffer[2] = 'f';
+			return 3;
+		}
 	}
-	*str = 0;
-	return count;
+
+	ssize length = 0;
+	if (sign) {
+		buffer[0] = '-';
+		buffer++;
+		length++;
+	}
+
+	if (exp == 0) {
+		length += FloatToDecimal(significand, -149, precision, buffer);
+	}
+	else {
+		length += FloatToDecimal(significand | 0x800000, (int32)exp - 127 - 23, precision, buffer);
+	}
+
+	return length;
+}
+
+ssize Float32ToDecimal(float32 value, int32 precision, byte* buffer) {
+	union {float32 f; uint32 u;} cvt;
+	cvt.f = value;
+	return Float32ToDecimal(cvt.u, precision, buffer);
+}
+
+ssize Float64ToDecimal(uint64 value, int32 precision, byte* buffer) {
+	uint32 sign =        (value & 0x8000000000000000) >> 63;
+	uint32 exp  =        (value & 0x7FF0000000000000) >> 52;
+	uint64 significand = (value & 0x000FFFFFFFFFFFFF) >> 00;
+
+	if (exp == 0x7FF) {
+		if (significand) {
+			buffer[0] = 'N';
+			buffer[1] = 'a';
+			buffer[2] = 'N';
+			return 3;
+		}
+		
+		if (sign) {
+			buffer[0] = '-';
+			buffer[1] = 'i';
+			buffer[2] = 'n';
+			buffer[3] = 'f';
+			return 4;
+		}
+
+		else {
+			buffer[0] = 'i';
+			buffer[1] = 'n';
+			buffer[2] = 'f';
+			return 3;
+		}
+	}
+
+	ssize length = 0;
+	if (sign) {
+		buffer[0] = '-';
+		buffer++;
+		length++;
+	}
+
+	if (exp == 0) {
+		length += FloatToDecimal(significand, -1075, precision, buffer);
+	}
+	else {
+		length += FloatToDecimal(significand | 0x10000000000000, (int32)exp - 1023 - 52, precision, buffer);
+	}
+
+	return length;
+}
+
+ssize Float64ToDecimal(float64 value, int32 precision, byte* buffer) {
+	union {float64 f; uint64 u;} cvt;
+	cvt.f = value;
+	return Float64ToDecimal(cvt.u, precision, buffer);
 }
 
 #define COPY(source, dest) (memcpy(dest, source, sizeof(source)-1), sizeof(source)-1)
@@ -705,13 +898,13 @@ struct StringBuilder {
 
 	StringBuilder operator()(float32 f, int32 precision) {
 		StringBuilder concat = *this;
-		concat.ptr += FloatToDecimal(f, precision, concat.ptr);
+		concat.ptr += Float32ToDecimal(f, precision, concat.ptr);
 		return concat;
 	}
 
 	StringBuilder operator()(float64 f, int32 precision) {
 		StringBuilder concat = *this;
-		concat.ptr += FloatToDecimal(f, precision, concat.ptr);
+		concat.ptr += Float64ToDecimal(f, precision, concat.ptr);
 		return concat;
 	}
 
