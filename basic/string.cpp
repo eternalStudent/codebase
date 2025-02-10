@@ -68,6 +68,8 @@ ssize UnsignedToDecimal(uint64 high, uint64 low, byte* str) {
 	uint64 high_r = high % 10;
 	high = high / 10;
 	uint64 last;
+	// TODO: 
+	// division by a constant should be replace with multiplication and a shift
 	low = udiv(high_r, low, 10, &last);
 
 	byte* ptr = str;
@@ -152,7 +154,7 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 	ASSERT(highBit <= 52);
 	bool hasWhole = 0 <= e2 || -e2 <= highBit;
 	if (hasWhole) {
-		bool wholeFitsIn128 = highBit + 1 + e2 <= 128;
+		bool wholeFitsIn128 = highBit + e2 < 128;
 		if (wholeFitsIn128) {
 			uint64 high = 0;
 			uint64 low = 0;
@@ -169,8 +171,35 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 			ptr += UnsignedToDecimal(high, low, ptr);
 		}
 		else {
-			// TODO:
-			ASSERT(0);
+			uint64 low = 0;
+			uint64 high = m2 << (64 - highBit);
+			uint32 e10 = 128 - highBit;
+
+			for (int32 i = e10; i < e2; i++) {
+				if ((high & 0x8000000000000000) != 0) {
+					high = (high << 1) | ((low & 0x8000000000000000) >> 63);
+					low <<= 1;
+				}
+				else {
+					uint64 remainder;
+					// TODO: 
+					// division by a constant should be replace with
+					// multiplication and a shift
+					low = udiv(high, low, 5, &remainder, &high);
+					e10++;
+				}
+			}
+
+			ssize length = UnsignedToDecimal(high, low, ptr);
+			uint32 exp = e10 + (int32)length - 1;
+			if (length - 2 > p) length = p + 2;
+			memmove(ptr + 1, ptr, length);
+			ptr[1] = '.';
+			ptr += length + 1;
+			while (*(ptr - 1) == '0') ptr--;
+
+			*(ptr++) = 'e';
+			ptr += UnsignedToDecimal(exp, ptr);
 		}
 	} else {
 		*(ptr++) = '0';
@@ -191,6 +220,9 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 				uint64 digit = udiv(high, numerator, denominator, &numerator);
 				*(ptr++) = (byte)digit + '0';
 			}
+
+			// remove trailing zeroes
+			while (*(ptr - 1) == '0') ptr--;
 		}
 		else {
 			ASSERT(!hasWhole);
@@ -217,16 +249,16 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 				}
 			}
 
-			// TODO: remove trailing zeroes
 			ssize length = UnsignedToDecimal(high, low, ptr);
 			int32 exp = e10 - (int32)length + 1;
 			if (length - 2 > p) length = p + 2;
 			memmove(ptr + 1, ptr, length);
 			ptr[1] = '.';
 			ptr += length + 1;
+			while (*(ptr - 1) == '0') ptr--;
+
 			*(ptr++) = 'e';
 			*(ptr++) = '-';
-
 			ptr += UnsignedToDecimal(exp, ptr);
 		}
 	}
@@ -493,12 +525,73 @@ void StringFindWord(String string, ssize index, ssize* start, ssize* end) {
 }
 
 uint64 ParseUInt64(String str) {
-	uint64 result = 0;
-	for (ssize i = 0; i < str.length; i++) {
-		byte c = str.data[i];
-		result *= 10;
-		result += c-'0';
+	byte* data = str.data;
+	ssize length = str.length;
+	ASSERT(str.length <= 20);
+
+	static const uint8_t shufmask[] = {
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	};
+
+	const __m128i zeroes =  _mm_set1_epi8('0');
+	const __m128i factors1 = _mm_set_epi8(1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10);
+	const __m128i factors2 = _mm_set_epi16(1, 100, 1, 100, 1, 100, 1, 100);
+	const __m128i factors3 = _mm_set_epi16(1, 10000, 1, 10000, 1, 10000, 1, 10000);
+	static const uint64 factors[] = {10, 100, 1000, 10000};
+
+	uint64 result;
+	if (length <= 16) {
+		// if [data, data+16) crosses page boundary, but [data, data+length) does not
+		// then you potentially cannot load [data] as 16-byte load
+		// will need to load at previous 16-byte boundary (data rounded down to 16 factorsiple)
+		// extra is amount of bytes to advance to there
+		uint64 address = (uint64)data % 16;
+		uint64 extra = (address + length <= 16) ? address : 0;
+
+		__m128i shuffle = _mm_loadu_si128((const __m128i*)(shufmask + 16 + extra + length));
+		__m128i mask = _mm_loadu_si128((const __m128i*)(shufmask + length));
+
+		__m128i x = _mm_loadu_si128((const __m128i*)(data - extra));
+		x = _mm_shuffle_epi8(x, shuffle);
+
+		x = _mm_sub_epi8(x, zeroes);
+		x = _mm_and_si128(x, mask);
+		x = _mm_maddubs_epi16(x, factors1);
+		x = _mm_madd_epi16(x, factors2);
+		x = _mm_packus_epi32(x, x);
+		x = _mm_madd_epi16(x, factors3);
+
+		uint32 a = _mm_extract_epi32(x, 0);
+		uint32 b = _mm_extract_epi32(x, 1);
+		result = 100000000ull*a + b;
 	}
+	else {
+		__m128i hi = _mm_loadu_si128((const __m128i*)data);
+
+		hi = _mm_sub_epi8(hi, zeroes);
+		hi = _mm_maddubs_epi16(hi, factors1);
+		hi = _mm_madd_epi16(hi, factors2);
+		hi = _mm_packus_epi32(hi, hi);
+		hi = _mm_madd_epi16(hi, factors3);
+
+		uint32 hi0 = _mm_extract_epi32(hi, 0);
+		uint32 hi1 = _mm_extract_epi32(hi, 1);
+		uint64 a = 100000000ull*hi0 + hi1;
+
+		// TODO: this can be done in SWAR, feels like an overkill
+		__m128i mask = _mm_loadu_si128((const __m128i*)(shufmask + length - 16));
+		__m128i lo = _mm_loadu_si128((const __m128i*)(data + length - 16));
+		lo = _mm_sub_epi8(lo, zeroes);
+		lo = _mm_and_si128(lo, mask);
+		lo = _mm_maddubs_epi16(lo, factors1);
+		lo = _mm_madd_epi16(lo, factors2);
+		uint64 b = (uint64)(uint32)_mm_extract_epi32(lo, 3);
+
+		result = factors[length - 16 - 1]*a + b;
+	}
+
 	return result;
 }
 

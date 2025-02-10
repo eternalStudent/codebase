@@ -84,14 +84,15 @@ uint64 uadd(uint64 a, uint64 b, byte* carry) {
 	return c;
 }
 
+// NOTE: don't use if divisor is known at compile time
 uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder) {
 #if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
 	uint64 quotient;
 	uint64 rem;
 
 	asm("divq %4"
-	    : "=a"(quotient), "=d"(*rem)
-	    : "d"(high), "a"(low), "r"(divisor));
+		: "=a"(quotient), "=d"(rem)
+		: "d"(high), "a"(low), "r"(divisor));
 
 	*remainder = rem;
 
@@ -99,6 +100,13 @@ uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder) {
 #elif defined(COMPILER_MSVC)
 	return _udiv128(high, low, divisor, remainder);
 #endif
+}
+
+// NOTE: don't use if divisor is known at compile time
+uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder, uint64* high_quotient) {
+	uint64 high_r = high % divisor;
+	*high_quotient = high / divisor;
+	return udiv(high_r, low, divisor, remainder);
 }
 
 uint64 umul(uint64 a, uint64 b, uint64 *high_c) {
