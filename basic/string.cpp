@@ -60,26 +60,25 @@ ssize UnsignedToDecimal(uint64 number, byte* str) {
 	return numberOfDigits;
 }
 
+// TODO: I don't love this implementation
 ssize UnsignedToDecimal(uint64 high, uint64 low, byte* str) {
 	if (high == 0)
 		return UnsignedToDecimal(low, str);
 
 	// get the last decimal digit
-	uint64 high_r = high % 10;
-	high = high / 10;
 	uint64 last;
-	// TODO: 
-	// division by a constant should be replace with multiplication and a shift
-	low = udiv(high_r, low, 10, &last);
+	low = udiv10(high, low, &last, &high);
 
 	byte* ptr = str;
 	if (high == 0) {
 		ptr += UnsignedToDecimal(low, ptr);
 	}
 	else {
+		// TODO: division by a constant should not be done with div
 		uint64 remainder;
 		uint64 quotient = udiv(high, low, 10000000000000000000, &remainder);
 		ptr += UnsignedToDecimal(quotient, ptr);
+		// TODO: I might want to add a pad parameter to UnsignedToDecimal
 		ssize length = UnsignedToDecimal(remainder, ptr);
 		if (length < 19) {
 			ssize diff = 19 - length;
@@ -172,20 +171,17 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 		}
 		else {
 			uint64 low = 0;
-			uint64 high = m2 << (64 - highBit);
-			uint32 e10 = 128 - highBit;
+			uint64 high = m2 << (63 - highBit);
+			uint32 e10 = 0;
 
-			for (int32 i = e10; i < e2; i++) {
-				if ((high & 0x8000000000000000) != 0) {
+			for (int32 i = 0; i < e2 + highBit - 127; i++) {
+				if ((high & 0x8000000000000000) == 0) {
 					high = (high << 1) | ((low & 0x8000000000000000) >> 63);
 					low <<= 1;
 				}
 				else {
 					uint64 remainder;
-					// TODO: 
-					// division by a constant should be replace with
-					// multiplication and a shift
-					low = udiv(high, low, 5, &remainder, &high);
+					low = udiv5(high, low, &remainder, &high);
 					e10++;
 				}
 			}
@@ -200,6 +196,7 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 
 			*(ptr++) = 'e';
 			ptr += UnsignedToDecimal(exp, ptr);
+			return ptr - buffer;
 		}
 	} else {
 		*(ptr++) = '0';
@@ -212,12 +209,15 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 		int32 denominatorExp = -e2;
 		if (denominatorExp < 64) {
 			uint64 denominator = 1ull << denominatorExp;
-			uint64 numerator = m2 & (denominator - 1);
+			uint64 mask = denominator - 1;
+			uint64 numerator = m2 & mask;
 
 			for (uint32 digits = 0; numerator && digits < p; digits++) {
 				uint64 high;
 				numerator = umul(numerator, 10, &high);
-				uint64 digit = udiv(high, numerator, denominator, &numerator);
+				// digit = udiv(high, numerator, denominator, &numerator)
+				uint64 digit = numerator >> denominatorExp | ((high & mask) << denominatorExp);
+				numerator = numerator & mask;
 				*(ptr++) = (byte)digit + '0';
 			}
 
