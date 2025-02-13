@@ -29,6 +29,7 @@ enum Quadrant {
 # define GfxDrawSLQuad				OpenGLUIDrawSLQuad
 # define GfxCropScreen				OpenGLUICropScreen
 # define GfxClearCrop				OpenGLUIClearCrop
+# define GfxGetCurrentCrop			OpenGLUIGetCurrentCrop
 
 #elif defined(GFX_BACKEND_D3D11)
 # include "d3d11ui.cpp"
@@ -54,6 +55,7 @@ enum Quadrant {
 # define GfxDrawSLQuad				D3D11UIDrawSLQuad
 # define GfxCropScreen				D3D11UICropScreen
 # define GfxClearCrop				D3D11UIClearCrop
+# define GfxGetCurrentCrop			D3D11UIGetCurrentCrop
 #endif
 
 

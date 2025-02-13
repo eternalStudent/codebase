@@ -83,16 +83,20 @@ struct {
 	OpenGLProgram glyphProgram;
 	OpenGLProgram segmentProgram;
 	OpenGLProgram imageProgram;
-	OpenGLProgram shadowProgram;
-	OpenGLProgram semiSphereProgram;
 	OpenGLProgram waveProgram;
 	OpenGLProgram hueProgram;
 	OpenGLProgram slProgram;
 	OpenGLProgram* currentProgram;
+
+	// TODO: merge both shadow and semi-sphere into quad
+	OpenGLProgram shadowProgram;
+	OpenGLProgram semiSphereProgram;
+
 	void* quads;
 	int32 quadCount;
 	Color backgorundColor;
 	Dimensions2i dim;
+	Box2 crop;
 } opengl;
 
 GLchar* quadVertexSource = (GLchar*)R"STRING(
@@ -722,6 +726,8 @@ void OpenGLUIInit(uint32 globalFlags) {
 	};
 
 	opengl.quadCount = 0;
+	Dimensions2i dim = OSGetWindowDimensions();
+	opengl.crop = {0, 0, (float32)dim.width, (float32)dim.height};
 }
 
 void OpenGLUISetBackgroundColor(Color color) {
@@ -1198,12 +1204,19 @@ void OpenGLUIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
 	opengl.quadCount++;
 }
 
+Box2 OpenGLUIGetCurrentCrop() {
+	return opengl.crop;
+}
+
 void OpenGLUICropScreen(int32 x, int32 y, int32 width, int32 height) {
 	OpenGLUIFlush();
 	glScissor(x, opengl.dim.height - y - height, width, height);
+
+	opengl.crop = {(float32)x, (float32)y, (float32)(x + width), (float32)(y + height)};
 }
 
 void OpenGLUIClearCrop() {
 	OpenGLUIFlush();
 	glScissor(0, 0, opengl.dim.width, opengl.dim.height);
+	opengl.crop = {0, 0, (float32)opengl.dim.width, (float32)opengl.dim.height};
 }

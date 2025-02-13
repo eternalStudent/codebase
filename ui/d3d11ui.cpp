@@ -8,6 +8,7 @@ struct D3D11Quad {
 	float32 cornerRadius;
 	float32 borderThickness;
 	Color borderColor;
+	Box2 crop;
 };
 
 struct D3D11Glyph {
@@ -111,17 +112,20 @@ struct {
 	D3D11Program glyphProgram;
 	D3D11Program segmentProgram;
 	D3D11Program imageProgram;
-	D3D11Program shadowProgram;
-	D3D11Program semiSphereProgram;
 	D3D11Program waveProgram;
 	D3D11Program hueProgram;
 	D3D11Program slProgram;
 	D3D11Program* currentProgram;
+
+	// TODO: shadow should be merged into quad
+	D3D11Program shadowProgram;
 	
 	int32 quadCount;
 	Dimensions2i dim;
 	FLOAT background[4];
 	D3D11_MAPPED_SUBRESOURCE mapped;
+
+	Box2 crop;
 } d3d11;
 
 static char quadCode[] = 
@@ -137,6 +141,7 @@ R"STRING(
 		float radius : RAD;
 		float bThickness : BTHICK;
 		float4 bColor : BCOL;	
+		float4 crop: CROP;
 		uint vertexId : SV_VertexID;
 	};				
 					
@@ -148,6 +153,7 @@ R"STRING(
 		float radius : RAD;
 		float bThickness : BTHICK;
 		float4 bColor : BCOL;
+		float4 crop: CROP;
 	};				
 					
 	cbuffer cbuffer0 : register(b0) {
@@ -180,6 +186,7 @@ R"STRING(
 		output.radius = input.radius;
 		output.bColor = input.bColor;
 		output.bThickness = input.bThickness;
+		output.crop = input.crop;
 		return output;
 	}				
 					
@@ -189,8 +196,11 @@ R"STRING(
 	}				
 					
 	float4 ps(PS_INPUT input) : SV_TARGET	
-	{				
+	{		
 		float2 pos = input.pos.xy;
+		if (pos.x < input.crop.x || pos.x > input.crop.z || pos.y < input.crop.y || pos.y > input.crop.w)
+			discard;
+
 		float4 color = input.color;
 		float sd_ = sd(pos - input.center, input.size, input.radius);
 		float sd2 = sd_ + input.bThickness;	
@@ -414,62 +424,6 @@ R"STRING(
 		float a = 1 - smoothstep(-input.blur, 0.5f, sd_);
 		float4 color = input.color;
 		color.a *= a;
-		return color;
-	}				
-)STRING";
-
-static char semiSphereCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
-R"STRING(
-	struct VS_INPUT	{
-		float2 pos : POS;
-		float radius : RAD;
-		uint quadrant : QUADRANT;
-		float thickness : THICK;
-		float4 color : COLOR;	
-		uint vertexId : SV_VertexID;
-	};				
-					
-	struct PS_INPUT {
-		float4 pos : SV_POSITION;
-		float4 color : COLOR;
-		float2 center : POS;
-		float radius : RAD;
-		float thickness : THICK;
-	};				
-					
-	cbuffer cbuffer0 : register(b0) {
-		row_major float4x4 mvp;
-	}				
-					
-	PS_INPUT vs(VS_INPUT input) {
-		PS_INPUT output;
-		float2 pixel_poses[] = {
-			float2(input.pos.x, input.pos.y + input.radius),
-			float2(input.pos.x, input.pos.y),
-			float2(input.pos.x + input.radius, input.pos.y + input.radius),
-			float2(input.pos.x + input.radius, input.pos.y),
-		};			
-		float2 pixel_pos = pixel_poses[input.vertexId];
-		float4 pos = mul(mvp, float4(pixel_pos, 0, 1));
-		output.pos = pos;
-		
-		output.center = pixel_poses[input.quadrant];
-		output.color = input.color;
-		output.radius = input.radius;
-		output.thickness = input.thickness;
-		return output;
-	}				
-					
-	float4 ps(PS_INPUT input) : SV_TARGET	
-	{				
-		float2 pos = input.pos.xy;
-		float sd_ = distance(pos, input.center) - input.radius;
-		float sd2 = sd_ + input.thickness;	
-		float a = 1 - smoothstep(-0.5f, +0.5f, sd_);
-		float a2 = 1 - smoothstep(-0.5f, +0.5f, sd2);
-		float4 color = input.color;
-		color.a = a*(1 - a2)*color.a;
 		return color;
 	}				
 )STRING";
@@ -950,6 +904,7 @@ void D3D11UIInit(uint32 globalFlags) {
 			{ "RAD"   , 0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11Quad, cornerRadius), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "BTHICK", 0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11Quad, borderThickness), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "BCOL"  , 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(struct D3D11Quad, borderColor), 		D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "CROP"  , 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(struct D3D11Quad, crop), 			D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 		};
 		d3d11.quadProgram = CreateProgram(STR(quadCode), desc, ARRAYSIZE(desc), sizeof(D3D11Quad));
 	}
@@ -1002,19 +957,6 @@ void D3D11UIInit(uint32 globalFlags) {
 	{
 		D3D11_INPUT_ELEMENT_DESC desc[] =
 		{
-			{ "POS",      0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(struct D3D11SemiSphere, pos), 			D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "RAD",      0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11SemiSphere, radius), 		D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "QUADRANT", 0, DXGI_FORMAT_R32_UINT,           0, offsetof(struct D3D11SemiSphere, quadrant), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "THICK",    0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(struct D3D11SemiSphere, thickness), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(struct D3D11SemiSphere, color),   		D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-
-		};
-		d3d11.semiSphereProgram = CreateProgram(STR(semiSphereCode), desc, ARRAYSIZE(desc), sizeof(D3D11SemiSphere));
-	}
-
-	{
-		D3D11_INPUT_ELEMENT_DESC desc[] =
-		{
 			{ "POS",     0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(D3D11Wave, pos0),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "POS",     1, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(D3D11Wave, pos1),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "THICK",   0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(D3D11Wave, thickness),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
@@ -1043,6 +985,9 @@ void D3D11UIInit(uint32 globalFlags) {
 		};
 		d3d11.slProgram = CreateProgram(STR(slCode), desc, ARRAYSIZE(desc), sizeof(D3D11SLBox));
 	}
+
+	Dimensions2i dim = OSGetWindowDimensions();
+	d3d11.crop = {0, 0, (float32)dim.width, (float32)dim.height};
 }
 
 void D3D11UIBeginDrawing() {
@@ -1227,6 +1172,7 @@ void D3D11UIDrawSolidColorQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -1249,6 +1195,7 @@ void D3D11UIDrawSolidColorQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		box
 	};
 
 	DrawQuad(quad);
@@ -1273,6 +1220,7 @@ void D3D11UIDrawVerticalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -1296,6 +1244,7 @@ void D3D11UIDrawVerticalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		box
 	};
 
 	DrawQuad(quad);
@@ -1320,6 +1269,7 @@ void D3D11UIDrawHorizontalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -1343,6 +1293,7 @@ void D3D11UIDrawHorizontalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		box
 	};
 
 	DrawQuad(quad);
@@ -1360,6 +1311,7 @@ void D3D11UIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 cornerRadius, f
 		cornerRadius,
 		thickness,
 		color,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -1377,6 +1329,69 @@ void D3D11UIDrawOutlineQuad(Box2 box, float32 cornerRadius, float32 thickness, C
 		cornerRadius,
 		thickness,
 		color,
+		box
+	};
+
+	DrawQuad(quad);
+}
+
+void D3D11UIDrawSphere(Point2 center, float32 radius, Color color, float32 borderThickness, Color borderColor) {
+
+	Point2 pos0 = {center.x - radius, center.y - radius};
+	Point2 pos1 = {center.x + radius, center.y + radius};	
+
+	D3D11Quad quad = {
+		pos0,
+		pos1,
+		color,
+		color,
+		color, 
+		color,
+		radius,
+		borderThickness,
+		borderColor,
+		{pos0.x, pos0.y, pos1.x, pos1.y}
+	};
+
+	DrawQuad(quad);
+}
+
+// NOTE: outline semi sphere
+void D3D11UIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float32 thickness, Color color) {
+	Point2 pos0 = {};
+	Point2 pos1 = {};
+	{
+		switch (quadrant) {
+			case Quadrant_I: {
+				pos0 = {pos.x - radius, pos.y};
+				pos1 = {pos.x + radius, pos.y + 2*radius};
+			} break;
+			case Quadrant_II: {
+				pos0 = pos;
+				pos1 = {pos.x + 2*radius, pos.y + 2*radius};
+			} break;
+			case Quadrant_III: {
+				pos0 = {pos.x, pos.y - radius};
+				pos1 = {pos.x + 2*radius, pos.y + radius};
+			} break;
+			case Quadrant_IV: {
+				pos0 = {pos.x - radius, pos.y - radius};
+				pos1 = {pos.x + radius, pos.y + radius};
+			} break;
+		}
+	}
+
+	D3D11Quad quad = {
+		pos0,
+		pos1,
+		{},
+		{},
+		{}, 
+		{},
+		radius,
+		thickness,
+		color,
+		{pos.x, pos.y, pos.x + radius, pos.y + radius},
 	};
 
 	DrawQuad(quad);
@@ -1405,26 +1420,6 @@ void D3D11UIDrawImage(D3D11Texture image, Point2 pos, Point2 dim) {
 	d3d11.context->PSSetSamplers(0, 1, &image.sampler);
 
 	d3d11.context->DrawInstanced(4, 1, 0, 0);
-}
-
-void D3D11UIDrawSphere(Point2 center, float32 radius, Color color, float32 borderThickness, Color borderColor) {
-
-	Point2 pos0 = {center.x - radius, center.y - radius};
-	Point2 pos1 = {center.x + radius, center.y + radius};	
-
-	D3D11Quad quad = {
-		pos0,
-		pos1,
-		color,
-		color,
-		color, 
-		color,
-		radius,
-		borderThickness,
-		borderColor,
-	};
-
-	DrawQuad(quad);
 }
 
 void D3D11UIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
@@ -1507,24 +1502,6 @@ void D3D11UIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offse
 	d3d11.quadCount++;
 }
 
-void D3D11UIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float32 thickness, Color color) {
-	uint32 quadrants[] = {0, 2, 3, 1};
-
-	if (d3d11.currentProgram != &d3d11.semiSphereProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.semiSphereProgram;
-		DisableMultiSample();
-	}
-
-	D3D11SemiSphere semi = {pos, radius, quadrants[(int32)quadrant], thickness, color};
-
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11SemiSphere), &semi, sizeof(D3D11SemiSphere));
-	d3d11.quadCount++;
-}
-
 void D3D11UIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
 	D3D11Wave wave = {
 		{pos.x, pos.y - dim.height},
@@ -1576,6 +1553,10 @@ void D3D11UIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
 	d3d11.quadCount++;
 }
 
+Box2 D3D11UIGetCurrentCrop() {
+	return d3d11.crop;
+}
+
 void D3D11UICropScreen(LONG left, LONG top, LONG width, LONG height) {
 	D3D11UIFlush();
 
@@ -1585,8 +1566,11 @@ void D3D11UICropScreen(LONG left, LONG top, LONG width, LONG height) {
 	rect.top = top;
 	rect.bottom = top + MAX(height, 0);
 	d3d11.context->RSSetScissorRects(1, &rect);
+
+	d3d11.crop = {(float32)rect.left, (float32)rect.top, (float32)rect.right, (float32)rect.bottom};
 }
 
 void D3D11UIClearCrop() {
 	D3D11UICropScreen(0, 0, d3d11.dim.width, d3d11.dim.height); 
+	d3d11.crop = {0, 0, (float32)d3d11.dim.width, (float32)d3d11.dim.height};
 }
