@@ -76,7 +76,7 @@ ssize UnsignedToDecimal(uint64 high, uint64 low, byte* str) {
 	else {
 		// TODO: division by a constant should not be done with div
 		uint64 remainder;
-		uint64 quotient = udiv(high, low, 10000000000000000000, &remainder);
+		uint64 quotient = udiv(high, low, 10000000000000000000ull, &remainder);
 		ptr += UnsignedToDecimal(quotient, ptr);
 		// TODO: I might want to add a pad parameter to UnsignedToDecimal
 		ssize length = UnsignedToDecimal(remainder, ptr);
@@ -238,7 +238,7 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 			// we already multipled by 5 e10 times, so we don't start with 0
 			for (int32 i = e10; i < -e2; i++) {
 				// if we can safely multiply by 5, then this is our preference
-				if (high < 3689348814741910323) {
+				if (high < 3689348814741910323ull) {
 					low = umul(high, low, 5, &high);
 					e10++;
 				}
@@ -605,9 +605,9 @@ bool TryParseUInt64(String str, uint64* result) {
 		if (!IsDigit(c))
 			return false;
 
-		if (i == 19 &&  (*result > 1844674407370955161
+		if (i == 19 &&  (*result > 1844674407370955161ull
 							||
-						(*result == 1844674407370955161 && c > '5'))) {
+						(*result == 1844674407370955161ull && c > '5'))) {
 
 			return false;
 		}
@@ -631,7 +631,7 @@ bool TryParseInt64(String str, int64* result) {
 		if (!TryParseUInt64({str.data+1, str.length-1}, &value))
 			return false;
 
-		if (value > 9223372036854775808)
+		if (value > 9223372036854775808ull)
 			return false;
 
 		*result = - (int64)value;
@@ -641,7 +641,7 @@ bool TryParseInt64(String str, int64* result) {
 		if (!TryParseUInt64(str, &value))
 			return false;
 
-		if (value > 9223372036854775807)
+		if (value > 9223372036854775807ull)
 			return false;
 
 		*result = (int64)value;

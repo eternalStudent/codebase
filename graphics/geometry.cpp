@@ -129,7 +129,12 @@ inline bool InBounds(Box2i bounds, Point2i p) {
 }
 
 union Point3 {
-	struct {float32 x, y, z;};
-	struct {Point2 xy; float32 z;};
+	struct {
+		union {
+			struct {float32 x, y;};
+			Point2 xy;
+		};
+		float32 z;
+	};
 	float32 e[3];
 };

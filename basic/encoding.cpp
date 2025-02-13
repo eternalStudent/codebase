@@ -96,7 +96,7 @@ ssize UTF16Decode(uint16* data, uint16* end, uint32* codepoint) {
 	if (data == end)
 		return 0;
 
-	if (data[0] < 0x10000) {
+	if (data[0] < 0xD800) {
 		*codepoint = (uint32)data[0];
 		return 2;
 	}

@@ -9,36 +9,36 @@ struct InMemoryFontFileStream : IDWriteFontFileStream {
 	HRESULT ReadFileFragment(const void** fragmentStart,
 							 UINT64 fileOffset,
 							 UINT64 fragmentSize,
-							 void** fragmentContext) override {
+							 void** fragmentContext) noexcept override {
 
 		*fragmentStart = data + fileOffset;
 
 		return S_OK;
 	}
 
-	void ReleaseFileFragment(void* fragmentContext) override {
+	void ReleaseFileFragment(void* fragmentContext) noexcept override {
 		// nothing
 	}
 
-	HRESULT GetFileSize(UINT64* fileSize) override {
+	HRESULT GetFileSize(UINT64* fileSize) noexcept override {
 		*fileSize = size;
 		return S_OK;
 	}
 
-	HRESULT GetLastWriteTime(UINT64* lastWriteTime) override {
+	HRESULT GetLastWriteTime(UINT64* lastWriteTime) noexcept override {
 		*lastWriteTime = 0;
 		return S_OK;
 	}
 
-	ULONG AddRef() override {
+	ULONG AddRef() noexcept override {
 		return 1;
 	}
 
-	HRESULT QueryInterface(REFIID riid, void** object) override {
+	HRESULT QueryInterface(REFIID riid, void** object) noexcept override {
 		return E_NOINTERFACE;
 	}
 
-	ULONG Release() override {
+	ULONG Release() noexcept override {
 		return 1;
 	}
 };
@@ -51,22 +51,22 @@ struct InMemoryFontFileLoader : public IDWriteFontFileLoader {
 
 	HRESULT CreateStreamFromKey(const void* fontFileReferenceKey,
 								UINT32 fontFileReferenceKeySize,
-								IDWriteFontFileStream** fontFileStream) override {
+								IDWriteFontFileStream** fontFileStream) noexcept override {
 
 		*fontFileStream = &_fontFileStream;
 
 		return S_OK;
 	}
 
-	ULONG AddRef() override {
+	ULONG AddRef() noexcept override {
 		return 1;
 	}
 
-	HRESULT QueryInterface(REFIID riid, void** object) override {
+	HRESULT QueryInterface(REFIID riid, void** object) noexcept override {
 		return E_NOINTERFACE;
 	}
 
-	ULONG Release() override {
+	ULONG Release() noexcept override {
 		return 1;
 	}
 

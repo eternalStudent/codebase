@@ -46,20 +46,20 @@ uint64 log10(uint64 n) {
 	}
 	else {
 		// 11..20
-		return n < 1000000000000000
-			? n < 10000000000000
-				? n < 1000000000000
-					? n < 100000000000 ? 11 : 12
+		return n < 1000000000000000ull
+			? n < 10000000000000ull
+				? n < 1000000000000ull
+					? n < 100000000000ull ? 11 : 12
 					: 13
 			
-				: n < 100000000000000 ? 14 : 15
+				: n < 100000000000000ull ? 14 : 15
 
-			: n < 1000000000000000000
-				? n < 100000000000000000
-					? n < 10000000000000000 ? 16 : 17
+			: n < 1000000000000000000ull
+				? n < 100000000000000000ull
+					? n < 10000000000000000ull ? 16 : 17
 					: 18
 
-				: n < 10000000000000000000 ? 19 : 20;
+				: n < 10000000000000000000ull ? 19 : 20;
 	}
 }
 
@@ -130,7 +130,7 @@ uint64 udiv5(uint64 high, uint64 low, uint64* remainder, uint64* high_quotient) 
     _addcarry_u64(carry, merged, 0, &merged);
     uint64 rem = merged % 5;
     uint64 lowSub = low - rem;
-    uint64 low_quotient = lowSub * 14757395258967641293;
+    uint64 low_quotient = lowSub * 14757395258967641293ull;
     *high_quotient = high / 5;
 
     *remainder = rem;
@@ -149,7 +149,7 @@ uint64 udiv10(uint64 high, uint64 low, uint64* remainder, uint64* quotient_high)
 
     uint64 rem = merged % 5;
     uint64 lowSub = low2 - rem;
-    uint64 low_quotient = lowSub * 14757395258967641293;
+    uint64 low_quotient = lowSub * 14757395258967641293ull;
 
     *remainder = low - 2*lowSub;
     *quotient_high = high / 10;
