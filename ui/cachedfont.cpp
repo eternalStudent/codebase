@@ -42,10 +42,7 @@ void GlyphCacheInit() {
 // TODO:
 #endif
 
-#pragma warning(push)
-#pragma warning(disable : 4324) // structure was padded due to alignment specifier
-#include "../third_party/meow_hash_x64_aesni.h"
-#pragma warning(pop)
+#include "../basic/hash.cpp"
 
 uint64 GetHashCode(ScaledFont* font, uint16 glyphId) {
 	uintptr_t face = (uintptr_t)font->face;
@@ -56,8 +53,9 @@ uint64 GetHashCode(ScaledFont* font, uint16 glyphId) {
 	memcpy(buffer + sizeof(face), &emSize, sizeof(emSize));
 	memcpy(buffer + sizeof(face) + sizeof(emSize), &glyphId, sizeof(glyphId));
 
-    meow_u128 hash = MeowHash(MeowDefaultSeed, sizeof(buffer), buffer);
-    uint64 hash64 = MeowU64From(hash, 0);
+    // TODO: am I being stupid here, 
+    // or is it okay to pass 0 as the thrid argument?
+    uint64 hash64 = xxh_64(buffer, sizeof(buffer), 0);
     return hash64;
 }
 
