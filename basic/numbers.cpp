@@ -78,14 +78,42 @@ uint64 power(uint32 base, uint32 exponent) {
 	return result;
 }
 
-uint64 uadd(uint64 a, uint64 b, byte* carry) {
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+typedef unsigned long long carry_t;
+#elif defined(COMPILER_MSVC)
+typedef unsigned char carry_t;
+#endif
+
+inline uint64 uadd(carry_t carry, uint64 a, uint64 b, carry_t* high_c) {
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+	return __builtin_addcll(a, b, carry, high_c);
+#elif defined(COMPILER_MSVC)
 	uint64 c;
-	*carry = _addcarry_u64(0, a, b, &c);
+	*high_c = _addcarry_u64(carry, a, b, &c);
 	return c;
+#endif
+}
+
+inline uint64 ushiftright(uint64 high, uint64 low, byte shift, uint64* high_shifted) {
+	*high_shifted = high >> shift;
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+	return (high << (64 - shift)) | (low >> shift);
+#elif defined(COMPILER_MSVC)
+	return __shiftright128(low, high, shift);
+#endif
+}
+
+inline uint64 ushiftleft(uint64 high, uint64 low, byte shift, uint64* high_shifted) {
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+	*high_shifted = (high << shift) | (low >> (64 - shift));
+#elif defined(COMPILER_MSVC)
+	*high_shifted =  __shiftleft128(low, high, shift);
+#endif
+	return low << shift;
 }
 
 // NOTE: don't use if divisor is known at compile time
-uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder) {
+inline uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder) {
 #if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
 	uint64 quotient;
 	uint64 rem;
@@ -103,49 +131,48 @@ uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder) {
 }
 
 // NOTE: don't use if divisor is known at compile time
-uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder, uint64* high_quotient) {
+inline uint64 udiv(uint64 high, uint64 low, uint64 divisor, uint64* remainder, uint64* high_quotient) {
 	uint64 high_r = high % divisor;
 	*high_quotient = high / divisor;
 	return udiv(high_r, low, divisor, remainder);
 }
 
-uint64 udiv5(uint64 high, uint64 low, uint64* remainder, uint64* high_quotient) {
-    // Use 2^64 = 1 mod 5 to compute remainder:
-    // (high * 2^64 + low) 
-    // = high + low mod 5
-    // = high + low + carry mod 5 (the high + low might overflow, carry = 2^64 = 1 mod 5)
-    //
-    // Write high * 2^64 + low - remainder = highSub * 2^64 + lowSub
-    // Note that highSub + lowSub = highSub * 2^64 + lowSub = 0 mod 5
-    // Compute low bits of the divide:
-    // lowSub * (2^66+1)/5 (division is exact!)
-    // = lowSub/5 * 2^66 + lowSub/5
-    // = lowSub*4/5 * 2^64 + lowSub/5
-    // = highSub/5 * 2^64 + lowSub/5 mod 2^64 (lowSub * 4 = -lowSub = highSub mod 5)
-    // = (highSub * 2^64 + lowSub)/5 mod 2^64
-    // = flowor((high * 2^64 + low)/5) mod 2^64
+inline uint64 udiv5(uint64 high, uint64 low, uint64* remainder, uint64* high_quotient) {
+	// Use 2^64 = 1 mod 5 to compute remainder:
+	// (high * 2^64 + low) 
+	// = high + low mod 5
+	// = high + low + carry mod 5 (the high + low might overflow, carry = 2^64 = 1 mod 5)
+	//
+	// Write high * 2^64 + low - remainder = highSub * 2^64 + lowSub
+	// Note that highSub + lowSub = highSub * 2^64 + lowSub = 0 mod 5
+	// Compute low bits of the divide:
+	// lowSub * (2^66+1)/5 (division is exact!)
+	// = lowSub/5 * 2^66 + lowSub/5
+	// = lowSub*4/5 * 2^64 + lowSub/5
+	// = highSub/5 * 2^64 + lowSub/5 mod 2^64 (lowSub * 4 = -lowSub = highSub mod 5)
+	// = (highSub * 2^64 + lowSub)/5 mod 2^64
+	// = flowor((high * 2^64 + low)/5) mod 2^64
 
-    uint64 merged;
-    byte carry = _addcarry_u64(0, high, low, &merged);
-    _addcarry_u64(carry, merged, 0, &merged);
-    uint64 rem = merged % 5;
-    uint64 lowSub = low - rem;
-    uint64 low_quotient = lowSub * 14757395258967641293ull;
-    *high_quotient = high / 5;
+	carry_t carry;
+	uint64 merged = uadd(0, high, low, &carry);
+	merged = uadd(carry, merged, 0, &carry);
+	uint64 rem = merged % 5;
+	uint64 lowSub = low - rem;
+	uint64 low_quotient = lowSub * 14757395258967641293ull;
+	*high_quotient = high / 5;
 
-    *remainder = rem;
+	*remainder = rem;
 
-    return low_quotient;
+	return low_quotient;
 }
 
-uint64 udiv10(uint64 high, uint64 low, uint64* remainder, uint64* quotient_high) {
-    // low2 = __shighftright128(low, high, 1);
-    uint64 low2 = (high << 63) | (low >> 1);
-    uint64 high2 = (high >> 1);
-   
-    uint64 merged;
-    byte carry = _addcarry_u64(0, high2, low2, &merged);
-    _addcarry_u64(carry, merged, 0, &merged);
+inline uint64 udiv10(uint64 high, uint64 low, uint64* remainder, uint64* quotient_high) {
+    uint64 high2;
+	uint64 low2 = ushiftright(high, low, 1, &high2);
+
+	carry_t carry;
+	uint64 merged = uadd(0, high2, low2, &carry);
+	merged = uadd(carry, merged, 0, &carry);
 
     uint64 rem = merged % 5;
     uint64 lowSub = low2 - rem;
@@ -157,7 +184,7 @@ uint64 udiv10(uint64 high, uint64 low, uint64* remainder, uint64* quotient_high)
     return low_quotient;
 }
 
-uint64 umul(uint64 a, uint64 b, uint64 *high_c) {
+inline uint64 umul(uint64 a, uint64 b, uint64 *high_c) {
 #if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
 	__uint128_t product = (__uint128_t)a * (__uint128_t)b;
 	*high_c = product >> 64;
@@ -167,8 +194,14 @@ uint64 umul(uint64 a, uint64 b, uint64 *high_c) {
 #endif
 }
 
-uint64 umul(uint64 high_a, uint64 low_a, uint64 b, uint64 *high_c) {
-	uint64 low_c = umul(low_a, b, high_c);
+inline uint64 umul(uint64 high_a, uint64 low_a, uint64 b, uint64 *high_c) {
+#if defined(COMPILER_CLANG) || defined(COMPILER_GCC)
+	__uint128_t a = ((__uint128_t)high_a << 64) | (__uint128_t)low_a;
+	__uint128_t c = (__uint128_t)a * (__uint128_t)b;
+	*high_c = c >> 64;
+	return c;
+#elif defined(COMPILER_MSVC)
+	uint64 low_c = _umul128(low_a, b, high_c);
 	*high_c += high_a*b;
 	return low_c;
 }

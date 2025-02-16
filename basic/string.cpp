@@ -46,8 +46,35 @@ ssize UnsignedToHex(uint64 number, byte* str) {
 	return numberOfDigits;
 }
 
+static inline uint64 getNumberOfDecimalDigits(uint64 n) {
+	static uint64 table[] = {
+		9,
+		99,
+		999,
+		9999,
+		99999,
+		999999,
+		9999999,
+		99999999,
+		999999999,
+		9999999999,
+		99999999999,
+		999999999999,
+		9999999999999,
+		99999999999999,
+		999999999999999ull,
+		9999999999999999ull,
+		99999999999999999ull,
+		999999999999999999ull,
+		9999999999999999999ull
+	};
+	uint64 y = (19 * bits_findFirstSetBit(n, 0) >> 6);
+	y += n > table[y];
+	return y + 1;
+}
+
 ssize UnsignedToDecimal(uint64 number, byte* str) {
-	ssize numberOfDigits = log10(number);
+	ssize numberOfDigits = getNumberOfDecimalDigits(number);
 	ssize index = numberOfDigits;
 
 	str[index] = 0;
@@ -65,7 +92,6 @@ ssize UnsignedToDecimal(uint64 high, uint64 low, byte* str) {
 	if (high == 0)
 		return UnsignedToDecimal(low, str);
 
-	// get the last decimal digit
 	uint64 last;
 	low = udiv10(high, low, &last, &high);
 
@@ -74,7 +100,6 @@ ssize UnsignedToDecimal(uint64 high, uint64 low, byte* str) {
 		ptr += UnsignedToDecimal(low, ptr);
 	}
 	else {
-		// TODO: division by a constant should not be done with div
 		uint64 remainder;
 		uint64 quotient = udiv(high, low, 10000000000000000000ull, &remainder);
 		ptr += UnsignedToDecimal(quotient, ptr);
@@ -99,42 +124,44 @@ ssize SignedToDecimal(int64 number, byte* str) {
 	return UnsignedToDecimal((uint32)number, str);
 }
 
-static int32 bitIndexToExp[53] = {
-	55, 54, 53, 53, 52, 52, 52, 51, 51, 50, 50, 
-	49, 49, 49, 48, 48, 47, 47, 46, 46, 46, 45, 45, 
-	44, 44, 43, 43, 43, 42, 42, 41, 41, 40, 40, 40, 
-	39, 39, 38, 38, 37, 37, 37, 36, 36, 35, 35, 
-	34, 34, 34, 33, 33, 32, 32
-};
-
-static struct {uint64 high, low;} powersOf5[24] = {
-	{0x4ee, 0x2d6d415b85acef81},
-	{0x18a6, 0xe32246c99c60ad85},
-	{0x7b42, 0x6fab61f00de36399},
-	{0x2684c, 0x2e58e9b04570f1fd},
-	{0xc097c, 0xe7bc90715b34b9f1},
-	{0x3c2f70, 0x86aed236c807a1b5},
-	{0x12ced32, 0xa16a1b11e8262889},
-	{0x5e0a1fd, 0x2712875988becaad},
-	{0x1d6329f1, 0xc35ca4bfabb9f561},
-	{0x92efd1b8, 0xd0cf37be5aa1cae5},
-	{0x2deaf189c, 0x140c16b7c528f679},
-	{0xe596b7b0c, 0x643c7196d9ccd05d},
-	{0x47bf19673d, 0xf52e37f2410011d1},
-	{0x166bb7f0435, 0xc9e717bb45005915},
-	{0x701a97b150c, 0xf18376a85901bd69},
-	{0x23084f676940, 0xb7915149bd08b30d},
-	{0xaf298d050e43, 0x95d69670b12b7f41},
-	{0x36bcfc1194751, 0xed30f03375d97c45},
-	{0x111b0ec57e6499, 0xa1f4b1014d3f6d59},
-	{0x558749db77f700, 0x29c77506823d22bd},
-	{0x1aba4714957d300, 0xd0e549208b31adb1},
-	{0x85a36366eb71f04, 0x147a6da2b7f86475},
-	{0x29c30f1029939b14, 0x6664242d97d9f649},
-	{0xd0cf4b50cfe20765, 0xfff4b4e3f741cf6d},
-};
-
 ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
+
+	static int32 exponentOf5[53] = {
+		55, 54, 53, 53, 52, 52, 52, 51, 51, 50, 50, 
+		49, 49, 49, 48, 48, 47, 47, 46, 46, 46, 45, 45, 
+		44, 44, 43, 43, 43, 42, 42, 41, 41, 40, 40, 40, 
+		39, 39, 38, 38, 37, 37, 37, 36, 36, 35, 35, 
+		34, 34, 34, 33, 33, 32, 32
+	};
+
+	// starting with 5^32
+	static struct {uint64 high, low;} powerOf5[24] = {
+		{0x4ee, 0x2d6d415b85acef81},
+		{0x18a6, 0xe32246c99c60ad85},
+		{0x7b42, 0x6fab61f00de36399},
+		{0x2684c, 0x2e58e9b04570f1fd},
+		{0xc097c, 0xe7bc90715b34b9f1},
+		{0x3c2f70, 0x86aed236c807a1b5},
+		{0x12ced32, 0xa16a1b11e8262889},
+		{0x5e0a1fd, 0x2712875988becaad},
+		{0x1d6329f1, 0xc35ca4bfabb9f561},
+		{0x92efd1b8, 0xd0cf37be5aa1cae5},
+		{0x2deaf189c, 0x140c16b7c528f679},
+		{0xe596b7b0c, 0x643c7196d9ccd05d},
+		{0x47bf19673d, 0xf52e37f2410011d1},
+		{0x166bb7f0435, 0xc9e717bb45005915},
+		{0x701a97b150c, 0xf18376a85901bd69},
+		{0x23084f676940, 0xb7915149bd08b30d},
+		{0xaf298d050e43, 0x95d69670b12b7f41},
+		{0x36bcfc1194751, 0xed30f03375d97c45},
+		{0x111b0ec57e6499, 0xa1f4b1014d3f6d59},
+		{0x558749db77f700, 0x29c77506823d22bd},
+		{0x1aba4714957d300, 0xd0e549208b31adb1},
+		{0x85a36366eb71f04, 0x147a6da2b7f86475},
+		{0x29c30f1029939b14, 0x6664242d97d9f649},
+		{0xd0cf4b50cfe20765, 0xfff4b4e3f741cf6d},
+	};
+
 	if (m2 == 0) {
 		buffer[0] = '0';
 		buffer[1] = '.';
@@ -146,11 +173,14 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 	byte* ptr = buffer;
 
 	int32 trailingZeroes = (int32)LowBit(m2);
+
+	// simplify the fraction
 	m2 >>= trailingZeroes;
 	e2 += trailingZeroes;
 
-	int32 highBit = (int32)HighBit(m2, 0);
+	int32 highBit = (int32)HighBit(m2, 0); 
 	ASSERT(highBit <= 52);
+
 	bool hasWhole = 0 <= e2 || -e2 <= highBit;
 	if (hasWhole) {
 		bool wholeFitsIn128 = highBit + e2 < 128;
@@ -170,14 +200,30 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 			ptr += UnsignedToDecimal(high, low, ptr);
 		}
 		else {
+			/*
+			 * We need to reduce the exponent of 2 to 0, 
+			 * but we can only shift left `127 - highBit` times
+			 * and still fit into 128 bits
+			 * and we know that `highBit + e2 > 127`, so it's not enough.
+			 *
+			 * The trick here is that x*2^n = x*2^n * 5^(-m)*5^m
+			 *                              = x*2^(n-m)*2^m * 5^(-m)*5^m
+			 *                              = x*2^(n-m) * 5^(-m) * 2^m*5^m
+			 *                              = x*2^(n-m)*5^(-m) * 10^m
+			 *
+			 * So each time we divide the mantisa by 5, 
+			 * we reduce the exponent of 2 by 1
+			 * and increase the exponent of 10 by 1
+			 * but dividing by 5 reduces precision,
+			 * so whenever possible we prefer to shift left.
+			 */
 			uint64 low = 0;
 			uint64 high = m2 << (63 - highBit);
 			uint32 e10 = 0;
 
 			for (int32 i = 0; i < e2 + highBit - 127; i++) {
 				if ((high & 0x8000000000000000) == 0) {
-					high = (high << 1) | ((low & 0x8000000000000000) >> 63);
-					low <<= 1;
+					low = ushiftleft(high, low, 1, &high);
 				}
 				else {
 					uint64 remainder;
@@ -187,15 +233,19 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 			}
 
 			ssize length = UnsignedToDecimal(high, low, ptr);
-			uint32 exp = e10 + (int32)length - 1;
+			uint32 exp = e10 + (uint32)length - 1;
 			if (length - 2 > p) length = p + 2;
 			memmove(ptr + 1, ptr, length);
 			ptr[1] = '.';
 			ptr += length + 1;
+
+			// remove trailing zeroes
 			while (*(ptr - 1) == '0') ptr--;
 
 			*(ptr++) = 'e';
 			ptr += UnsignedToDecimal(exp, ptr);
+
+			// there's not going to be any fraction, so just return
 			return ptr - buffer;
 		}
 	} else {
@@ -206,17 +256,17 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 
 	bool hasFraction = e2 < 0;
 	if (hasFraction) {
-		int32 denominatorExp = -e2;
+		byte denominatorExp = (byte)-e2;
 		if (denominatorExp < 64) {
 			uint64 denominator = 1ull << denominatorExp;
 			uint64 mask = denominator - 1;
-			uint64 numerator = m2 & mask;
+			uint64 numerator = m2 & mask; // remove the whole part
 
+			// This is just long division
 			for (uint32 digits = 0; numerator && digits < p; digits++) {
 				uint64 high;
-				numerator = umul(numerator, 10, &high);
-				// digit = udiv(high, numerator, denominator, &numerator)
-				uint64 digit = numerator >> denominatorExp | ((high & mask) << denominatorExp);
+				numerator = umul(0, numerator, 10, &high);
+				uint64 digit = ushiftright(high, numerator, denominatorExp, &high);
 				numerator = numerator & mask;
 				*(ptr++) = (byte)digit + '0';
 			}
@@ -226,26 +276,39 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 		}
 		else {
 			ASSERT(!hasWhole);
+			// oops we printed `0.` but we don't need it.
 			ptr -= 2;
 
-			// we need to either multiply m2 by 5, or shift it by 1, -e2 times
-			// start by multiplying m2 by 5^n, where n can be determined by the high-bit
-			int32 e10 = bitIndexToExp[highBit];
+			/*
+			 * We need to increase the exponent of 2 to 0.
+			 *
+			 * The trick here is that x*2^(-n) = x*(2^-n) * 5^m*5^(-m)
+			 *                                 = x*2^(m-n)*2^m * 5^m*5^(-m)
+			 *                                 = x*2^(m-n) * 5^m * 2^(-m)*5^(-m)
+			 *                                 = x*2^(m-n)*5^m * 10^(-m)
+			 *
+			 * So each time we multiple the mantisa by 5, 
+			 * we increase the exponent of 2 by 1
+			 * and decrease the exponent of 10 by 1.
+			 * We'll figure out how many times we can safely multiply by 5
+			 * using the hight bit, and taking the worst case scenario.
+			 * and then multiply by a 5 to the power of that many times.
+			 * Whenever we can't multiply by 5 without overflowing, 
+			 * we will shift right instead, which also increases the exponent of 2,
+			 * but decreases precision.
+			 */
+
+			int32 e10 = exponentOf5[highBit];
 			if (e10 > -e2) e10 = -e2;
 			uint64 high;
-			uint64 low = umul(powersOf5[e10 - 32].high, powersOf5[e10 - 32].low, m2, &high);
-			
-			// we already multipled by 5 e10 times, so we don't start with 0
+			uint64 low = umul(powerOf5[e10 - 32].high, powerOf5[e10 - 32].low, m2, &high);
 			for (int32 i = e10; i < -e2; i++) {
-				// if we can safely multiply by 5, then this is our preference
 				if (high < 3689348814741910323ull) {
 					low = umul(high, low, 5, &high);
 					e10++;
 				}
 				else {
-					low >>= 1;
-					low |= ((high & 1) << 63);
-					high >>= 1;
+					low = ushiftright(high, low, 1, &high);
 				}
 			}
 
@@ -255,6 +318,8 @@ ssize FloatToDecimal(uint64 m2, int32 e2, int32 precision, byte* buffer) {
 			memmove(ptr + 1, ptr, length);
 			ptr[1] = '.';
 			ptr += length + 1;
+
+			// remove trailing zeroes
 			while (*(ptr - 1) == '0') ptr--;
 
 			*(ptr++) = 'e';
