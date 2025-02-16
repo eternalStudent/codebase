@@ -68,7 +68,7 @@ static inline uint64 getNumberOfDecimalDigits(uint64 n) {
 		999999999999999999ull,
 		9999999999999999999ull
 	};
-	uint64 y = (19 * bits_findFirstSetBit(n, 0) >> 6);
+	uint64 y = (19 * HighBit(n, 0) >> 6);
 	y += n > table[y];
 	return y + 1;
 }

@@ -204,6 +204,7 @@ inline uint64 umul(uint64 high_a, uint64 low_a, uint64 b, uint64 *high_c) {
 	uint64 low_c = _umul128(low_a, b, high_c);
 	*high_c += high_a*b;
 	return low_c;
+#endif
 }
 
 // Signed
