@@ -1,5 +1,6 @@
-#if defined(_OS_WINDOWS)
-#  include "Shlwapi.h"
+#if defined(OS_WINDOWS)
+#  undef OS_WINDOWS
+#  include <Shlwapi.h>
 #  include "win32io.cpp"
 #  define File          		HANDLE
 #  define FILE_ERROR 			INVALID_HANDLE_VALUE 
@@ -16,7 +17,7 @@
 #  define STDIN 				GetStdHandle(STD_INPUT_HANDLE)
 #  define STDOUT 				GetStdHandle(STD_OUTPUT_HANDLE)
 
-#elif defined(_OS_UNIX)
+#elif defined(OS_UNIX)
 #  include <fcntl.h>
 #  include <sys/stat.h>
 #  include <errno.h>

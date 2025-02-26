@@ -512,6 +512,34 @@ void Win32CreateWindowFullScreen(LPCWSTR title) {
 	SetWindowLong(window.handle, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
 }
 
+void Win32CreateWindowMaximized(LPCWSTR title) {
+	WNDCLASSEXW windowClass = CreateWindowClass();
+	window = {};
+	LoadCursors();
+	
+	RECT rect;
+	if (!SystemParametersInfoW(SPI_GETWORKAREA, 0, &rect, 0)) {
+		LOG("failed to get work area");
+		return;
+	}
+
+	LONG width = rect.right - rect.left;
+	LONG height = rect.bottom - rect.top;
+
+	window.dim = {width, height};
+	window.handle = CreateWindowExW(0,
+		windowClass.lpszClassName, 
+		title,
+		WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+		rect.left,
+		rect.top,
+		width,
+		height,
+		0, 0, windowClass.hInstance, 0);
+	
+	ShowWindow(window.handle, SW_MAXIMIZE);
+}
+
 void Win32ProcessWindowEvents() {
 	MSG message;
 	while (PeekMessage(&message, 0, 0, 0, PM_REMOVE)) {

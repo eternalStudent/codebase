@@ -1,10 +1,10 @@
-#if defined(_WIN32)
+#if defined(OS_WINDOWS)
 #  include "win32opengl.cpp"
 #  define OSOpenGLInit			Win32OpenGLInit
 #  define OSOpenGLSwapBuffers	Win32OpenGLSwapBuffers
 #endif
 
-#if defined(__gnu_linux__)
+#if defined(OS_LINUX)
 #  include "linuxopengl.cpp"
 #  define OSOpenGLInit			LinuxOpenGLInit
 #  define OSOpenGLSwapBuffers	LinuxOpenGLSwapBuffers

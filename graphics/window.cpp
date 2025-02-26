@@ -133,7 +133,7 @@ enum : uint32 {
 #define KEY_F11 				0x7A
 #define KEY_F12 				0x7B
 
-#if defined(_OS_WINDOWS)
+#if defined(OS_WINDOWS)
 #  include <Windowsx.h>
 #  include "win32window.cpp"
 
@@ -142,6 +142,7 @@ enum : uint32 {
 #  define OSProcessWindowEvents 	Win32ProcessWindowEvents
 
 #  define OSCreateWindowFullScreen	Win32CreateWindowFullScreen
+#  define OSCreateWindowMaximized	Win32CreateWindowMaximized
 #  define OSExitFullScreen			Win32ExitFullScreen
 #  define OSEnterFullScreen 		Win32EnterFullScreen
 #  define OSSetWindowIcon			Win32SetWindowIcon
@@ -168,7 +169,7 @@ enum : uint32 {
 #  define OSPollEvent				Win32PollEvent
 #endif
 
-#if defined(_OS_LINUX)
+#if defined(OS_LINUX)
 #  include <X11/Xlib.h>
 #  include <X11/Xutil.h>
 #  include <X11/Xatom.h>
@@ -182,6 +183,7 @@ enum : uint32 {
 #  define OSProcessWindowEvents 	LinuxProcessWindowEvents
 
 #  define OSCreateWindowFullScreen	LinuxCreateWindowFullScreen
+#  define OSCreateWindowMaximized	LinuxCreateWindowMaximized
 #  define OSExitFullScreen			LinuxExitFullScreen
 #  define OSEnterFullScreen 		LinuxEnterFullScreen
 #  define OSSetWindowIcon			LinuxSetWindowIcon

@@ -39,7 +39,7 @@ BakedAtlasBitmap CreateAtlasBitmap(int32 width, int32 height, byte* buffer) {
 	return atlas;
 }
 
-#if _OS_WINDOWS
+#if defined(OS_WINDOWS)
 #  include "dwrite.cpp"
 #  define FontFace 		    			IDWriteFontFace
 #  define FontInit 						DWriteInit

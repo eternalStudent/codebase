@@ -7,30 +7,30 @@
 #endif
 
 #if defined(_WIN32) || defined(_WIN64)
-#  define _OS_WINDOWS 1
+#  define OS_WINDOWS 1
 #elif defined(__ANDROID__)
-#  define _OS_ANDROID 1
-#  define _OS_UNIX 1
+#  define OS_ANDROID 1
+#  define OS_UNIX 1
 #  define _MATH_ALREADY_DEFINED_ 1
 #  define _NO_ROTATE_ 1
 #elif defined(__linux__)
-#  define _OS_LINUX 1
-#  define _OS_UNIX 1
+#  define OS_LINUX 1
+#  define OS_UNIX 1
 #endif
 
-#if defined(_OS_WINDOWS)
+#if defined(OS_WINDOWS)
 #  define NOMINMAX
 #  include <windows.h>
 #  include <tmmintrin.h>
 #  include <wmmintrin.h>
 #  include <intrin.h>
-#elif defined(_OS_ANDROID)
+#elif defined(OS_ANDROID)
 #  include <unistd.h>
 #  include <jni.h>
 #  include <android/log.h>
 #  include <android/asset_manager.h>
 #  include <android_native_app_glue.h>
-#elif defined(_OS_LINUX)
+#elif defined(OS_LINUX)
 #  include <unistd.h>
 #endif
 
@@ -53,7 +53,7 @@
 #  define ASSERT(expression)	(void)(expression)
 #endif
 
-#if defined(_OS_WINDOWS)
+#if defined(OS_WINDOWS)
 #  define ASSERT_HR(hr) ASSERT(SUCCEEDED(hr))
 #endif
 

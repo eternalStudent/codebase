@@ -1,4 +1,4 @@
-#if defined(_OS_WINDOWS)
+#if defined(OS_WINDOWS)
 #  include "win32memory.cpp"
 #  define OSAllocate			Win32Allocate
 #  define OSReserve				Win32Reserve

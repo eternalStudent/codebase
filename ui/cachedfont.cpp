@@ -27,7 +27,7 @@ void GlyphCacheInit() {
 
 //------------------------------------
 
-#if _OS_WINDOWS
+#if defined(OS_WINDOWS)
 #  include "dwrite.cpp"
 #  define FontFace 		    			IDWriteFontFace
 #  define FontInit 						DWriteInit
