@@ -98,6 +98,8 @@ inline bool IsPowerOf2OrZero(uint64 value) {
 	return (value & (value - 1)) == 0;
 }
 
+#define RoundUpPowerOf2(x, b) (((x) + (b) - 1)&(~((b) - 1)))
+
 inline int32 ReverseBits16(int32 n) {
 	n = ((n & 0xAAAA) >>  1) | ((n & 0x5555) << 1);
 	n = ((n & 0xCCCC) >>  2) | ((n & 0x3333) << 2);
