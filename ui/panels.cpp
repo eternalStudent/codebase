@@ -87,7 +87,7 @@ struct UIPanelManager {
 	FixedSize allocator;
 };
 
-void UIPanelSplit(UIPanelManager* manager, UIPanel* oldParent, UIAlignement align, float32 splitPoint) {
+UIPanel* UIPanelSplit(UIPanelManager* manager, UIPanel* oldParent, UIAlignement align, float32 splitPoint) {
 	FixedSize* allocator = &manager->allocator;
 	UIPanel* newParent = (UIPanel*)FixedSizeAlloc(allocator);
 	newParent->a = (UIPanel*)FixedSizeAlloc(allocator);
@@ -109,6 +109,8 @@ void UIPanelSplit(UIPanelManager* manager, UIPanel* oldParent, UIAlignement alig
 
 	newParent->a->parent = newParent;
 	newParent->b->parent = newParent;
+
+	return newParent->a;
 }
 
 void UIPanelSplit(UIPanelManager* manager, UIPanel* oldParent, UIAlignement align, UIPanel* panel) {
