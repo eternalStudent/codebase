@@ -174,14 +174,19 @@ float32 FontGetWordWidth(ScaledFont* font, byte* data, byte* end) {
 	return width;
 }
 
-Point2 FontDrawString(Point2 pos, ScaledFont* font, String string, Color color,
+Point2 FontDrawString(Point2 pos, 
+					  ScaledFont* font, 
+					  String string, 
+					  Color color,
 					  bool shouldWrap = false, 
-					  float32 x1 = 0) {
+					  float32 x1 = 0,
+					  float32* maxx = NULL) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 x = pos.x;
 	float32 y = pos.y + font->ascent;
 	float32 x0 = pos.x;
+	if (maxx) *maxx = x0;
 
 	uint32 codepoint;
 	ssize bytesToEncode;
@@ -191,8 +196,9 @@ Point2 FontDrawString(Point2 pos, ScaledFont* font, String string, Color color,
 		bool whiteSpace = IsWhiteSpace(codepoint);
 		if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 			float32 wordWidth = FontGetWordWidth(font, data, end);
-			if (x1 <= pos.x + wordWidth) {
+			if (x1 <= x + wordWidth) {
 				y += font->height + font->lineGap;
+				if (maxx && *maxx < x) *maxx = x;
 				x = x0;
 			}
 		}
@@ -205,7 +211,9 @@ Point2 FontDrawString(Point2 pos, ScaledFont* font, String string, Color color,
 			CachedGlyph glyph = FontGetGlyph(font, codepoint);
 			x += FontDrawGlyph({x, y}, glyph, color);
 		}
+		prevCharWasWhiteSpace = whiteSpace;
 	}
+	if (maxx && *maxx < x) *maxx = x;
 	return {x, y - font->ascent};
 }
 
@@ -395,12 +403,14 @@ Point2 FontDrawStringList(Point2 pos,
 						  StringList list, 
 						  Color color,
 						  bool shouldWrap = false, 
-						  float32 x1 = 0) {
+						  float32 x1 = 0, 
+						  float32* maxx = NULL) {
 
 	bool prevCharWasWhiteSpace = false;
 	float32 x0 = pos.x;
 	float32 x = pos.x;
 	float32 y = pos.y + font->ascent;
+	if (maxx) *maxx = x0;
 
 	LINKEDLIST_FOREACH(&list, StringNode, node) {
 		String string = node->string;
@@ -412,8 +422,9 @@ Point2 FontDrawStringList(Point2 pos,
 			bool whiteSpace = IsWhiteSpace(codepoint);
 			if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 				float32 wordWidth = FontGetWordWidth(font, {node, data - string.data});
-				if (x1 <= pos.x + wordWidth) {
+				if (x1 <= x + wordWidth) {
 					y += font->height + font->lineGap;
+					if (maxx && *maxx < x) *maxx = x;
 					x = x0;
 				}
 			}
@@ -428,6 +439,7 @@ Point2 FontDrawStringList(Point2 pos,
 			prevCharWasWhiteSpace = whiteSpace;
 		}
 	}
+	if (maxx && *maxx < x) *maxx = x;
 	return {x, y - font->ascent};
 }
 
@@ -489,8 +501,8 @@ void FontDrawTextSelection(Point2 pos,
 						   float32 x1 = 0) {
 
 	bool prevCharWasWhiteSpace = false;
-	float32 x = 0;
-	float32 y = 0;
+	float32 x = pos.x;
+	float32 y = pos.y;
 	int32 state = 0;
 	float32 startx = x;
 	Point2 selection;
@@ -520,7 +532,7 @@ void FontDrawTextSelection(Point2 pos,
 				if (shouldWrap && prevCharWasWhiteSpace && !whiteSpace) {
 					float32 wordWidth = FontGetWordWidth(font, {node, data - string.data});
 					if (x1 <= x + wordWidth) {
-						x = 0;
+						x = pos.x;
 						y += font->height + font->lineGap;
 					}
 				}
@@ -529,8 +541,8 @@ void FontDrawTextSelection(Point2 pos,
 					startx = x;
 
 					if (!onEnd) {
-						selection.x = round(pos.x + startx);
-						selection.y = round(pos.y + y);
+						selection.x = round(startx);
+						selection.y = round(y);
 						Dimensions2 dim = {2, font->height};
 						GfxDrawSolidColorQuad(selection, dim, caretColor);
 					}
@@ -541,7 +553,7 @@ void FontDrawTextSelection(Point2 pos,
 
 				x += FontGetGlyphWidth(font, codepoint);
 				if (codepoint == 10) {
-					x = 0;
+					x = pos.x;
 					y += font->height + font->lineGap;
 				}
 			}
@@ -552,13 +564,13 @@ void FontDrawTextSelection(Point2 pos,
 					float32 wordWidth = FontGetWordWidth(font, {node, data - string.data});
 					if (x1 <= x + wordWidth) {
 
-						selection.x = round(pos.x + startx);
-						selection.y = round(pos.y + y);
+						selection.x = round(startx);
+						selection.y = round(y);
 						Dimensions2 dim = {(x - startx), font->height};
 						GfxDrawSolidColorQuad(selection, dim, color);
 						startx = 0;
 
-						x = 0;
+						x = pos.x;
 						y += font->height + font->lineGap;
 						state++;
 						data -= bytesToEncode;
@@ -568,13 +580,13 @@ void FontDrawTextSelection(Point2 pos,
 				x += FontGetGlyphWidth(font, codepoint);
 				if (codepoint == 10) {
 
-					selection.x = round(pos.x + startx);
-					selection.y = round(pos.y + y);
+					selection.x = round(startx);
+					selection.y = round(y);
 					Dimensions2 dim = {(x - startx), font->height};
 					GfxDrawSolidColorQuad(selection, dim, color);
 					startx = 0;
 					
-					x = 0;
+					x = pos.x;
 					y += font->height + font->lineGap;
 					state++;
 					continue;
@@ -588,11 +600,11 @@ void FontDrawTextSelection(Point2 pos,
 					if (x1 <= x + wordWidth) {
 
 						selection.x = round(pos.x);
-						selection.y = round(pos.y + y);
+						selection.y = round(y);
 						Dimensions2 dim = {x, font->height};
 						GfxDrawSolidColorQuad(selection, dim, color);
 
-						x = 0;
+						x = pos.x;
 						y += font->height + font->lineGap;
 					}
 				}
@@ -600,11 +612,11 @@ void FontDrawTextSelection(Point2 pos,
 				if (codepoint == 10) {
 
 					selection.x = round(pos.x);
-					selection.y = round(pos.y + y);
+					selection.y = round(y);
 					Dimensions2 dim = {x, font->height};
 					GfxDrawSolidColorQuad(selection, dim, color);
 
-					x = 0;
+					x = pos.x;
 					y += font->height + font->lineGap;
 				}
 			}
@@ -614,15 +626,15 @@ void FontDrawTextSelection(Point2 pos,
 		if (end.node == node) break;
 	}
 
-	selection.y = round(pos.y + y);
+	selection.y = round(y);
 	bool eq = StringListPosEquals(tail, head);
 	if (!eq) {
-		selection.x = round(pos.x + startx);
+		selection.x = round(startx);
 		GfxDrawSolidColorQuad(selection, {(x - startx), font->height}, color);
 	}
 
 	if (onEnd || eq) {
-		selection.x = round(pos.x + x);
+		selection.x = round(x);
 		GfxDrawSolidColorQuad(selection, {2, font->height}, caretColor);
 	}
 }
