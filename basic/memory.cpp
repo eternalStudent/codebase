@@ -7,7 +7,7 @@
 #  define OSFree				Win32Free
 #endif
 
-#if defined(_OS_UNIX)
+#if defined(OS_UNIX)
 #  include <sys/mman.h>
 #  include "linuxmemory.cpp"
 #  define OSAllocate			LinuxAllocate

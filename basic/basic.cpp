@@ -16,6 +16,8 @@
 #elif defined(__linux__)
 #  define OS_LINUX 1
 #  define OS_UNIX 1
+#  define _MATH_ALREADY_DEFINED_ 1
+#  define _NO_ROTATE_ 1
 #endif
 
 #if defined(OS_WINDOWS)

@@ -64,7 +64,7 @@ int LinuxGetDefaultFontFile() {
     }
 
     FcChar8 *filename;
-    if (!FcPatternGetString (fontMatch, FC_FILE, 0, &filename) == FcResultMatch) {
+    if (FcPatternGetString(fontMatch, FC_FILE, 0, &filename) != FcResultMatch) {
         LOG("failed to get font file name");
         return {};
     }
