@@ -12,6 +12,43 @@ struct UIAccordion {
 	int32 hovered;
 };
 
+bool UIAccordionInExpanded(UIAccordion* accordion, Point2 cursor) {
+	if (accordion->expanded == 0)
+		return false;
+
+	if (cursor.x < accordion->x || cursor.x >= accordion->x + accordion->width)
+		return false;
+
+	float32 expandedHeight = accordion->height - accordion->count*accordion->rowHeight;
+	float32 expandedY = accordion->y + accordion->expanded*accordion->rowHeight;
+
+	return expandedY <= cursor.y && cursor.y < expandedY + expandedHeight;
+}
+
+Box2 UIAccordionGetExpandedBox(UIAccordion* accordion) {
+	if (accordion->expanded == 0)
+		return {};
+
+	float32 expandedHeight = accordion->height - accordion->count*accordion->rowHeight;
+	float32 expandedY = accordion->y + accordion->expanded*accordion->rowHeight;
+
+	return {accordion->x, expandedY, accordion->x + accordion->width, expandedY + expandedHeight};
+}
+
+Box2 UIAccordionGetHoveredBox(UIAccordion* accordion) {
+	if (accordion->hovered == 0)
+		return {};
+
+	float32 x0 = accordion->x;
+	float32 x1 = accordion->x + accordion->width;
+	float32 y0 = accordion->hovered <= accordion->expanded || accordion->expanded == 0
+		? accordion->y + (accordion->hovered - 1)*accordion->rowHeight
+		: accordion->y + accordion->height + (accordion->hovered - 1 - accordion->count)*accordion->rowHeight;
+	float32 y1 = y0 + accordion->rowHeight;
+
+	return {x0, y0, x1, y1};
+}
+
 bool UIAccordionProcessEvent(UIAccordion* accordion, OSEvent event) {
 	switch (event.type) {
 	case Event_MouseMove: {

@@ -20,7 +20,7 @@
 #define KB(n)	(((ssize)(n)) << 10)
 #define MB(n)	(((ssize)(n)) << 20)
 #define GB(n)	(((ssize)(n)) << 30)
-#define RESERVE_SIZE		GB(16)
+#define RESERVE_SIZE		GB(1)
 
 #include "arena.cpp"
 #include "bigarray.cpp"
