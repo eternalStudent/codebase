@@ -227,7 +227,7 @@ inline float32 max(float32 x, float32 y) {
 	return x < y ? y : x;
 }
 
-#ifndef _MATH_ALREADY_DEFINED_
+#ifndef _ABS_ALREADY_DEFINED_
 
 inline float32 abs(float32 x) {
 	return x < 0 ? -x : x;
@@ -299,7 +299,7 @@ inline float64 max(float64 x, float64 y) {
 	return x < y ? y : x;
 }
 
-#ifndef _MATH_ALREADY_DEFINED_
+#ifndef _ABS_ALREADY_DEFINED_
 
 inline float64 abs(float64 x) {
 	return x < 0 ? -x : x;

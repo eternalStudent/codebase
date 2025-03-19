@@ -14,7 +14,7 @@ struct {
 	Atom _NET_WM_ICON;
 
 	Window root;
-	Cursor cursors[7];
+	Cursor cursors[CUR_COUNT];
 	XIC xic;
 
 	char keyPressed[256];
@@ -351,7 +351,7 @@ void LinuxProcessWindowEvents() {
 
 void LinuxSetWindowIcon(Image image) {
 	int longCount = 2 + image.width * image.height;
-	byte* icon = (byte*)LinuxHeapAllocate(longCount * sizeof(unsigned long));
+	byte* icon = (byte*)LinuxAllocate(longCount * sizeof(unsigned long));
 	unsigned long* target = (unsigned long*)icon;
 	*target++ = image.width;
 	*target++ = image.height;
@@ -465,7 +465,7 @@ int OpenPipe(const char* cmd) {
 	int write_end = pipefd[1];
 	int read_end = pipefd[0];
 	int pid = fork();
-	if (pid = -1) {
+	if (pid == -1) {
 		LOG("failed to create new process");
 		close(write_end);
 		return -1;
@@ -491,8 +491,8 @@ int LinuxSaveFileDialog() {
 }
 
 void LinuxCopyToClipboard(String str) {
-	LinuxHeapFree(window.selection.data, window.selection.length);
-	window.selection.data = (byte*)LinuxHeapAllocate(str.length);
+	LinuxFree(window.selection.data, window.selection.length);
+	window.selection.data = (byte*)LinuxAllocate(str.length);
 	window.selection.length = str.length;
 	StringCopy(str, window.selection.data);
 	XSetSelectionOwner(window.display, window.CLIPBOARD, window.window, CurrentTime);

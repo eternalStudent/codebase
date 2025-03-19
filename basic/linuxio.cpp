@@ -45,6 +45,8 @@ off_t LinuxGetFileSize(int fd) {
     return st.st_size;
 }
 
+/*
+// TODO: move to ui folder
 #if defined(__gnu_linux__)
 #include <fontconfig/fontconfig.h>
 int LinuxGetDefaultFontFile() {
@@ -72,3 +74,4 @@ int LinuxGetDefaultFontFile() {
     return LinuxOpenFile((const char*)filename);
 }
 #endif
+*/
