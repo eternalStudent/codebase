@@ -34,7 +34,7 @@ float64 LinuxTimeStop() {
 	float64 elapsed = stopwatch.elapsed + ToMilliseconds(stopwatch.startTimeStamp, endTimeStamp);
 	stopwatch.elapsed = 0.0;
 	stopwatch.isRunning = false;
-	return stopwatch.elapsed;
+	return elapsed;
 }
 
 float64 LinuxTimeRestart() {
