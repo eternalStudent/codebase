@@ -43,10 +43,103 @@ struct {
 	String selection;
 	Atom target;
 	void (*pasteCallback)(String);
-	
 } window;
 
-void _internalCreateWindow(Window root, const char* title, int width, int height) {
+WindowHandle LinuxGetWindowHandle() {
+	return window.handle;
+}
+
+Dimensions2i LinuxGetWindowDimensions() {
+	/*
+	XWindowAttributes attr;
+	Status status = XGetWindowAttributes(window.display, window.window, &attr);
+	ASSERT(status && "Failed to get window attributes");
+
+	return {attr.width, attr.height};
+	*/
+	return window.dim;
+}
+
+void LinuxExitFullScreen() {
+	Atom wm_state = XInternAtom(window.display, "_NET_WM_STATE", True);
+	Atom wm_fullscreen = XInternAtom(window.display, "_NET_WM_STATE_FULLSCREEN", True);
+
+	XEvent event = {};
+	event.type = ClientMessage;
+	event.xclient.window = window.window;
+	event.xclient.message_type = wm_state;
+	//event.xclient.send_event = True; ???
+	event.xclient.format = 32;
+	event.xclient.data.l[0] = 0;
+	event.xclient.data.l[1] = wm_fullscreen;
+	event.xclient.data.l[2] = 0;
+	XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
+}
+
+void LinuxEnterFullScreen() {
+	Atom wm_state = XInternAtom(window.display, "_NET_WM_STATE", True);
+	Atom wm_fullscreen = XInternAtom(window.display, "_NET_WM_STATE_FULLSCREEN", True);
+
+	XEvent event = {};
+	event.type = ClientMessage;
+	event.xclient.window = window.window;
+	event.xclient.message_type = wm_state;
+	//event.xclient.send_event = True; ???
+	event.xclient.format = 32;
+	event.xclient.data.l[0] = 1;
+	event.xclient.data.l[1] = wm_fullscreen;
+	event.xclient.data.l[2] = 0;
+	XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
+}
+
+void LinuxEnqueueEvent(OSEvent event) {
+	window.queue.table[window.queue.writeIndex & EVENT_QUEUE_MASK] = event;
+	__asm__ __volatile__ ("":::"memory");
+	window.queue.writeIndex++;
+}
+
+bool LinuxPollEvent(OSEvent* event) {
+	if (window.queue.readIndex == window.queue.writeIndex) return False;
+	*event = window.queue.table[window.queue.readIndex & EVENT_QUEUE_MASK];
+	__asm__ __volatile__ ("":::"memory");
+	window.queue.readIndex++;
+	return True;
+}
+
+void LinuxSetWindowIcon(Image image) {
+	// TODO: why am I allocating and not freeing?
+
+	int longCount = 2 + image.width * image.height;
+	byte* icon = (byte*)LinuxAllocate(longCount * sizeof(unsigned long));
+	unsigned long* target = (unsigned long*)icon;
+	*target++ = image.width;
+	*target++ = image.height;
+	for (int x = image.width;  x >= 0;  x--) for (int y = 0;  y < image.height;  y++) {
+		*target++ = (((unsigned long) image.data[(x*image.height + y) * 4 + 0]) << 16) |
+		(((unsigned long) image.data[(x*image.height + y) * 4 + 1]) <<  8) |
+		(((unsigned long) image.data[(x*image.height + y) * 4 + 2]) <<  0) |
+		(((unsigned long) image.data[(x*image.height + y) * 4 + 3]) << 24);
+	}
+
+	XChangeProperty(window.display, window.window,
+					window._NET_WM_ICON,
+					XA_CARDINAL, 32,
+					PropModeReplace,
+					(byte*) icon,
+					longCount);
+
+	XFlush(window.display);
+}
+
+void LinuxSetWindowTitle(const char* title) {
+	XStoreName(window.display, window.window, title);
+}
+
+Bool LinuxWindowDestroyed() {
+	return window.destroyed;
+}
+
+void _internalCreateWindow(Window root, const char* title, int width, int height, bool maximized = false) {
 	window.root = root;
 	XSetWindowAttributes attributes;
 	attributes.event_mask = StructureNotifyMask;
@@ -71,6 +164,19 @@ void _internalCreateWindow(Window root, const char* title, int width, int height
 
 	XSetWMProtocols(window.display, window.window, &window.WM_DELETE_WINDOW, 1);
 
+	if (maximized) {
+		Atom _NET_WM_STATE  =  XInternAtom(window.display, "_NET_WM_STATE", False);
+
+		Atom _NET_WM_STATE_MAXIMIZED[2];
+		_NET_WM_STATE_MAXIMIZED[0] =  XInternAtom(window.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+		_NET_WM_STATE_MAXIMIZED[1] =  XInternAtom(window.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+
+		XChangeProperty(window.display, window.window, 
+			_NET_WM_STATE, XA_ATOM, 
+			32, PropModeAppend, 
+			(unsigned char*)_NET_WM_STATE_MAXIMIZED, 2);
+	}
+
 	// show the window
 	XMapWindow(window.display, window.window);
 
@@ -91,7 +197,6 @@ void _internalCreateWindow(Window root, const char* title, int width, int height
 		xim = XOpenIM(window.display, 0, 0, 0);
 	}
 	window.xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, window.window, XNFocusWindow, window.window, NULL);
-
 }
 
 void LinuxCreateWindow(const char* title, int width, int height) {
@@ -101,38 +206,6 @@ void LinuxCreateWindow(const char* title, int width, int height) {
 		return;
 	}
 	_internalCreateWindow(DefaultRootWindow(window.display), title, width, height);
-}
-
-void LinuxEnterFullScreen() {
-	Atom wm_state = XInternAtom(window.display, "_NET_WM_STATE", True);
-	Atom wm_fullscreen = XInternAtom(window.display, "_NET_WM_STATE_FULLSCREEN", True);
-
-	XEvent event = {};
-	event.type = ClientMessage;
-	event.xclient.window = window.window;
-	event.xclient.message_type = wm_state;
-	//event.xclient.send_event = True; ???
-	event.xclient.format = 32;
-	event.xclient.data.l[0] = 1;
-	event.xclient.data.l[1] = wm_fullscreen;
-	event.xclient.data.l[2] = 0;
-	XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
-}
-
-void LinuxExitFullScreen() {
-	Atom wm_state = XInternAtom(window.display, "_NET_WM_STATE", True);
-	Atom wm_fullscreen = XInternAtom(window.display, "_NET_WM_STATE_FULLSCREEN", True);
-
-	XEvent event = {};
-	event.type = ClientMessage;
-	event.xclient.window = window.window;
-	event.xclient.message_type = wm_state;
-	//event.xclient.send_event = True; ???
-	event.xclient.format = 32;
-	event.xclient.data.l[0] = 0;
-	event.xclient.data.l[1] = wm_fullscreen;
-	event.xclient.data.l[2] = 0;
-	XSendEvent(window.display, window.root, False, SubstructureRedirectMask | SubstructureNotifyMask, &event);
 }
 
 void LinuxCreateWindowFullScreen(const char* title) {
@@ -151,18 +224,22 @@ void LinuxCreateWindowFullScreen(const char* title) {
 	LinuxEnterFullScreen();
 }
 
-void LinuxEnqueueEvent(OSEvent event) {
-	window.queue.table[window.queue.writeIndex & EVENT_QUEUE_MASK] = event;
-	__asm__ __volatile__ ("":::"memory");
-	window.queue.writeIndex++;
-}
+void LinuxMaximizeWindow() {
+	Atom _NET_WM_STATE  =  XInternAtom(window.display, "_NET_WM_STATE", False);
+	Atom _NET_WM_STATE_MAXIMIZED_HORZ =  XInternAtom(window.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+	Atom _NET_WM_STATE_MAXIMIZED_VERT =  XInternAtom(window.display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
 
-bool LinuxPollEvent(OSEvent* event) {
-	if (window.queue.readIndex == window.queue.writeIndex) return False;
-	*event = window.queue.table[window.queue.readIndex & EVENT_QUEUE_MASK];
-	__asm__ __volatile__ ("":::"memory");
-	window.queue.readIndex++;
-	return True;
+	XEvent xev;
+	memset(&xev, 0, sizeof(xev));
+	xev.type = ClientMessage;
+	xev.xclient.window = window.window;
+	xev.xclient.message_type = _NET_WM_STATE;
+	xev.xclient.format = 32;
+	xev.xclient.data.l[0] = 1;
+	xev.xclient.data.l[1] = _NET_WM_STATE_MAXIMIZED_HORZ;
+	xev.xclient.data.l[2] = _NET_WM_STATE_MAXIMIZED_VERT;
+
+	XSendEvent(window.display, DefaultRootWindow(window.display), False, SubstructureNotifyMask, &xev);
 }
 
 uint32 GetVkCodeFromSymbol(KeySym symbol) {
@@ -334,6 +411,8 @@ void LinuxProcessWindowEvents() {
 				osevent.type = Event_none;
 				osevent.time = button.time;
 				osevent.mouse.cursorPos = {button.x, button.y};
+				osevent.mouse.ctrlIsDown = (button.state & ControlMask) == ControlMask;
+
 				if (button.button == Button1) {
 					osevent.type = Event_MouseLeftButtonUp;
 				}
@@ -464,51 +543,6 @@ void LinuxProcessWindowEvents() {
 			} break;
 		}
 	}
-}
-
-
-void LinuxSetWindowIcon(Image image) {
-	// TODO: why am I allocating and not freeing?
-
-	int longCount = 2 + image.width * image.height;
-	byte* icon = (byte*)LinuxAllocate(longCount * sizeof(unsigned long));
-	unsigned long* target = (unsigned long*)icon;
-	*target++ = image.width;
-	*target++ = image.height;
-	for (int x = image.width;  x >= 0;  x--) for (int y = 0;  y < image.height;  y++) {
-		*target++ = (((unsigned long) image.data[(x*image.height + y) * 4 + 0]) << 16) |
-		(((unsigned long) image.data[(x*image.height + y) * 4 + 1]) <<  8) |
-		(((unsigned long) image.data[(x*image.height + y) * 4 + 2]) <<  0) |
-		(((unsigned long) image.data[(x*image.height + y) * 4 + 3]) << 24);
-	}
-
-	XChangeProperty(window.display, window.window,
-					window._NET_WM_ICON,
-					XA_CARDINAL, 32,
-					PropModeReplace,
-					(byte*) icon,
-					longCount);
-
-	XFlush(window.display);
-}
-
-Bool LinuxWindowDestroyed() {
-	return window.destroyed;
-}
-
-WindowHandle LinuxGetWindowHandle() {
-	return window.handle;
-}
-
-Dimensions2i LinuxGetWindowDimensions() {
-	/*
-	XWindowAttributes attr;
-	Status status = XGetWindowAttributes(window.display, window.window, &attr);
-	ASSERT(status && "Failed to get window attributes");
-
-	return {attr.width, attr.height};
-	*/
-	return window.dim;
 }
 
 void LinuxSetCursorIcon(int32 icon) {
