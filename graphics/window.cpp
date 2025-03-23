@@ -20,7 +20,7 @@ enum : uint32 {
 
 	Event_KeyboardPress,
 	Event_KeyboardChar,
-	Event_KeyboardKeyUp,
+	Event_KeyboardKeyUp, // TODO: rename to Release?
 
 	Event_Custom,
 
@@ -42,6 +42,7 @@ struct MouseEvent {
 struct KeyboardEvent {
 	uint32 vkCode;
 	uint32 scanCode;
+	// TODO: UTF8
 	byte character;
 	bool ctrlIsDown;
 	bool shiftIsDown;
@@ -187,6 +188,8 @@ enum : uint32 {
 #  define OSExitFullScreen			LinuxExitFullScreen
 #  define OSEnterFullScreen 		LinuxEnterFullScreen
 #  define OSSetWindowIcon			LinuxSetWindowIcon
+#  define OSSetWindowToNoneResizable LinuxSetWindowToNoneResizable
+#  define OSSetWindowTitle			LinuxSetWindowTitle
 
 #  define OSGetWindowDimensions 	LinuxGetWindowDimensions
 #  define OSWindowDestroyed 		LinuxWindowDestroyed
@@ -196,21 +199,14 @@ enum : uint32 {
 #  define OSOpenFileDialog			LinuxOpenFileDialog
 #  define OSSaveFileDialog			LinuxSaveFileDialog
 
-#  define OSIsKeyDown 				LinuxIsKeyDown
-#  define OSIsKeyPressed			LinuxIsKeyPressed
 #  define OSGetTypedText			LinuxGetTypedText
 #  define OSResetTypedText			LinuxResetTypedText
 #  define OSIsMouseLeftButtonDown 	LinuxIsMouseLeftButtonDown
-#  define OSIsMouseLeftButtonUp 	LinuxIsMouseLeftButtonUp
-#  define OSIsMouseLeftClicked		LinuxIsMouseLeftClicked
-#  define OSIsMouseLeftReleased 	LinuxIsMouseLeftReleased
-#  define OSIsMouseRightClicked 	LinuxIsMouseRightClicked
-#  define OSIsMouseDoubleClicked	LinuxIsMouseDoubleClicked
-#  define OSIsMouseTripleClicked	LinuxIsMouseTripleClicked
-#  define OSGetMouseWheelDelta		LinuxGetMouseWheelDelta
-#  define OSGetMouseHWheelDelta 	LinuxGetMouseHWheelDelta
-#  define OSResetMouse				LinuxResetMouse
+#  define OSIsKeyDown				LinuxIsKeyDown
 
 #  define OSCopyToClipboard 		LinuxCopyToClipboard
 #  define OSRequestClipboardData	LinuxRequestClipboardData
+
+#  define OSEnqueueEvent			LinuxEnqueueEvent
+#  define OSPollEvent				LinuxPollEvent
 #endif

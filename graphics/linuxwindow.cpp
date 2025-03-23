@@ -1,3 +1,12 @@
+#define EVENT_QUEUE_CAP			8
+#define EVENT_QUEUE_MASK		(EVENT_QUEUE_CAP - 1)
+
+struct EventQueue {
+	OSEvent table[EVENT_QUEUE_CAP];
+	volatile uint32 writeIndex;
+	volatile uint32 readIndex;
+};
+
 struct WindowHandle {
 	Window window;
 	Display* display;
@@ -17,28 +26,15 @@ struct {
 	Cursor cursors[CUR_COUNT];
 	XIC xic;
 
-	char keyPressed[256];
-	char shiftIsDown;
-	char shiftWasDown;
-	char ctrlIsDown;
-	char ctrlWasDown;
-	char typed[4];
-	int32 strlength;
-	
-	char mouseLeftButtonIsDown;
-	char mouseRightButtonIsDown;
-	char mouseLeftButtonWasDown;
-	char mouseRightButtonWasDown;
 	int32 clickCount;
-	int32 prevClickCount;
 	Point2i lastClickPoint;
 	Time timeLastClicked;
-	int32 mouseWheelDelta;
-	int32 mouseHWheelDelta;
 
 	Point2i cursorPos;
 	Dimensions2i dim;
 	Bool destroyed;
+
+	EventQueue queue;
 
 	// clipboard
 	Atom CLIPBOARD;
@@ -155,18 +151,113 @@ void LinuxCreateWindowFullScreen(const char* title) {
 	LinuxEnterFullScreen();
 }
 
-void LinuxProcessWindowEvents() {
-	memset(window.keyPressed, 0, 256);
-	window.ctrlWasDown = window.ctrlIsDown;
-	window.shiftWasDown = window.shiftIsDown;
-	window.mouseLeftButtonWasDown = window.mouseLeftButtonIsDown;
-	window.mouseRightButtonWasDown = window.mouseRightButtonIsDown;
-	window.prevClickCount = window.clickCount;
-	window.strlength = 0;
-	window.mouseWheelDelta = 0;
-	window.mouseHWheelDelta = 0;
-	window.strlength = 0;
+void LinuxEnqueueEvent(OSEvent event) {
+	window.queue.table[window.queue.writeIndex & EVENT_QUEUE_MASK] = event;
+	__asm__ __volatile__ ("":::"memory");
+	window.queue.writeIndex++;
+}
 
+bool LinuxPollEvent(OSEvent* event) {
+	if (window.queue.readIndex == window.queue.writeIndex) return False;
+	*event = window.queue.table[window.queue.readIndex & EVENT_QUEUE_MASK];
+	__asm__ __volatile__ ("":::"memory");
+	window.queue.readIndex++;
+	return True;
+}
+
+uint32 GetVkCodeFromSymbol(KeySym symbol) {
+	uint32 vkCode = 0;
+	switch (symbol) {
+	case XK_BackSpace: {vkCode = KEY_BACKSPACE;} break;
+	case XK_Tab      : {vkCode = KEY_TAB      ;} break;
+	case XK_Return   : {vkCode = KEY_ENTER    ;} break;
+	case XK_Shift_L  :
+	case XK_Shift_R  : {vkCode = KEY_SHIFT    ;} break;
+	case XK_Control_L:
+	case XK_Control_R: {vkCode = KEY_CTRL	  ;} break;
+	case XK_Alt_L    :
+	case XK_Alt_R    : {vkCode = KEY_ALT      ;} break;
+	case XK_Escape   : {vkCode = KEY_ESC 	  ;} break;
+	case XK_space    : {vkCode = KEY_SPACE    ;} break;
+	case XK_Page_Up  : {vkCode = KEY_PGUP	  ;} break;
+	case XK_Page_Down: {vkCode = KEY_PGDN     ;} break;
+	case XK_End      : {vkCode = KEY_END      ;} break;
+	case XK_Home     : {vkCode = KEY_HOME     ;} break;
+	case XK_Left     : {vkCode = KEY_LEFT     ;} break;
+	case XK_Up       : {vkCode = KEY_UP	      ;} break;
+	case XK_Right    : {vkCode = KEY_RIGHT    ;} break;
+	case XK_Down     : {vkCode = KEY_DOWN     ;} break;
+	case XK_Delete   : {vkCode = KEY_DELETE   ;} break;
+	case XK_greater  : {vkCode = KEY_GREATER  ;} break;
+	case XK_A        :
+	case XK_a        : {vkCode = KEY_A  	  ;} break;
+	case XK_B        :
+	case XK_b        : {vkCode = KEY_B  	  ;} break;
+	case XK_C        :
+	case XK_c        : {vkCode = KEY_C  	  ;} break;
+	case XK_D        :
+	case XK_d        : {vkCode = KEY_D  	  ;} break;
+	case XK_E        :
+	case XK_e        : {vkCode = KEY_E  	  ;} break;
+	case XK_F        :
+	case XK_f        : {vkCode = KEY_F  	  ;} break;
+	case XK_G        :
+	case XK_g        : {vkCode = KEY_G  	  ;} break;
+	case XK_H        :
+	case XK_h        : {vkCode = KEY_H  	  ;} break;
+	case XK_I        :
+	case XK_i        : {vkCode = KEY_I  	  ;} break;
+	case XK_J        :
+	case XK_j        : {vkCode = KEY_J  	  ;} break;
+	case XK_K        :
+	case XK_k        : {vkCode = KEY_K  	  ;} break;
+	case XK_L        :
+	case XK_l        : {vkCode = KEY_L		  ;} break;
+	case XK_M        :
+	case XK_m        : {vkCode = KEY_M	      ;} break;
+	case XK_N        :
+	case XK_n        : {vkCode = KEY_N  	  ;} break;
+	case XK_O        :
+	case XK_o        : {vkCode = KEY_O  	  ;} break;
+	case XK_P        :
+	case XK_p        : {vkCode = KEY_P  	  ;} break;
+	case XK_Q        :
+	case XK_q        : {vkCode = KEY_Q  	  ;} break;
+	case XK_R        :
+	case XK_r        : {vkCode = KEY_R  	  ;} break;
+	case XK_S        :
+	case XK_s        : {vkCode = KEY_S  	  ;} break;
+	case XK_T        :
+	case XK_t        : {vkCode = KEY_T  	  ;} break;
+	case XK_U        :
+	case XK_u        : {vkCode = KEY_U  	  ;} break;
+	case XK_V        :
+	case XK_v        : {vkCode = KEY_V  	  ;} break;
+	case XK_W        :
+	case XK_w        : {vkCode = KEY_W  	  ;} break;
+	case XK_X        :
+	case XK_x        : {vkCode = KEY_X  	  ;} break;
+	case XK_Y        :
+	case XK_y        : {vkCode = KEY_Y  	  ;} break;
+	case XK_Z        :
+	case XK_z        : {vkCode = KEY_Z  	  ;} break;
+	case XK_F1       : {vkCode = KEY_F1 	  ;} break;
+	case XK_F2       : {vkCode = KEY_F2 	  ;} break;
+	case XK_F3       : {vkCode = KEY_F3 	  ;} break;
+	case XK_F4       : {vkCode = KEY_F4 	  ;} break;
+	case XK_F5       : {vkCode = KEY_F5 	  ;} break;
+	case XK_F6       : {vkCode = KEY_F6 	  ;} break;
+	case XK_F7       : {vkCode = KEY_F7 	  ;} break;
+	case XK_F8       : {vkCode = KEY_F8 	  ;} break;
+	case XK_F9       : {vkCode = KEY_F9 	  ;} break;
+	case XK_F10      : {vkCode = KEY_F10      ;} break;
+	case XK_F11      : {vkCode = KEY_F11      ;} break;
+	case XK_F12      : {vkCode = KEY_F12      ;} break;
+	}
+	return vkCode;
+}
+
+void LinuxProcessWindowEvents() {
 	while (XPending(window.display)) {
 		XEvent event;
 		XNextEvent(window.display, &event);
@@ -189,9 +280,13 @@ void LinuxProcessWindowEvents() {
 			case ButtonPress: {
 				XButtonEvent button = event.xbutton;
 				window.cursorPos = {button.x, button.y};
-				if (button.button == Button1) {
-					window.mouseLeftButtonIsDown = 1;
+				OSEvent osevent;
+				osevent.time = button.time;
+				osevent.mouse.cursorPos = {button.x, button.y};
+				osevent.mouse.ctrlIsDown = (button.state & ControlMask) == ControlMask;
+				osevent.type = Event_none;
 
+				if (button.button == Button1) {
 					Time time = button.time;
 
 					int32 dx = ABS(window.cursorPos.x - window.lastClickPoint.x);
@@ -203,84 +298,107 @@ void LinuxProcessWindowEvents() {
 
 					window.timeLastClicked = time;
 					window.lastClickPoint = window.cursorPos;
+
+					osevent.type = Event_MouseLeftButtonDown;
 				}
-				//else if (button.button == Button2) {
-				//	window.mouse[1] = 1;
-				//}
 				else if (event.xbutton.button == Button3) {
-					window.mouseRightButtonIsDown = 1;
 					window.clickCount = 0;
+
+					osevent.type = Event_MouseRightButtonDown;
 				}
 				else if (event.xbutton.button == Button4) {
-					window.mouseWheelDelta = 72;
+					osevent.mouse.wheelDelta = 72;
+					osevent.type = Event_MouseVerticalWheel;
 				}
 				else if (event.xbutton.button == Button5) {
-					window.mouseWheelDelta = -72;
+					osevent.mouse.wheelDelta = -72;
+					osevent.type = Event_MouseVerticalWheel;
 				}
 				else if (event.xbutton.button == Button6) {
-					window.mouseHWheelDelta = -72;
+					osevent.mouse.wheelDelta = -72;
+					osevent.type = Event_MouseHorizontalWheel;
 				}
 				else if (event.xbutton.button == Button7) {
-					window.mouseHWheelDelta = 72;
+					osevent.mouse.wheelDelta = 72;
+					osevent.type = Event_MouseHorizontalWheel;
 				}
+
+				if (event.type != Event_none)
+					LinuxEnqueueEvent(osevent);
 			} break;
 			case ButtonRelease: {
 				XButtonEvent button = event.xbutton;
 				window.cursorPos = {button.x, button.y};
+
+				OSEvent osevent;
+				osevent.type = Event_none;
+				osevent.time = button.time;
+				osevent.mouse.cursorPos = {button.x, button.y};
 				if (button.button == Button1) {
-					window.mouseLeftButtonIsDown = 0;
+					osevent.type = Event_MouseLeftButtonUp;
 				}
 				else if (button.button == Button3) {
-					window.mouseRightButtonIsDown = 0;
-				} 
+					osevent.type = Event_MouseRightButtonUp;
+				}
+				if (event.type != Event_none)
+					LinuxEnqueueEvent(osevent);
 			} break;
 			case MotionNotify: {
 				window.cursorPos = {event.xmotion.x, event.xmotion.y};
+				OSEvent osevent;
+				osevent.type = Event_MouseMove;
+				osevent.time = event.xmotion.time;
+				osevent.mouse.cursorPos = {event.xmotion.x, event.xmotion.y};
+				osevent.mouse.ctrlIsDown = (event.xmotion.state & ControlMask) == ControlMask;
+				LinuxEnqueueEvent(osevent);
 			} break;
 			case ConfigureNotify: {
 				window.dim = {event.xconfigure.width, event.xconfigure.height};
+
+				OSEvent osevent;
+				osevent.type = Event_WindowResize;
+				osevent.window.dim = {event.xconfigure.width, event.xconfigure.height};
+				osevent.window.prevDim = window.dim;
+				LinuxEnqueueEvent(osevent);
 			} break;
 			case KeyPress: {
 				KeySym symbol = NoSymbol;
 				Status status;
-				char typed[4];
-				int32 strlength = Xutf8LookupString(window.xic, &event.xkey, typed, 4, &symbol, &status);
+				char buffer[100];
+				int length = Xutf8LookupString(window.xic, &event.xkey, buffer, sizeof(buffer)-1, &symbol, &status);
 
-				if (strlength == 1 && (32 <= typed[0] && typed[0] < 127 || 9 <= typed[0] && typed[0] <= 10)) {
-					window.typed[window.strlength] = typed[0];
-					window.strlength++;
+				if (status == XBufferOverflow) {
+					// TODO: increase the buffer
 				}
 
-				if (symbol == XK_Control_L || symbol == XK_Control_R) {window.ctrlIsDown = 1;} 
-				else if (symbol == XK_Shift_L || symbol == XK_Shift_R) {window.shiftIsDown = 1;}
-				else if (symbol == XK_BackSpace ) {window.keyPressed[KEY_BACKSPACE] = 1;}
-				else if (symbol == XK_Tab       ) {window.keyPressed[KEY_TAB]       = 1;}
-				else if (symbol == XK_Return    ) {window.keyPressed[KEY_ENTER]     = 1;}
-				else if (symbol == XK_Escape    ) {window.keyPressed[KEY_ESC]       = 1;}
-				else if (symbol == XK_space     ) {window.keyPressed[KEY_SPACE]     = 1;}
-				else if (symbol == XK_Page_Up   ) {window.keyPressed[KEY_PGUP]      = 1;}
-				else if (symbol == XK_Page_Down ) {window.keyPressed[KEY_PGDN]      = 1;}
-				else if (symbol == XK_End       ) {window.keyPressed[KEY_END]       = 1;}
-				else if (symbol == XK_Home      ) {window.keyPressed[KEY_HOME]      = 1;}
-				else if (symbol == XK_Left      ) {window.keyPressed[KEY_LEFT]      = 1;}
-				else if (symbol == XK_Up        ) {window.keyPressed[KEY_UP]        = 1;}
-				else if (symbol == XK_Right     ) {window.keyPressed[KEY_RIGHT]     = 1;}
-				else if (symbol == XK_Down      ) {window.keyPressed[KEY_DOWN]      = 1;}
-				else if (symbol == XK_Delete    ) {window.keyPressed[KEY_DELETE]    = 1;}
-				else if (symbol == XK_A || symbol == XK_a) {window.keyPressed[KEY_A]= 1;}
-				else if (symbol == XK_C || symbol == XK_c) {window.keyPressed[KEY_C]= 1;}
-				else if (symbol == XK_V || symbol == XK_v) {window.keyPressed[KEY_V]= 1;}
-				else if (symbol == XK_X || symbol == XK_X) {window.keyPressed[KEY_X]= 1;}
-				else window.keyPressed[symbol & 0xff] = 1;
+				OSEvent osevent;
+				osevent.type = Event_KeyboardPress;
+				osevent.time = event.xkey.time;
+				osevent.keyboard.scanCode = event.xkey.keycode;
+				osevent.keyboard.vkCode = GetVkCodeFromSymbol(symbol);
+				osevent.keyboard.ctrlIsDown = (event.xkey.state & ControlMask) != 0;
+				osevent.keyboard.shiftIsDown = (event.xkey.state & ShiftMask) != 0;
+				LinuxEnqueueEvent(osevent);
+
+				if (status == XLookupChars || status == XLookupBoth) {					
+					osevent.type = Event_KeyboardChar;
+
+					for (int i = 0; i < length; i++) {
+						// TODO: UTF8
+						osevent.keyboard.character = buffer[i];
+						LinuxEnqueueEvent(osevent);
+					}
+				}
 			} break;
 			case KeyRelease: {
-				KeySym symbol = XkbKeycodeToKeysym(window.display, event.xkey.keycode, 0, 0);
-				if (symbol == XK_Control_L || symbol == XK_Control_R) {
-					window.ctrlIsDown = 0;
-				} 
-				else if (symbol == XK_Shift_L || symbol == XK_Shift_R) {
-					window.shiftIsDown = 0;
-				}
+				OSEvent osevent;
+				osevent.type = Event_KeyboardKeyUp;
+				osevent.time = event.xkey.time;
+				osevent.keyboard.scanCode = event.xkey.keycode;
+				//osevent.keyboard.vkCode = GetVkCodeFromSymbol(symbol);
+				osevent.keyboard.ctrlIsDown = (event.xkey.state & ControlMask) != 0;
+				osevent.keyboard.shiftIsDown = (event.xkey.state & ShiftMask) != 0;
+				LinuxEnqueueEvent(osevent);
 			} break;
 			case SelectionNotify: {
 				XSelectionEvent selection = event.xselection;
@@ -350,6 +468,8 @@ void LinuxProcessWindowEvents() {
 
 
 void LinuxSetWindowIcon(Image image) {
+	// TODO: why am I allocating and not freeing?
+
 	int longCount = 2 + image.width * image.height;
 	byte* icon = (byte*)LinuxAllocate(longCount * sizeof(unsigned long));
 	unsigned long* target = (unsigned long*)icon;
@@ -370,66 +490,6 @@ void LinuxSetWindowIcon(Image image) {
 					longCount);
 
 	XFlush(window.display);
-}
-
-Bool LinuxIsKeyDown(int key) {
-	if (key == 0x10) return window.shiftIsDown == 1;
-	if (key == 0x11) return window.ctrlIsDown == 1;
-	return window.keyPressed[key] == 1;
-}
-
-Bool LinuxIsKeyPressed(int key) {
-	if (key == 0x10) return window.shiftIsDown == 1 && window.shiftWasDown == 0;
-	if (key == 0x11) return window.ctrlIsDown == 1 && window.ctrlWasDown == 0;
-	return window.keyPressed[key] == 1;
-}
-
-Bool LinuxIsMouseLeftButtonDown() {
-	return window.mouseLeftButtonIsDown == 1 && window.clickCount == 1;
-}
-
-Bool LinuxIsMouseLeftButtonUp() {
-	return window.mouseLeftButtonIsDown == 0;
-}
-
-Bool LinuxIsMouseLeftReleased() {
-	return window.mouseLeftButtonIsDown == 0 && window.mouseLeftButtonWasDown == 1;
-}
-
-Bool LinuxIsMouseLeftClicked() {
-	return window.clickCount == 1 && window.mouseLeftButtonIsDown == 1 && window.mouseLeftButtonWasDown == 0;
-}
-
-Bool LinuxIsMouseRightClicked() {
-	return window.mouseRightButtonIsDown == 1 && window.mouseRightButtonWasDown == 0;
-}
-
-Bool LinuxIsMouseDoubleClicked() {
-	return window.clickCount == 2 && window.prevClickCount == 1;
-}
-
-Bool LinuxIsMouseTripleClicked() {
-	return window.clickCount == 3 && window.prevClickCount == 2;
-}
-
-void LinuxResetMouse(){
-	window.mouseLeftButtonIsDown = 0;
-}
-
-int32 LinuxGetMouseWheelDelta() {
-	return window.mouseWheelDelta;
-}
-
-int32 LinuxGetMouseHWheelDelta() {
-	return window.mouseHWheelDelta;
-}
-
-String LinuxGetTypedText() {
-	return {(byte*)window.typed, (ssize)window.strlength};
-}
-
-void LinuxResetTypedText() {
-	window.strlength = 0;
 }
 
 Bool LinuxWindowDestroyed() {
