@@ -72,8 +72,8 @@ struct OpenGLProgram {
 	GLsizei stride;
 	OpenGLInputElement elements[12];
 	int32 elementCount;
-	GLchar* textureName;
-	GLchar* dimName;
+	const GLchar* textureName;
+	const GLchar* dimName;
 	GLuint texture;
 	Dimensions2 dim;
 };
@@ -100,7 +100,7 @@ struct {
 } opengl;
 
 GLchar* quadVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_pos0;
 layout (location = 1) in vec2 in_pos1;
@@ -147,7 +147,7 @@ void main() {
 	)STRING";
 
 GLchar* quadFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 out vec4 out_color;
 
 in vec4 color;
@@ -176,7 +176,7 @@ void main() {
 	)STRING";
 
 GLchar* glyphVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_pos0;
 layout (location = 1) in vec2 in_pos1;
@@ -212,7 +212,7 @@ void main() {
 	)STRING";
 
 GLchar* glyphFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 in vec2 uv;
 in vec4 color;
@@ -228,7 +228,7 @@ void main() {
 	)STRING";
 
 GLchar* imageVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_position;
 layout (location = 1) in vec2 in_uv;
@@ -245,7 +245,7 @@ void main() {
 	)STRING";
 
 GLchar* imageFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 in vec2 uv;
 
@@ -259,7 +259,7 @@ void main() {
 	)STRING";
 
 GLchar* segmentVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_pos0;
 layout (location = 1) in vec2 in_pos1;
@@ -286,7 +286,7 @@ void main() {
 	)STRING";
 
 GLchar* segmentFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 in vec4 color;
 
@@ -298,7 +298,7 @@ void main() {
 	)STRING";
 
 GLchar* shadowVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_pos0;
 layout (location = 1) in vec2 in_pos1;
@@ -334,7 +334,7 @@ void main() {
 	)STRING";
 
 GLchar* shadowFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 out vec4 out_color;
 
 in vec4 color;
@@ -360,7 +360,7 @@ void main() {
 	)STRING";
 
 GLchar* semiSphereVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_pos;
 layout (location = 1) in float in_radius;
@@ -394,7 +394,7 @@ void main() {
 )STRING";
 
 GLchar* semiSphereFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 out vec4 out_color;
 
 in vec2 pos;
@@ -414,7 +414,7 @@ void main() {
 )STRING";
 
 GLchar* waveVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_pos0;
 layout (location = 1) in vec2 in_pos1;
@@ -457,7 +457,7 @@ void main() {
 )STRING";
 
 GLchar* waveFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 out vec4 out_color;
 
@@ -477,7 +477,7 @@ void main() {
 )STRING";
 
 GLchar* hueVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 layout (location = 0) in vec2 in_pos0;
 layout (location = 1) in vec2 in_pos1;
@@ -502,7 +502,7 @@ void main() {
 )STRING";
 
 GLchar* hueFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 out vec4 out_color;
 
@@ -517,7 +517,7 @@ void main() {
 )STRING";
 
 GLchar* slVertexSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 layout (location = 0) in vec2 in_pos0;
 layout (location = 1) in vec2 in_pos1;
 layout (location = 2) in float in_hue;
@@ -550,7 +550,7 @@ void main() {
 )STRING";
 
 GLchar* slFragmentSource = (GLchar*)R"STRING(
-#version 330 core
+#version 420
 
 out vec4 out_color;
 

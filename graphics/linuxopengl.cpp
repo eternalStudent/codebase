@@ -10,6 +10,7 @@
 	X(PFNGLCLEARCOLORPROC,               glClearColor               ) \
 	X(PFNGLCLEARPROC,                    glClear                    ) \
 	X(PFNGLDRAWARRAYSPROC,               glDrawArrays               ) \
+	X(PFNGLDRAWARRAYSINSTANCEDPROC,      glDrawArraysInstanced      ) \
 	X(PFNGLCREATEBUFFERSPROC,            glCreateBuffers            ) \
 	X(PFNGLNAMEDBUFFERSTORAGEPROC,       glNamedBufferStorage       ) \
 	X(PFNGLBINDVERTEXARRAYPROC,          glBindVertexArray          ) \
@@ -52,6 +53,7 @@
 	X(PFNGLGENVERTEXARRAYSPROC,			 glGenVertexArrays   		) \
 	X(PFNGLENABLEVERTEXATTRIBARRAYPROC,	 glEnableVertexAttribArray  ) \
 	X(PFNGLVERTEXATTRIBPOINTERPROC,		 glVertexAttribPointer   	) \
+	X(PFNGLVERTEXATTRIBDIVISORPROC,		 glVertexAttribDivisor   	) \
 	X(PFNGLPOLYGONMODEPROC,				 glPolygonMode  		 	) \
 	X(PFNGLUSEPROGRAMPROC,				 glUseProgram  			 	) \
 	X(PFNGLACTIVETEXTUREPROC,			 glActiveTexture 		  	) \
@@ -59,14 +61,15 @@
 	X(PFNGLUNIFORM1IPROC,		 		 glUniform1i 			  	) \
 	X(PFNGLDELETEVERTEXARRAYSPROC,		 glDeleteVertexArrays   	) \
 	X(PFNGLDELETEBUFFERSPROC,			 glDeleteBuffers 		  	) \
+	X(PFNGLUNIFORM2FPROC,				 glUniform2f  			 	) \
 	X(PFNGLUNIFORM4FPROC,				 glUniform4f  			 	) \
-	X(PFNGLLINEWIDTHPROC,				 glLineWidth 			  	) 
+	X(PFNGLUNIFORMMATRIX4FVPROC,		 glUniformMatrix4fv 	    ) \
 
 #define X(type, name) static type name;
 GL_FUNCTIONS(X)
 #undef X
 
-EGLBoolean LinuxOpenGLInit() {
+EGLBoolean LinuxOpenGLInit(int samples) {
 	WindowHandle handle = LinuxGetWindowHandle();
 
 	// initialize EGL
@@ -105,9 +108,8 @@ EGLBoolean LinuxOpenGLInit() {
 			EGL_DEPTH_SIZE,   24,
 			EGL_STENCIL_SIZE,  8,
 
-			// uncomment for multisampled framebuffer
-			//EGL_SAMPLE_BUFFERS, 1,
-			//EGL_SAMPLES,        4, // 4x MSAA
+			EGL_SAMPLE_BUFFERS, samples > 1 ? 1 : 0,
+			EGL_SAMPLES,        samples,
 
 			EGL_NONE,
 		};

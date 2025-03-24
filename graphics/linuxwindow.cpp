@@ -224,6 +224,15 @@ void LinuxCreateWindowFullScreen(const char* title) {
 	LinuxEnterFullScreen();
 }
 
+void LinuxCreateWindowMaximized(const char* title) {
+	window.display = XOpenDisplay(NULL);
+	if (!window.display) {
+		LOG("Cannot open X display");
+		return;
+	}
+	_internalCreateWindow(DefaultRootWindow(window.display), title, 100, 100, true);
+}
+
 void LinuxMaximizeWindow() {
 	Atom _NET_WM_STATE  =  XInternAtom(window.display, "_NET_WM_STATE", False);
 	Atom _NET_WM_STATE_MAXIMIZED_HORZ =  XInternAtom(window.display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);

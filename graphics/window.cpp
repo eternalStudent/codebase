@@ -179,6 +179,7 @@ enum : uint32 {
 #  define Button6            6
 #  define Button7            7
 #  include "linuxwindow.cpp"
+#  define GFX_BACKEND_OPENGL
 
 #  define OSCreateWindow			LinuxCreateWindow
 #  define OSProcessWindowEvents 	LinuxProcessWindowEvents
