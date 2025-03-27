@@ -161,7 +161,7 @@ EGLBoolean LinuxOpenGLInit(int samples) {
 #undef X
 
 	// use 0 to disable vsync
-	int vsync = 0;
+	int vsync = 1;
 	ok = eglSwapInterval(display, vsync);
 	if (!ok)
 		LOG("Failed to set swap interval");

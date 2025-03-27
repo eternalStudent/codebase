@@ -47,8 +47,14 @@ BakedAtlasBitmap CreateAtlasBitmap(int32 width, int32 height, byte* buffer) {
 #  define FontLoadDefaultFontFace		DWriteLoadDefaultFontFace
 #  define FontLoadFontFaceFromMemory 	DWriteLoadFontFaceFromMemory
 #  define FontBakeFont					DWriteBakeFont
-#else
-// TODO:
+#elif defined (OS_LINUX)
+#  include "ftype.cpp"
+#  define FontFace                      FT_Face
+#  define FontInit 						FTypeInit
+#  define FontLoadFontFace				FTypeLoadFontFace
+#  define FontLoadDefaultFontFace		FTypeLoadDefaultFontFace
+#  define FontLoadFontFaceFromMemory 	FTypeLoadFontFaceFromMemory
+#  define FontBakeFont					FTypeBakeFont
 #endif
 
 Image FontGetImageFromAtlas(BakedAtlasBitmap* atlas) {

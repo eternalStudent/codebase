@@ -38,8 +38,17 @@ void GlyphCacheInit() {
 #  define ScaledFont 					DWriteScaledFont
 #  define FontGetScaledFont				DWriteGetScaledFont
 #  define FontBakeGlyph 				DWriteBakeGlyph
-#else
-// TODO:
+#elif defined (OS_LINUX)
+#  include "ftype.cpp"
+#  define FontFace                      FT_Face
+#  define FontInit 						FTypeInit
+#  define FontLoadFontFace				FTypeLoadFontFace
+#  define FontLoadDefaultFontFace		FTypeLoadDefaultFontFace
+#  define FontLoadFontFaceFromMemory 	FTypeLoadFontFaceFromMemory
+#  define FontGetGlyphIndex 			FTypeGetGlyphIndex
+#  define ScaledFont 					FTypeScaledFont
+#  define FontGetScaledFont				FTypeGetScaledFont
+#  define FontBakeGlyph 				FTypeBakeGlyph
 #endif
 
 #include "../basic/hash.cpp"
