@@ -21,4 +21,4 @@ It contains:
 
 Text Rendering is done with DirectWrite on Window, and FreeType on Linux.
 
-Everything in here should be treated as WIP, specifically audio support for Linux is missing, and I only slightly ever touched Android.
+Everything in here should be treated as WIP.
