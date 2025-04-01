@@ -35,6 +35,7 @@
 #  include <android_native_app_glue.h>
 #elif defined(OS_LINUX)
 #  include <unistd.h>
+#  include <pthread.h>
 #endif
 
 #include <memory.h>
