@@ -1,4 +1,4 @@
-This is the reusable portions of the code I write for my own projects in C-style C++, what I start with when I start a new project.
+This is the reusable portions of the code I write for my own projects in C-style C++, the code I start with when I start a new project.
 
 It contains:
 * Basic types, bit operations, math operations
@@ -11,7 +11,7 @@ It contains:
   - Input handling
   - Audio
   - Time measurements
-  - Memory
+  - Virtual Memory
 * Bitmap + PNG Decoding (slightly modified version of stb_image)
 * Graphics layer (D3D11 and OpenGL)
 * Bare bones UI
@@ -19,4 +19,6 @@ It contains:
   - Text rendering + icons
   - Some important widgets, like: UISlider, UIList, UIColorPicker, UIMenu
 
-Everything in here should be treated as WIP, specifically I haven't updated Linux implementaion of the Platfrom Layer in quite a while, and only slightly ever touched Android.
+Text Rendering is done with DirectWrite on Window, and FreeType on Linux.
+
+Everything in here should be treated as WIP, specifically audio support for Linux is missing, and I only slightly ever touched Android.
