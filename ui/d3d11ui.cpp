@@ -20,27 +20,7 @@ struct D3D11Glyph {
 	Color color;
 };
 
-struct D3D11Rectangle {
-	Point2 pos0;
-	Point2 pos1;
-};
-
-struct D3D11Segment {
-	Point2 pos0;
-	Point2 pos1;
-	Point2 pos2;
-	Point2 pos3;
-	Color color;
-};
-
-struct D3D11SemiSphere {
-	Point2 pos;
-	float32 radius;
-	uint32 quadrant;
-	float32 thickness;
-	Color color;
-};
-
+// TODO: merge with D3D11Glyph
 struct D3D11Wave {
 	Point2 pos0;
 	Point2 pos1;
@@ -59,6 +39,21 @@ struct D3D11SLBox {
 	Point2 pos0;
 	Point2 pos1;
 	float32 hue;
+};
+
+// TODO: remove?
+struct D3D11Rectangle {
+	Point2 pos0;
+	Point2 pos1;
+};
+
+// TODO: remove?
+struct D3D11Segment {
+	Point2 pos0;
+	Point2 pos1;
+	Point2 pos2;
+	Point2 pos3;
+	Color color;
 };
 
 struct D3D11Program {
@@ -103,11 +98,16 @@ struct {
 
 	D3D11Program quadProgram;
 	D3D11Program glyphProgram;
-	D3D11Program segmentProgram;
-	D3D11Program imageProgram;
-	D3D11Program waveProgram;
 	D3D11Program hueProgram;
 	D3D11Program slProgram;
+
+	// TODO: merge with glyphProgram
+	D3D11Program waveProgram;
+
+	// TODO: remove?
+	D3D11Program segmentProgram;
+	D3D11Program imageProgram;
+
 	D3D11Program* currentProgram;
 	
 	int32 quadCount;
@@ -767,7 +767,7 @@ void D3D11UIInit(uint32 globalFlags) {
 	{
 		D3D11_BUFFER_DESC desc = {};
 		{
-			desc.ByteWidth = 1024 * 1024;
+			desc.ByteWidth = KB(128);
 			desc.Usage = D3D11_USAGE_DYNAMIC;
 			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -1479,20 +1479,42 @@ Box2 D3D11UIGetCurrentCrop() {
 	return d3d11.crop;
 }
 
-void D3D11UICropScreen(LONG left, LONG top, LONG width, LONG height) {
+void CropScreen(D3D11_RECT rect) {
 	D3D11UIFlush();
+	d3d11.context->RSSetScissorRects(1, &rect);
+}
+
+void D3D11UICropScreen(Point2 pos, Dimensions2 dim) {
+	Point2 p0 = pos;
+	Point2 p1 = pos + dim;
+	d3d11.crop = {p0.x, p0.y, p1.x, p1.y};
 
 	D3D11_RECT rect = {};
-	rect.left = left;
-	rect.right = left + MAX(width, 0);
-	rect.top = top;
-	rect.bottom = top + MAX(height, 0);
-	d3d11.context->RSSetScissorRects(1, &rect);
+	rect.left = (LONG)p0.x;
+	rect.right = (LONG)p1.x;
+	rect.top = (LONG)p0.y;
+	rect.bottom = (LONG)p1.y;
+	CropScreen(rect);
+}
 
-	d3d11.crop = {(float32)rect.left, (float32)rect.top, (float32)rect.right, (float32)rect.bottom};
+void D3D11UICropScreen(Box2 box) {
+	d3d11.crop = box;
+
+	D3D11_RECT rect = {};
+	rect.left = (LONG)box.x0;
+	rect.right = (LONG)box.x1;
+	rect.top = (LONG)box.y0;
+	rect.bottom = (LONG)box.y1;
+	CropScreen(rect);
 }
 
 void D3D11UIClearCrop() {
-	D3D11UICropScreen(0, 0, d3d11.dim.width, d3d11.dim.height); 
 	d3d11.crop = {0, 0, (float32)d3d11.dim.width, (float32)d3d11.dim.height};
+
+	D3D11_RECT rect = {};
+	rect.left = 0;
+	rect.right = 0;
+	rect.top = d3d11.dim.width;
+	rect.bottom = d3d11.dim.height;
+	CropScreen(rect);
 }

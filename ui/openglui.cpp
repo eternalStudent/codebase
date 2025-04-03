@@ -20,14 +20,7 @@ struct OpenGLGlyph {
 	Color color;
 };
 
-struct OpenGLSegment {
-	Point2 pos0;
-	Point2 pos1;
-	Point2 pos2;
-	Point2 pos3;
-	Color color;
-};
-
+// TODO: merge with OpenGLGlyph
 struct OpenGLWave {
 	Point2 pos0;
 	Point2 pos1;
@@ -46,6 +39,15 @@ struct OpenGLSLBox {
 	Point2 pos0;
 	Point2 pos1;
 	float32 hue;
+};
+
+// TODO: remove?
+struct OpenGLSegment {
+	Point2 pos0;
+	Point2 pos1;
+	Point2 pos2;
+	Point2 pos3;
+	Color color;
 };
 
 struct OpenGLInputElement {
@@ -67,11 +69,16 @@ struct OpenGLProgram {
 struct {
 	OpenGLProgram quadProgram;
 	OpenGLProgram glyphProgram;
-	OpenGLProgram segmentProgram;
-	OpenGLProgram imageProgram;
-	OpenGLProgram waveProgram;
 	OpenGLProgram hueProgram;
 	OpenGLProgram slProgram;
+
+	// TODO: merge with glyphProgram
+	OpenGLProgram waveProgram;
+
+	// TODO: remove?
+	OpenGLProgram segmentProgram;
+	OpenGLProgram imageProgram;
+
 	OpenGLProgram* currentProgram;
 
 	void* quads;
@@ -486,7 +493,7 @@ void main() {
 void OpenGLUIInit(uint32 globalFlags) {
 	opengl = {};
 	OSOpenGLInit(globalFlags & GFX_MULTISAMPLE ? 4 : 1);
-	opengl.quads = OSAllocate(sizeof(OpenGLQuad)*1024);
+	opengl.quads = OSAllocate(KB(128));
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1103,15 +1110,29 @@ Box2 OpenGLUIGetCurrentCrop() {
 	return opengl.crop;
 }
 
-void OpenGLUICropScreen(int32 x, int32 y, int32 width, int32 height) {
+void OpenGLUICropScreen(Point2 pos, Dimensions2 dim) {
 	OpenGLUIFlush();
-	glScissor(x, opengl.dim.height - y - height, width, height);
+	opengl.crop = {pos.x, pos.y, pos.x + dim.width, pos.y + dim.height};
 
-	opengl.crop = {(float32)x, (float32)y, (float32)(x + width), (float32)(y + height)};
+	glScissor((GLint)pos.x, 
+			  (GLint)(opengl.dim.height - pos.y - dim.height), 
+			  (GLsizei)dim.width, 
+			  (GLsizei)dim.height);
+}
+
+void OpenGLUICropScreen(Box2 box) {
+	OpenGLUIFlush();
+	opengl.crop = box;
+
+	glScissor((GLint)box.x0, 
+			  (GLint)(opengl.dim.height - box.y1), 
+			  (GLsizei)(box.x1 - box.x0), 
+			  (GLsizei)(box.y1 - box.y0));
 }
 
 void OpenGLUIClearCrop() {
 	OpenGLUIFlush();
-	glScissor(0, 0, opengl.dim.width, opengl.dim.height);
 	opengl.crop = {0, 0, (float32)opengl.dim.width, (float32)opengl.dim.height};
+
+	glScissor(0, 0, opengl.dim.width, opengl.dim.height);
 }

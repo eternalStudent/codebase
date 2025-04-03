@@ -266,11 +266,3 @@ void GfxDrawPath(Point2 start, Point2 end, bool vertFirst, float32 maxRadius, fl
 	GfxDrawPath(start, end, mid, vertFirst, maxRadius, thickness, color0, color1);
 }
 
-void GfxCropScreen(Point2 pos, Dimensions2 dim) {
-	GfxCropScreen((int32)pos.x, (int32)pos.y, (int32)dim.width, (int32)dim.height);
-}
-
-void GfxCropScreen(Box2 box) {
-	GfxCropScreen((int32)box.x0, (int32)box.y0, (int32)(box.x1 - box.x0), (int32)(box.y1 - box.y0));
-}
-
