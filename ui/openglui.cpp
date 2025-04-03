@@ -8,6 +8,8 @@ struct OpenGLQuad {
 	float32 cornerRadius;
 	float32 borderThickness;
 	Color borderColor;
+	Box2 crop;
+	float32 blur;
 };
 
 struct OpenGLGlyph {
@@ -23,22 +25,6 @@ struct OpenGLSegment {
 	Point2 pos1;
 	Point2 pos2;
 	Point2 pos3;
-	Color color;
-};
-
-struct OpenGLShadow {
-	Point2 pos0;
-	Point2 pos1;
-	float32 cornerRadius;
-	float32 blur;
-	Color color;
-};
-
-struct OpenGLSemiSphere {
-	Point2 pos;
-	float32 radius;
-	uint32 quadrant;
-	float32 thickness;
 	Color color;
 };
 
@@ -88,10 +74,6 @@ struct {
 	OpenGLProgram slProgram;
 	OpenGLProgram* currentProgram;
 
-	// TODO: merge both shadow and semi-sphere into quad
-	OpenGLProgram shadowProgram;
-	OpenGLProgram semiSphereProgram;
-
 	void* quads;
 	int32 quadCount;
 	Color backgorundColor;
@@ -102,25 +84,29 @@ struct {
 GLchar* quadVertexSource = (GLchar*)R"STRING(
 #version 420
 
-layout (location = 0) in vec2 in_pos0;
-layout (location = 1) in vec2 in_pos1;
-layout (location = 2) in vec4 in_color00;
-layout (location = 3) in vec4 in_color01;
-layout (location = 4) in vec4 in_color10;
-layout (location = 5) in vec4 in_color11;
-layout (location = 6) in float in_cornerRadius;
-layout (location = 7) in float in_borderThickness;
-layout (location = 8) in vec4 in_borderColor;
+layout (location =  0) in vec2  in_pos0;
+layout (location =  1) in vec2  in_pos1;
+layout (location =  2) in vec4  in_color00;
+layout (location =  3) in vec4  in_color01;
+layout (location =  4) in vec4  in_color10;
+layout (location =  5) in vec4  in_color11;
+layout (location =  6) in float in_cornerRadius;
+layout (location =  7) in float in_borderThickness;
+layout (location =  8) in vec4  in_borderColor;
+layout (location =  9) in vec4  in_crop;
+layout (location = 10) in float in_blur;
 
 uniform mat4 mvp;
 
-out vec4 color;
-out vec2 pixelpos;
+out vec4  color;
+out vec2  pixelpos;
 out float cornerRadius;
 out float borderThickness;
-out vec4 borderColor;
-out vec2 halfSize;
-out vec2 center;
+out vec4  borderColor;
+out vec2  halfSize;
+out vec2  center;
+out vec4  crop;
+out float blur;
 
 void main() {
 	vec2 poses[4] = {
@@ -141,8 +127,10 @@ void main() {
 	cornerRadius = in_cornerRadius;
 	borderThickness = in_borderThickness;
 	borderColor = in_borderColor;
-	halfSize = 0.5*(in_pos1 - in_pos0);
+	halfSize = 0.5*(in_pos1 - in_pos0 - in_blur);
 	center = 0.5*(in_pos1 + in_pos0);
+	crop = in_crop;
+	blur = in_blur;
 } 
 	)STRING";
 
@@ -150,13 +138,15 @@ GLchar* quadFragmentSource = (GLchar*)R"STRING(
 #version 420
 out vec4 out_color;
 
-in vec4 color;
-in vec2 pixelpos;
+in vec4  color;
+in vec2  pixelpos;
 in float cornerRadius;
 in float borderThickness;
-in vec4 borderColor;
-in vec2 halfSize;
-in vec2 center;
+in vec4  borderColor;
+in vec2  halfSize;
+in vec2  center;
+in vec4  crop;
+in float blur;
 
 float sd(vec2 pos, vec2 halfSize, float radius) {
 	pos = abs(pos) - halfSize + radius;
@@ -164,11 +154,15 @@ float sd(vec2 pos, vec2 halfSize, float radius) {
 }
 
 void main() {
+	if (pixelpos.x < crop.x || pixelpos.x > crop.z || pixelpos.y < crop.y || pixelpos.y > crop.w)
+		discard;
+
 	float sd_from_outer = sd(pixelpos - center, halfSize, cornerRadius);
 	float sd_from_inner = sd_from_outer + borderThickness;
 	
-	float a1 = 1.0f - smoothstep(-0.5, +0.5, sd_from_outer);
-	float a2 = 1.0f - smoothstep(-0.5, +0.5, sd_from_inner);
+	float smoothness = 0.573896787348 + 0.5*blur;
+	float a1 = 1.0f - smoothstep(-smoothness, smoothness, sd_from_outer);
+	float a2 = 1.0f - smoothstep(-smoothness, smoothness, sd_from_inner);
 	
 	out_color = mix(borderColor, color, a2);
 	out_color.a = out_color.a*a1;
@@ -296,122 +290,6 @@ void main() {
 	out_color = color;
 }   
 	)STRING";
-
-GLchar* shadowVertexSource = (GLchar*)R"STRING(
-#version 420
-
-layout (location = 0) in vec2 in_pos0;
-layout (location = 1) in vec2 in_pos1;
-layout (location = 2) in float in_cornerRadius;
-layout (location = 3) in float in_blur;
-layout (location = 4) in vec4 in_color;
-
-uniform mat4 mvp;
-
-out vec4 color;
-out vec2 pixelpos;
-out float cornerRadius;
-out float blur;
-out vec2 halfSize;
-out vec2 center;
-
-void main() {
-	vec2 poses[4] = {
-		vec2(in_pos0.x, in_pos0.y),
-		vec2(in_pos0.x, in_pos1.y),
-		vec2(in_pos1.x, in_pos0.y),
-		vec2(in_pos1.x, in_pos1.y),
-	};
-	pixelpos = poses[gl_VertexID];
-	gl_Position = mvp * vec4(pixelpos, 0.0, 1.0);
-
-	color = in_color;
-	blur = in_blur;
-	cornerRadius = in_cornerRadius;
-	halfSize = 0.5*(in_pos1 - in_pos0);
-	center = 0.5*(in_pos1 + in_pos0);
-} 
-	)STRING";
-
-GLchar* shadowFragmentSource = (GLchar*)R"STRING(
-#version 420
-out vec4 out_color;
-
-in vec4 color;
-in vec2 pixelpos;
-in float cornerRadius;
-in float blur;
-in vec2 halfSize;
-in vec2 center;
-
-float sd(vec2 pos, vec2 halfSize, float radius) {
-	pos = abs(pos) - halfSize + radius;
-	return length(max(pos, 0)) + min(max(pos.x, pos.y), 0) - radius;
-}
-
-void main() {
-	float sd_ = sd(pixelpos - center, halfSize, cornerRadius + blur);
-	
-	float a = 1.0f - smoothstep(-blur, +0.5, sd_);
-	
-	out_color = color;
-	out_color.a = out_color.a*a;
-}
-	)STRING";
-
-GLchar* semiSphereVertexSource = (GLchar*)R"STRING(
-#version 420
-
-layout (location = 0) in vec2 in_pos;
-layout (location = 1) in float in_radius;
-layout (location = 2) in uint in_quadrant;
-layout (location = 3) in float in_thickness;
-layout (location = 4) in vec4 in_color;
-
-uniform mat4 mvp;
-
-out vec2 pos;
-out vec4 color;
-out vec2 center;
-out float radius;
-out float thickness;
-
-void main() {
-	vec2 poses[] = {
-		vec2(in_pos.x, in_pos.y),
-		vec2(in_pos.x, in_pos.y + in_radius),
-		vec2(in_pos.x + in_radius, in_pos.y),
-		vec2(in_pos.x + in_radius, in_pos.y + in_radius),
-	};			
-	pos = poses[gl_VertexID];
-	gl_Position = mvp * vec4(pos, 0.0, 1.0);
-	
-	center = poses[in_quadrant];
-	color = in_color;
-	radius = in_radius;
-	thickness = in_thickness;
-}
-)STRING";
-
-GLchar* semiSphereFragmentSource = (GLchar*)R"STRING(
-#version 420
-out vec4 out_color;
-
-in vec2 pos;
-in vec4 color;
-in vec2 center;
-in float radius;
-in float thickness;
-
-void main() {
-	float sd_ = distance(pos, center) - radius;
-	float sd2 = sd_ + thickness;	
-	float a = 1 - smoothstep(-0.5, +0.5, sd_);
-	float a2 = 1 - smoothstep(-0.5, +0.5, sd2);
-	out_color = color;
-	out_color.a = a*(1 - a2)*out_color.a;
-}
-)STRING";
 
 GLchar* waveVertexSource = (GLchar*)R"STRING(
 #version 420
@@ -637,9 +515,11 @@ void OpenGLUIInit(uint32 globalFlags) {
 			{4, offsetof(OpenGLQuad, color11)},
 			{1, offsetof(OpenGLQuad, cornerRadius)},
 			{1, offsetof(OpenGLQuad, borderThickness)},
-			{4, offsetof(OpenGLQuad, borderColor)}
+			{4, offsetof(OpenGLQuad, borderColor)},
+			{4, offsetof(OpenGLQuad, crop)},
+			{1, offsetof(OpenGLQuad, blur)},
 		},
-		9
+		11
 	};
 	opengl.glyphProgram = {
 		CreateProgram(glyphVertexSource, glyphFragmentSource),
@@ -667,30 +547,6 @@ void OpenGLUIInit(uint32 globalFlags) {
 		},
 		5,
 		"atlas"
-	};
-	opengl.shadowProgram = {
-		CreateProgram(shadowVertexSource, shadowFragmentSource),
-		sizeof(OpenGLShadow),
-		{
-			{2, offsetof(OpenGLShadow, pos0)},
-			{2, offsetof(OpenGLShadow, pos1)},
-			{1, offsetof(OpenGLShadow, cornerRadius)},
-			{1, offsetof(OpenGLShadow, blur)},
-			{4, offsetof(OpenGLShadow, color)}
-		},
-		5
-	};
-	opengl.semiSphereProgram = {
-		CreateProgram(semiSphereVertexSource, semiSphereFragmentSource),
-		sizeof(OpenGLSemiSphere),
-		{
-			{2, offsetof(OpenGLSemiSphere, pos)},
-			{1, offsetof(OpenGLSemiSphere, radius)},
-			{1, offsetof(OpenGLSemiSphere, quadrant)},
-			{1, offsetof(OpenGLSemiSphere, thickness)},
-			{4, offsetof(OpenGLSemiSphere, color)}
-		},
-		5
 	};
 	opengl.waveProgram = {
 		CreateProgram(waveVertexSource, waveFragmentSource),
@@ -841,6 +697,7 @@ void OpenGLUIDrawSolidColorQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -863,6 +720,7 @@ void OpenGLUIDrawSolidColorQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		box
 	};
 
 	DrawQuad(quad);
@@ -887,6 +745,7 @@ void OpenGLUIDrawVerticalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -910,6 +769,7 @@ void OpenGLUIDrawVerticalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		box
 	};
 
 	DrawQuad(quad);
@@ -934,6 +794,7 @@ void OpenGLUIDrawHorizontalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -957,6 +818,7 @@ void OpenGLUIDrawHorizontalGradQuad(
 		cornerRadius,
 		borderThickness,
 		borderColor,
+		box
 	};
 
 	DrawQuad(quad);
@@ -974,6 +836,7 @@ void OpenGLUIDrawOutlineQuad(Point2 pos, Dimensions2 dim, float32 cornerRadius, 
 		0,
 		thickness,
 		color,
+		{pos.x, pos.y, pos.x + dim.width, pos.y + dim.height}
 	};
 
 	DrawQuad(quad);
@@ -991,6 +854,7 @@ void OpenGLUIDrawOutlineQuad(Box2 box, float32 cornerRadius, float32 thickness, 
 		0,
 		thickness,
 		color,
+		box
 	};
 
 	DrawQuad(quad);
@@ -1011,6 +875,69 @@ void OpenGLUIDrawSphere(Point2 center, float32 radius, Color color, float32 bord
 		radius,
 		borderThickness,
 		borderColor,
+		{pos0.x, pos0.y, pos1.x, pos1.y}
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float32 thickness, Color color) {
+	Point2 pos0 = {};
+	Point2 pos1 = {};
+	{
+		switch (quadrant) {
+			case Quadrant_I: {
+				pos0 = {pos.x - radius, pos.y};
+				pos1 = {pos.x + radius, pos.y + 2*radius};
+			} break;
+			case Quadrant_II: {
+				pos0 = pos;
+				pos1 = {pos.x + 2*radius, pos.y + 2*radius};
+			} break;
+			case Quadrant_III: {
+				pos0 = {pos.x, pos.y - radius};
+				pos1 = {pos.x + 2*radius, pos.y + radius};
+			} break;
+			case Quadrant_IV: {
+				pos0 = {pos.x - radius, pos.y - radius};
+				pos1 = {pos.x + radius, pos.y + radius};
+			} break;
+		}
+	}
+
+	OpenGLQuad quad = {
+		pos0,
+		pos1,
+		{},
+		{},
+		{}, 
+		{},
+		radius,
+		thickness,
+		color,
+		{pos.x, pos.y, pos.x + radius, pos.y + radius},
+	};
+
+	DrawQuad(quad);
+}
+
+void OpenGLUIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offset, float32 blur, Color color) {
+	Box2 box = 
+		{pos.x + offset.x - blur,             pos.y + offset.y - blur,
+		 pos.x + offset.x + blur + dim.width, pos.y + offset.y + blur + dim.height};
+
+	OpenGLQuad quad = {
+		{box.x0, box.y0},
+		{box.x1, box.y1},
+		color,
+		color,
+		color, 
+		color,
+		radius,
+		0,
+		color,
+		box,
+		blur
 	};
 
 	DrawQuad(quad);
@@ -1128,38 +1055,6 @@ void OpenGLUIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick
 		prev = current;
 	}
 #undef SEGMENTS
-}
-
-void OpenGLUIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offset, float32 blur, Color color) {
-	if (opengl.currentProgram != &opengl.shadowProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.shadowProgram;
-		glDisable(GL_MULTISAMPLE);
-	}
-
-	OpenGLShadow shadow = {
-		{pos.x + offset.x - blur/2,             pos.y + offset.y - blur/2}, 
-		{pos.x + offset.x + blur/2 + dim.width, pos.y + offset.y + blur/2 + dim.height}, 
-		radius, blur, color
-	};
-
-	memcpy((OpenGLShadow*)opengl.quads + opengl.quadCount, &shadow, sizeof(shadow));
-	opengl.quadCount++;
-}
-
-void OpenGLUIDrawSemiSphere(Point2 pos, float32 radius, Quadrant quadrant, float32 thickness, Color color) {
-	uint32 quadrants[] = {1, 3, 2, 0}; //?
-
-	if (opengl.currentProgram != &opengl.semiSphereProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.semiSphereProgram;
-		glDisable(GL_MULTISAMPLE);
-	}
-
-	OpenGLSemiSphere semi = {pos, radius, quadrants[(int32)quadrant], thickness, color};
-
-	memcpy((OpenGLSemiSphere*)opengl.quads + opengl.quadCount, &semi, sizeof(OpenGLSemiSphere));
-	opengl.quadCount++;
 }
 
 void OpenGLUIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
