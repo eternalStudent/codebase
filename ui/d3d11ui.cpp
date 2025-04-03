@@ -1513,8 +1513,8 @@ void D3D11UIClearCrop() {
 
 	D3D11_RECT rect = {};
 	rect.left = 0;
-	rect.right = 0;
-	rect.top = d3d11.dim.width;
+	rect.right = d3d11.dim.width;
+	rect.top = 0;
 	rect.bottom = d3d11.dim.height;
 	CropScreen(rect);
 }

@@ -112,7 +112,11 @@ inline Box2 GetBounds(Point2 pos, Dimensions2 dim) {
 }
 
 inline Box2 GetIntersection(Box2 a, Box2 b) {
-	return {MAX(a.x0, b.x0), MAX(a.y0, b.y0), MIN(a.x1, b.x1), MIN(a.y1, b.y1)};
+	float32 x0 = MAX(a.x0, b.x0);
+	float32 y0 = MAX(a.y0, b.y0);
+	float32 x1 = MAX(MIN(a.x1, b.x1), x0);
+	float32 y1 = MAX(MIN(a.y1, b.y1), y0);
+	return {x0, y0, x1, y1};
 }
 
 inline Box2 GetIntersection(Box2 box, Point2 pos, Dimensions2 dim) {
