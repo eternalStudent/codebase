@@ -13,20 +13,16 @@ struct D3D11Quad {
 };
 
 struct D3D11Glyph {
+	uint32 type;
+	//----------
 	Point2 pos0;
 	Point2 pos1;
 	Point2 uv0;
 	Point2 uv1;
 	Color color;
-};
-
-// TODO: merge with D3D11Glyph
-struct D3D11Wave {
-	Point2 pos0;
-	Point2 pos1;
+	//----------
 	float32 thickness;
 	float32 period;
-	Color color;
 };
 
 struct D3D11Hue {
@@ -101,9 +97,6 @@ struct {
 	D3D11Program hueProgram;
 	D3D11Program slProgram;
 
-	// TODO: merge with glyphProgram
-	D3D11Program waveProgram;
-
 	// TODO: remove?
 	D3D11Program segmentProgram;
 	D3D11Program imageProgram;
@@ -134,8 +127,8 @@ R"STRING(
 		float4 crop: CROP;
 		float blur: BLUR;
 		uint vertexId : SV_VertexID;
-	};				
-					
+	};
+
 	struct PS_INPUT {
 		float4 pos : SV_POSITION;
 		float4 color : COLOR;
@@ -146,12 +139,12 @@ R"STRING(
 		float4 bColor : BCOL;
 		float blur: BLUR;
 		float4 crop: CROP;
-	};				
-					
+	};
+
 	cbuffer cbuffer0 : register(b0) {
 		row_major float4x4 mvp;
-	}				
-					
+	}
+
 	PS_INPUT vs(VS_INPUT input) {
 		PS_INPUT output;
 		float2 pixel_poses[] = {
@@ -159,7 +152,7 @@ R"STRING(
 			float2(input.pos0.x, input.pos0.y),
 			float2(input.pos1.x, input.pos1.y),
 			float2(input.pos1.x, input.pos0.y),
-		};			
+		};
 		float2 pixel_pos = pixel_poses[input.vertexId];
 		float4 pos = mul(mvp, float4(pixel_pos, 0, 1));
 		output.pos = pos;
@@ -168,7 +161,7 @@ R"STRING(
 			input.color00,
 			input.color11,
 			input.color10,
-		};			
+		};
 		output.size = float2(	
 			(input.pos1.x - input.pos0.x)/2,
 			(input.pos1.y - input.pos0.y)/2 
@@ -182,13 +175,13 @@ R"STRING(
 		output.crop = input.crop;
 		output.blur = input.blur;
 		return output;
-	}				
-					
+	}
+
 	float sd(float2 pos, float2 halfSize, float radius) {
 		pos = abs(pos) - halfSize + radius;	
 		return length(max(pos, 0)) + min(max(pos.x, pos.y), 0) - radius;
-	}				
-					
+	}
+
 	float4 ps(PS_INPUT input) : SV_TARGET	
 	{		
 		float2 pos = input.pos.xy;
@@ -204,30 +197,37 @@ R"STRING(
 		color = lerp(input.bColor, input.color, a2);
 		color.a *= a;
 		return color;
-	}				
+	}
 )STRING";
 
 static char glyphCode[] = 
 "	#line " STRINGIFY(__LINE__) "\n"
 R"STRING(
 	struct VS_INPUT	{
+		uint type : TYPE;
 		float2 pos0 : POS0;
 		float2 pos1 : POS1;
 		float2 uv0 : UV0;
 		float2 uv1 : UV1;
-		float4 color : COLOR;	
+		float4 color : COLOR;
+		float thickness : THICK;
+		float period : PERIOD;	
 		uint vertexId : SV_VertexID;
-	};				
-					
+	};
+
 	struct PS_INPUT {
+		uint type : TYPE;
 		float4 pos : SV_POSITION;
 		float2 uv : UV;
 		float4 color : COLOR;
-	};				
-					
+		float2 xy : XY;
+		float thickness : THICK;
+		float pixel : PIXEL;
+	};
+
 	cbuffer cbuffer0 : register(b0) {
 		row_major float4x4 mvp;
-	}			
+	}
 
 	cbuffer cbuffer1 : register(b1) {
 		float2 atlasDim;
@@ -235,7 +235,7 @@ R"STRING(
 
 	Texture2D<float> atlas : register(t0);
 	SamplerState lsampler : register(s0);
-					
+
 	PS_INPUT vs(VS_INPUT input) {
 		PS_INPUT output;
 		float2 pixel_poses[] = {
@@ -255,18 +255,43 @@ R"STRING(
 		};
 		output.uv = uvs[input.vertexId] / atlasDim;
 
+		float tau = 6.28318548;
+		float x1 = abs(input.pos1.x - input.pos0.x)*tau/input.period;
+
+		float2 xys[] = {
+			float2(0, 2),
+			float2(0, -2),
+			float2(x1, 2),
+			float2(x1, -2),
+		};
+		output.xy = xys[input.vertexId];
+		
+		output.pixel = 2/abs(input.pos1.y - input.pos0.y);
+		output.thickness = input.thickness;
+
 		output.color = input.color;
+		output.type = input.type;
 
 		return output;
-	}			
-					
-	float4 ps(PS_INPUT input) : SV_TARGET {				
-		float a = atlas.Sample(lsampler, input.uv);
-		if (a == 0) discard;
+	}
+
+	float4 ps(PS_INPUT input) : SV_TARGET {	
 		float4 color = input.color;
-		color.a *= a;
+		switch (input.type) {
+		case 0: {			
+			float a = atlas.Sample(lsampler, input.uv);
+			if (a == 0) discard;
+			color.a *= a;
+		} break;
+		case 1: {
+			float value = sin(input.xy.x);
+			float dist = abs(value - input.xy.y) - input.thickness*input.pixel;
+			float a = 1 - smoothstep(-input.pixel, input.pixel, dist);
+			color.a *= a;
+		} break;
+		}
  		return color;
-	}				
+	}
 )STRING";
 
 static char imageCode[] = 
@@ -276,20 +301,20 @@ R"STRING(
 		float2 pos0 : POS0;
 		float2 pos1 : POS1;
 		uint vertexId : SV_VertexID;
-	};				
-					
+	};
+
 	struct PS_INPUT {
 		float4 pos : SV_POSITION;
 		float2 uv : UV;
-	};				
-					
+	};
+
 	cbuffer cbuffer0 : register(b0) {
 		row_major float4x4 mvp;
 	}
 
 	Texture2D<float4> image : register(t0);
 	SamplerState lsampler : register(s0);
-					
+
 	PS_INPUT vs(VS_INPUT input) {
 		PS_INPUT output;
 		float2 pixel_poses[] = {
@@ -310,12 +335,12 @@ R"STRING(
 		output.uv = uvs[input.vertexId];
 
 		return output;
-	}			
-					
+	}
+
 	float4 ps(PS_INPUT input) : SV_TARGET {				
 		float4 color = image.Sample(lsampler, input.uv);
  		return color;
-	}				
+	}
 )STRING";
 
 char segmentCode[] = 
@@ -333,7 +358,7 @@ R"STRING(
 	struct PS_INPUT {
 		float4 pos : SV_POSITION;
 		float4 color : COLOR;
-	};	
+	};
 
 	cbuffer cbuffer0 : register(b0) {
 		row_major float4x4 mvp;
@@ -359,71 +384,6 @@ R"STRING(
 	}
 )STRING";
 
-static char waveCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
-R"STRING(
-	struct VS_INPUT	{
-		float2 pos0 : POS0;
-		float2 pos1 : POS1;
-		float thickness : THICK;
-		float period : PERIOD;
-		float4 color : COLOR;	
-		uint vertexId : SV_VertexID;
-	};				
-					
-	struct PS_INPUT {
-		float4 pos : SV_POSITION;
-		float2 xy : XY;
-		float thickness : THICK;
-		float pixel : PIXEL;
-		float4 color : COLOR;
-	};				
-					
-	cbuffer cbuffer0 : register(b0) {
-		row_major float4x4 mvp;
-	}				
-					
-	PS_INPUT vs(VS_INPUT input) {
-		PS_INPUT output;
-		float2 pixel_poses[] = {
-			float2(input.pos0.x, input.pos1.y),
-			float2(input.pos0.x, input.pos0.y),
-			float2(input.pos1.x, input.pos1.y),
-			float2(input.pos1.x, input.pos0.y),
-		};			
-		float2 pixel_pos = pixel_poses[input.vertexId];
-		float4 pos = mul(mvp, float4(pixel_pos, 0, 1));
-		output.pos = pos;
-
-		float tau = 6.28318548;
-		float x1 = abs(input.pos1.x - input.pos0.x)*tau/input.period;
-
-		float2 xys[] = {
-			float2(0, 2),
-			float2(0, -2),
-			float2(x1, 2),
-			float2(x1, -2),
-		};
-		output.xy = xys[input.vertexId];
-		
-		output.pixel = 2/abs(input.pos1.y - input.pos0.y);
-		output.thickness = input.thickness;
-		output.color = input.color;
-		return output;
-	}							
-					
-	float4 ps(PS_INPUT input) : SV_TARGET	
-	{				
-		float value = sin(input.xy.x);
-		float dist = abs(value - input.xy.y) - input.thickness*input.pixel;
-		float a = 1 - smoothstep(-input.pixel, input.pixel, dist);
-
-		float4 color = input.color;
-		color.a *= a;
-		return color;
-	}				
-)STRING";
-
 char hueCode[] = 
 "	#line " STRINGIFY(__LINE__) "\n"
 R"STRING(
@@ -437,7 +397,7 @@ R"STRING(
 	struct PS_INPUT {
 		float4 pos : SV_POSITION;
 		float hue : HUE;
-	};	
+	};
 
 	cbuffer cbuffer0 : register(b0) {
 		row_major float4x4 mvp;
@@ -481,7 +441,7 @@ R"STRING(
 	struct PS_INPUT {
 		float4 pos : SV_POSITION;
 		float3 hsl : HSL;
-	};	
+	};
 
 	cbuffer cbuffer0 : register(b0) {
 		row_major float4x4 mvp;
@@ -844,11 +804,14 @@ void D3D11UIInit(uint32 globalFlags) {
 	{
 		D3D11_INPUT_ELEMENT_DESC desc[] =
 		{
+			{ "TYPE"  , 0, DXGI_FORMAT_R32_UINT,            0, offsetof(struct D3D11Glyph, type),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "POS"   , 0, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Glyph, pos0), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "POS"   , 1, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Glyph, pos1), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "UV"    , 0, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Glyph, uv0),	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "UV"    , 1, DXGI_FORMAT_R32G32_FLOAT, 		0, offsetof(struct D3D11Glyph, uv1),	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 			{ "COLOR" , 0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, offsetof(struct D3D11Glyph, color),	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "THICK" , 0, DXGI_FORMAT_R32_FLOAT,           0, offsetof(struct D3D11Glyph, thickness), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "PERIOD", 0, DXGI_FORMAT_R32_FLOAT,           0, offsetof(struct D3D11Glyph, period), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 		};
 		d3d11.glyphProgram = CreateProgram(STR(glyphCode), desc, ARRAYSIZE(desc), sizeof(D3D11Glyph));
 	}
@@ -872,18 +835,6 @@ void D3D11UIInit(uint32 globalFlags) {
 			{ "COLOR" , 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 	0, offsetof(struct D3D11Segment, color), 	D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 		};
 		d3d11.segmentProgram = CreateProgram(STR(segmentCode), desc, ARRAYSIZE(desc), sizeof(D3D11Segment));
-	}
-
-	{
-		D3D11_INPUT_ELEMENT_DESC desc[] =
-		{
-			{ "POS",     0, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(D3D11Wave, pos0),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "POS",     1, DXGI_FORMAT_R32G32_FLOAT,       0, offsetof(D3D11Wave, pos1),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "THICK",   0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(D3D11Wave, thickness),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "PERIOD",  0, DXGI_FORMAT_R32_FLOAT,          0, offsetof(D3D11Wave, period),     D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-			{ "COLOR",   0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, offsetof(D3D11Wave, color),      D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-		};
-		d3d11.waveProgram = CreateProgram(STR(waveCode), desc, ARRAYSIZE(desc), sizeof(D3D11Wave));
 	}
 
 	{
@@ -1372,11 +1323,66 @@ void D3D11UIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 	}
 
 	D3D11Glyph glyph = {
+		0,
 		pos,
 		pos + dim,
 		crop.p0,
 		crop.p1,
-		color
+		color,
+		0, 0
+	};
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Glyph), &glyph, sizeof(D3D11Glyph));
+	d3d11.quadCount++;
+}
+
+void D3D11UIDrawWavyLine(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
+	if (d3d11.currentProgram != &d3d11.glyphProgram) {
+		D3D11UIFlush();
+		d3d11.currentProgram = &d3d11.glyphProgram;
+		DisableMultiSample();
+	}
+
+	Point2 unused = {};
+
+	D3D11Glyph glyph = {
+		1,
+		{pos.x, pos.y - dim.height},
+		{pos.x + dim.width, pos.y + dim.height},
+		unused,
+		unused,
+		color,
+		thickness,
+		2.5f*dim.height,
+	};
+
+	if (d3d11.quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+
+	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Glyph), &glyph, sizeof(D3D11Glyph));
+	d3d11.quadCount++;
+}
+
+void D3D11UIDrawStraightLine(Point2 pos, float32 width, float32 thickness, Color color) {
+	if (d3d11.currentProgram != &d3d11.glyphProgram) {
+		D3D11UIFlush();
+		d3d11.currentProgram = &d3d11.glyphProgram;
+		DisableMultiSample();
+	}
+
+	Point2 unused = {};
+
+	D3D11Glyph glyph = {
+		2,
+		{pos.x, pos.y - 0.5f*thickness},
+		{pos.x + width, pos.y + 0.5f*thickness},
+		unused,
+		unused,
+		color,
+		0, 0
 	};
 
 	if (d3d11.quadCount == 0)
@@ -1422,27 +1428,6 @@ void D3D11UIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick,
 		prev = current;
 	}
 #undef SEGMENTS
-}
-
-void D3D11UIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
-	D3D11Wave wave = {
-		{pos.x, pos.y - dim.height},
-		{pos.x + dim.width, pos.y + dim.height},
-		thickness,
-		2.5f*dim.height,
-		color
-	};
-	if (d3d11.currentProgram != &d3d11.waveProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.waveProgram;
-		DisableMultiSample();
-	}
-
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Wave), &wave, sizeof(D3D11Wave));
-	d3d11.quadCount++;
 }
 
 void D3D11UIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {

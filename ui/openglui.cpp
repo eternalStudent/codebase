@@ -13,20 +13,16 @@ struct OpenGLQuad {
 };
 
 struct OpenGLGlyph {
+	uint32 type;
+	//----------
 	Point2 pos0;
 	Point2 pos1;
 	Point2 uv0;
 	Point2 uv1;
 	Color color;
-};
-
-// TODO: merge with OpenGLGlyph
-struct OpenGLWave {
-	Point2 pos0;
-	Point2 pos1;
+	//----------
 	float32 thickness;
 	float32 period;
-	Color color;
 };
 
 struct OpenGLHue {
@@ -71,9 +67,6 @@ struct {
 	OpenGLProgram glyphProgram;
 	OpenGLProgram hueProgram;
 	OpenGLProgram slProgram;
-
-	// TODO: merge with glyphProgram
-	OpenGLProgram waveProgram;
 
 	// TODO: remove?
 	OpenGLProgram segmentProgram;
@@ -179,14 +172,21 @@ void main() {
 GLchar* glyphVertexSource = (GLchar*)R"STRING(
 #version 420
 
-layout (location = 0) in vec2 in_pos0;
-layout (location = 1) in vec2 in_pos1;
-layout (location = 2) in vec2 in_uv0;
-layout (location = 3) in vec2 in_uv1;
-layout (location = 4) in vec4 in_color;
+layout (location = 0) in uint  in_type;
+layout (location = 1) in vec2  in_pos0;
+layout (location = 2) in vec2  in_pos1;
+layout (location = 3) in vec2  in_uv0;
+layout (location = 4) in vec2  in_uv1;
+layout (location = 5) in vec4  in_color;
+layout (location = 6) in float in_thickness;
+layout (location = 7) in float in_period;
 
-out vec2 uv;
-out vec4 color;
+flat out uint  type;
+out vec2  uv;
+out vec4  color;
+out vec2  xy;
+out float thickness;
+out float pixel;
 
 uniform mat4 mvp;
 uniform vec2 atlasDim;
@@ -206,6 +206,21 @@ void main() {
 		vec2(in_uv1.x, in_uv1.y),
 	};
 
+	float tau = 6.28318548;
+	float x1 = abs(in_pos1.x - in_pos0.x)*tau/in_period;
+
+	vec2 xys[] = {
+		vec2(0, -2),
+		vec2(0, 2),
+		vec2(x1, -2),
+		vec2(x1, 2),
+	};
+	xy = xys[gl_VertexID];
+	
+	pixel = 2/abs(in_pos1.y - in_pos0.y);
+	thickness = in_thickness;
+
+	type = in_type;
 	uv = uvs[gl_VertexID]/atlasDim;
 	color = in_color;
 	gl_Position = mvp * vec4(pixelpos, 0.0, 1.0);
@@ -215,16 +230,31 @@ void main() {
 GLchar* glyphFragmentSource = (GLchar*)R"STRING(
 #version 420
 
-in vec2 uv;
-in vec4 color;
+flat in uint  type;
+in vec2  uv;
+in vec4  color;
+in vec2  xy;
+in float thickness;
+in float pixel;
 
 out vec4 out_color;
 
 uniform sampler2D atlas;
 
 void main() {
-	float a = texture(atlas, uv).r;
-    out_color = vec4(color.rgb, color.a*a);
+	out_color = color;
+	switch (type) {
+	case 0: {
+		float a = texture(atlas, uv).r;
+		out_color.a *= a;
+	} break;
+	case 1: {
+		float value = sin(xy.x);
+		float dist = abs(value - xy.y) - thickness*pixel;
+		float a = 1 - smoothstep(-pixel, pixel, dist);
+		out_color.a *= a;
+	} break;
+	};
 }   
 	)STRING";
 
@@ -297,69 +327,6 @@ void main() {
 	out_color = color;
 }   
 	)STRING";
-
-GLchar* waveVertexSource = (GLchar*)R"STRING(
-#version 420
-
-layout (location = 0) in vec2 in_pos0;
-layout (location = 1) in vec2 in_pos1;
-layout (location = 2) in float in_thickness;
-layout (location = 3) in float in_period;
-layout (location = 4) in vec4 in_color;
-
-uniform mat4 mvp;
-
-out vec2 xy;
-out float thickness;
-out float pixel;
-out vec4 color;
-
-void main() {
-	vec2 poses[] = {
-		vec2(in_pos0.x, in_pos0.y),
-		vec2(in_pos0.x, in_pos1.y),
-		vec2(in_pos1.x, in_pos0.y),
-		vec2(in_pos1.x, in_pos1.y),
-	};			
-	vec2 pixelpos = poses[gl_VertexID];
-	gl_Position = mvp * vec4(pixelpos, 0.0, 1.0);
-
-	float tau = 6.28318548;
-	float x1 = abs(in_pos1.x - in_pos0.x)*tau/in_period;
-
-	vec2 xys[] = {
-		vec2(0, -2),
-		vec2(0, 2),
-		vec2(x1, -2),
-		vec2(x1, 2),
-	};
-	xy = xys[gl_VertexID];
-	
-	pixel = 2/abs(in_pos1.y - in_pos0.y);
-	thickness = in_thickness;
-	color = in_color;
-}
-)STRING";
-
-GLchar* waveFragmentSource = (GLchar*)R"STRING(
-#version 420
-
-out vec4 out_color;
-
-in vec2 xy;
-in float thickness;
-in float pixel;
-in vec4 color;
-
-void main() {
-	float value = sin(xy.x);
-	float dist = abs(value - xy.y) - thickness*pixel;
-	float a = 1 - smoothstep(-pixel, pixel, dist);
-
-	out_color = color;
-	out_color.a *= a;
-}
-)STRING";
 
 GLchar* hueVertexSource = (GLchar*)R"STRING(
 #version 420
@@ -532,13 +499,16 @@ void OpenGLUIInit(uint32 globalFlags) {
 		CreateProgram(glyphVertexSource, glyphFragmentSource),
 		sizeof(OpenGLGlyph),
 		{
+			{1, offsetof(OpenGLGlyph, type)},
 			{2, offsetof(OpenGLGlyph, pos0)},
 			{2, offsetof(OpenGLGlyph, pos1)},
 			{2, offsetof(OpenGLGlyph, uv0)},
 			{2, offsetof(OpenGLGlyph, uv1)},
 			{4, offsetof(OpenGLGlyph, color)},
+			{1, offsetof(OpenGLGlyph, thickness)},
+			{1, offsetof(OpenGLGlyph, period)},
 		},
-		5,
+		8,
 		"atlas",
 		"atlasDim"
 	};
@@ -554,18 +524,6 @@ void OpenGLUIInit(uint32 globalFlags) {
 		},
 		5,
 		"atlas"
-	};
-	opengl.waveProgram = {
-		CreateProgram(waveVertexSource, waveFragmentSource),
-		sizeof(OpenGLWave),
-		{
-			{2, offsetof(OpenGLWave, pos0)},
-			{2, offsetof(OpenGLWave, pos1)},
-			{1, offsetof(OpenGLWave, thickness)},
-			{1, offsetof(OpenGLWave, period)},
-			{4, offsetof(OpenGLWave, color)}
-		},
-		5
 	};
 	opengl.hueProgram = {
 		CreateProgram(hueVertexSource, hueFragmentSource),
@@ -993,11 +951,13 @@ void OpenGLUIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 	}
 
 	OpenGLGlyph glyph = {
+		0,
 		pos,
 		pos + dim,
 		crop.p0,
 		crop.p1,
-		color
+		color,
+		0, 0
 	};
 
 	memcpy((OpenGLGlyph*)opengl.quads + opengl.quadCount, &glyph, sizeof(glyph));
@@ -1064,21 +1024,48 @@ void OpenGLUIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick
 #undef SEGMENTS
 }
 
-void OpenGLUIDrawWave(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
-	OpenGLWave wave = {
-		{pos.x, pos.y - dim.height},
-		{pos.x + dim.width, pos.y + dim.height},
-		thickness,
-		2.5f*dim.height,
-		color
-	};
-	if (opengl.currentProgram != &opengl.waveProgram) {
+void OpenGLUIDrawWavyLine(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
+	if (opengl.currentProgram != &opengl.glyphProgram) {
 		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.waveProgram;
+		opengl.currentProgram = &opengl.glyphProgram;
 		glDisable(GL_MULTISAMPLE);
 	}
 
-	memcpy((OpenGLWave*)opengl.quads + opengl.quadCount, &wave, sizeof(OpenGLWave));
+	Point2 unused = {};
+	OpenGLGlyph glyph = {
+		1,
+		{pos.x, pos.y - dim.height},
+		{pos.x + dim.width, pos.y + dim.height},
+		unused,
+		unused,
+		color,
+		thickness,
+		2.5f*dim.height,
+	};
+
+	memcpy((OpenGLGlyph*)opengl.quads + opengl.quadCount, &glyph, sizeof(glyph));
+	opengl.quadCount++;
+}
+
+void OpenGLUIDrawStraightLine(Point2 pos, float32 width, float32 thickness, Color color) {
+	if (opengl.currentProgram != &opengl.glyphProgram) {
+		OpenGLUIFlush();
+		opengl.currentProgram = &opengl.glyphProgram;
+		glDisable(GL_MULTISAMPLE);
+	}
+
+	Point2 unused = {};
+	OpenGLGlyph glyph = {
+		2,
+		{pos.x, pos.y - 0.5f*thickness},
+		{pos.x + width, pos.y + 0.5f*thickness},
+		unused,
+		unused,
+		color,
+		0, 0
+	};
+
+	memcpy((OpenGLGlyph*)opengl.quads + opengl.quadCount, &glyph, sizeof(glyph));
 	opengl.quadCount++;
 }
 
