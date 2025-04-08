@@ -62,6 +62,13 @@ struct OpenGLProgram {
 	Dimensions2 dim;
 };
 
+struct OpenGLVBuffer {
+	OpenGLProgram* currentProgram;
+	void* quads;
+	int32 quadCount;
+	int32 size;
+};
+
 struct {
 	OpenGLProgram quadProgram;
 	OpenGLProgram glyphProgram;
@@ -72,10 +79,9 @@ struct {
 	OpenGLProgram segmentProgram;
 	OpenGLProgram imageProgram;
 
-	OpenGLProgram* currentProgram;
+	OpenGLVBuffer vbuffers[4];
+	int32 activeBuffer;
 
-	void* quads;
-	int32 quadCount;
 	Color backgorundColor;
 	Dimensions2i dim;
 	Box2 crop;
@@ -460,7 +466,15 @@ void main() {
 void OpenGLUIInit(uint32 globalFlags) {
 	opengl = {};
 	OSOpenGLInit(globalFlags & GFX_MULTISAMPLE ? 4 : 1);
-	opengl.quads = OSAllocate(KB(128));
+
+	opengl.vbuffers[0].quads = OSAllocate(KB(256));
+	opengl.vbuffers[0].size = KB(256);
+	opengl.vbuffers[1].quads = OSAllocate(KB(32));
+	opengl.vbuffers[1].size = KB(32);
+	opengl.vbuffers[2].quads = OSAllocate(KB(32));
+	opengl.vbuffers[2].size = KB(32);
+	opengl.vbuffers[3].quads = OSAllocate(KB(16));
+	opengl.vbuffers[3].size = KB(16);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -546,7 +560,6 @@ void OpenGLUIInit(uint32 globalFlags) {
 		3
 	};
 
-	opengl.quadCount = 0;
 	Dimensions2i dim = OSGetWindowDimensions();
 	opengl.crop = {0, 0, (float32)dim.width, (float32)dim.height};
 }
@@ -577,32 +590,33 @@ void OpenGLUIBeginDrawing() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, opengl.dim.width, opengl.dim.height);
 
-	opengl.quadCount = 0;
+	opengl.vbuffers[opengl.activeBuffer].quadCount = 0;
 }
 
 void OpenGLUIFlush() {
-	if (!opengl.currentProgram || !opengl.quadCount) return;
+	OpenGLVBuffer* vbuffer = opengl.vbuffers + opengl.activeBuffer;
+	if (!vbuffer->currentProgram || !vbuffer->quadCount) return;
 
-	glUseProgram(opengl.currentProgram->handle);
+	glUseProgram(vbuffer->currentProgram->handle);
 
-	if (opengl.currentProgram->textureName) {
+	if (vbuffer->currentProgram->textureName) {
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, opengl.currentProgram->texture);
-		GLint location = glGetUniformLocation(opengl.currentProgram->handle, opengl.currentProgram->textureName);
+		glBindTexture(GL_TEXTURE_2D, vbuffer->currentProgram->texture);
+		GLint location = glGetUniformLocation(vbuffer->currentProgram->handle, vbuffer->currentProgram->textureName);
 		glUniform1i(location, 0);
 	}
-	if (opengl.currentProgram->dimName) {
-		GLint location = glGetUniformLocation(opengl.currentProgram->handle, opengl.currentProgram->dimName);
-		glUniform2f(location, opengl.currentProgram->dim.width, opengl.currentProgram->dim.height);	
+	if (vbuffer->currentProgram->dimName) {
+		GLint location = glGetUniformLocation(vbuffer->currentProgram->handle, vbuffer->currentProgram->dimName);
+		glUniform2f(location, vbuffer->currentProgram->dim.width, vbuffer->currentProgram->dim.height);	
 	}
-	PixelSpaceYIsDown(opengl.currentProgram->handle);
+	PixelSpaceYIsDown(vbuffer->currentProgram->handle);
 
 	// TODO: do I need to generate and delete buffers every frame?
 	//       Or can I do it once?
 	GLuint buffer;
 	glGenBuffers(1, &buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-	glBufferData(GL_ARRAY_BUFFER, opengl.currentProgram->stride * opengl.quadCount, opengl.quads, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, vbuffer->currentProgram->stride * vbuffer->quadCount, vbuffer->quads, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	GLuint vertexArray;
@@ -610,22 +624,22 @@ void OpenGLUIFlush() {
 	glBindVertexArray(vertexArray);
 
 	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-	for (int32 i = 0; i < opengl.currentProgram->elementCount; i++) {
-		OpenGLInputElement* e = opengl.currentProgram->elements + i;
+	for (int32 i = 0; i < vbuffer->currentProgram->elementCount; i++) {
+		OpenGLInputElement* e = vbuffer->currentProgram->elements + i;
 		glEnableVertexAttribArray(i);
-		glVertexAttribPointer(i, e->size, GL_FLOAT, GL_FALSE, opengl.currentProgram->stride, (void*)e->offset);
+		glVertexAttribPointer(i, e->size, GL_FLOAT, GL_FALSE, vbuffer->currentProgram->stride, (void*)e->offset);
 		glVertexAttribDivisor(i, 1);
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBindVertexArray(vertexArray);
-	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, opengl.quadCount);
+	glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, vbuffer->quadCount);
 	glBindVertexArray(0);
 	glDeleteVertexArrays(1, &vertexArray);
 	glDeleteBuffers(1, &buffer);
 
-	opengl.quadCount = 0;
+	vbuffer->quadCount = 0;
 }
 
 void OpenGLUIEndDrawing() {
@@ -633,15 +647,33 @@ void OpenGLUIEndDrawing() {
 	OSOpenGLSwapBuffers();
 }
 
-void DrawQuad(OpenGLQuad quad) {
-	if (opengl.currentProgram != &opengl.quadProgram) {
+void OpenGLUISetActiveVBuffer(int32 index) {
+	opengl.activeBuffer = index;
+}
+
+void SwitchProgram(OpenGLProgram* program) {
+	OpenGLVBuffer* buffer = opengl.vbuffers + opengl.activeBuffer;
+	if (buffer->currentProgram != program) {
 		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.quadProgram;
-		glDisable(GL_MULTISAMPLE);
+		buffer->currentProgram = program;
+	}
+}
+
+void AddQuadToActiveVBuffer(void* quad, ssize size) {
+	OpenGLVBuffer* vbuffer = opengl.vbuffers + opengl.activeBuffer;
+	if (vbuffer->quadCount*(size + 1) > vbuffer->size) {
+		ASSERT(0);
+		return;
 	}
 
-	memcpy((OpenGLQuad*)opengl.quads + opengl.quadCount, &quad, sizeof(quad));
-	opengl.quadCount++;
+	memcpy((byte*)vbuffer->quads + vbuffer->quadCount*size, quad, size);
+	vbuffer->quadCount++;
+}
+
+void DrawQuad(OpenGLQuad quad) {
+	SwitchProgram(&opengl.quadProgram);
+
+	AddQuadToActiveVBuffer(&quad, sizeof(quad));
 }
 
 void OpenGLUIDrawSolidColorQuad(
@@ -944,11 +976,7 @@ void GfxDrawImage(Point2 pos, Dimensions2 dim, GLuint texture, Box2 crop) {
 }
 
 void OpenGLUIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
-	if (opengl.currentProgram != &opengl.glyphProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.glyphProgram;
-		glDisable(GL_MULTISAMPLE);
-	}
+	SwitchProgram(&opengl.glyphProgram);
 
 	OpenGLGlyph glyph = {
 		0,
@@ -960,41 +988,11 @@ void OpenGLUIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 		0, 0
 	};
 
-	memcpy((OpenGLGlyph*)opengl.quads + opengl.quadCount, &glyph, sizeof(glyph));
-	opengl.quadCount++;
-}
-
-void OpenGLUIDrawLine(Point2 p0, Point2 p1, float32 thick, Color color) {
-	if (opengl.currentProgram != &opengl.segmentProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.segmentProgram;
-		glEnable(GL_MULTISAMPLE);
-	}
-
-	Point2 delta = p1 - p0;
-	float32 length = sqrt(delta.x*delta.x + delta.y*delta.y);
-		
-	float32 size = (0.5f*thick)/length;
-	Point2 radius = {size*delta.y, size*delta.x};
-		
-	OpenGLSegment segment = {
-		p0 - radius,
-		p0 + radius,
-		p1 - radius,
-		p1 + radius,
-		color
-	};
-
-	memcpy((OpenGLSegment*)opengl.quads + opengl.quadCount, &segment, sizeof(segment));
-	opengl.quadCount++;
+	AddQuadToActiveVBuffer(&glyph, sizeof(glyph));
 }
 
 void OpenGLUIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick, Color color) {
-	if (opengl.currentProgram != &opengl.segmentProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.segmentProgram;
-		glEnable(GL_MULTISAMPLE);
-	}
+	SwitchProgram(&opengl.segmentProgram);
 	
 #define SEGMENTS	32
 	Point2 prev = p0;
@@ -1017,19 +1015,14 @@ void OpenGLUIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick
 			color
 		};
 
-		memcpy((OpenGLSegment*)opengl.quads + opengl.quadCount, &segment, sizeof(segment));
-		opengl.quadCount++;
+		AddQuadToActiveVBuffer(&segment, sizeof(segment));
 		prev = current;
 	}
 #undef SEGMENTS
 }
 
 void OpenGLUIDrawWavyLine(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
-	if (opengl.currentProgram != &opengl.glyphProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.glyphProgram;
-		glDisable(GL_MULTISAMPLE);
-	}
+	SwitchProgram(&opengl.glyphProgram);
 
 	Point2 unused = {};
 	OpenGLGlyph glyph = {
@@ -1043,16 +1036,11 @@ void OpenGLUIDrawWavyLine(Point2 pos, Dimensions2 dim, float32 thickness, Color 
 		2.5f*dim.height,
 	};
 
-	memcpy((OpenGLGlyph*)opengl.quads + opengl.quadCount, &glyph, sizeof(glyph));
-	opengl.quadCount++;
+	AddQuadToActiveVBuffer(&glyph, sizeof(glyph));
 }
 
 void OpenGLUIDrawStraightLine(Point2 pos, float32 width, float32 thickness, Color color) {
-	if (opengl.currentProgram != &opengl.glyphProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.glyphProgram;
-		glDisable(GL_MULTISAMPLE);
-	}
+	SwitchProgram(&opengl.glyphProgram);
 
 	Point2 unused = {};
 	OpenGLGlyph glyph = {
@@ -1065,32 +1053,23 @@ void OpenGLUIDrawStraightLine(Point2 pos, float32 width, float32 thickness, Colo
 		0, 0
 	};
 
-	memcpy((OpenGLGlyph*)opengl.quads + opengl.quadCount, &glyph, sizeof(glyph));
-	opengl.quadCount++;
+	AddQuadToActiveVBuffer(&glyph, sizeof(glyph));
 }
 
 void OpenGLUIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {
-	OpenGLHue hue = {pos0, pos1, uv};
-	if (opengl.currentProgram != &opengl.hueProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.hueProgram;
-		glDisable(GL_MULTISAMPLE);
-	}
+	SwitchProgram(&opengl.hueProgram);
 
-	memcpy((OpenGLHue*)opengl.quads + opengl.quadCount, &hue, sizeof(OpenGLHue));
-	opengl.quadCount++;
+	OpenGLHue hue = {pos0, pos1, uv};
+
+	AddQuadToActiveVBuffer(&hue, sizeof(hue));
 }
 
 void OpenGLUIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
-	OpenGLSLBox sl = {pos0, pos1, hue};
-	if (opengl.currentProgram != &opengl.slProgram) {
-		OpenGLUIFlush();
-		opengl.currentProgram = &opengl.slProgram;
-		glDisable(GL_MULTISAMPLE);
-	}
+	SwitchProgram(&opengl.slProgram);
 
-	memcpy((OpenGLSLBox*)opengl.quads + opengl.quadCount, &sl, sizeof(OpenGLSLBox));
-	opengl.quadCount++;
+	OpenGLSLBox sl = {pos0, pos1, hue};
+
+	AddQuadToActiveVBuffer(&sl, sizeof(sl));
 }
 
 Box2 OpenGLUIGetCurrentCrop() {

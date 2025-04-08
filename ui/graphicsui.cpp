@@ -22,7 +22,6 @@ enum Quadrant {
 # define GfxDrawWavyLine			OpenGLUIDrawWavyLine
 # define GfxDrawStraightLine		OpenGLUIDrawStraightLine
 # define GfxDrawImage				OpenGLUIDrawImage
-# define GfxDrawLine				OpenGLUIDrawLine
 # define GfxDrawCurve				OpenGLUIDrawCurve
 # define GfxDrawShadow				OpenGLUIDrawShadow
 # define GfxDrawSemiSphere			OpenGLUIDrawSemiSphere
@@ -31,6 +30,7 @@ enum Quadrant {
 # define GfxCropScreen				OpenGLUICropScreen
 # define GfxClearCrop				OpenGLUIClearCrop
 # define GfxGetCurrentCrop			OpenGLUIGetCurrentCrop
+# define GfxSetActiveVBuffer		OpenGLUISetActiveVBuffer
 
 #elif defined(GFX_BACKEND_D3D11)
 # include "d3d11ui.cpp"
@@ -49,7 +49,6 @@ enum Quadrant {
 # define GfxDrawWavyLine			D3D11UIDrawWavyLine
 # define GfxDrawStraightLine		D3D11UIDrawStraightLine
 # define GfxDrawImage				D3D11UIDrawImage
-# define GfxDrawLine				D3D11UIDrawLine
 # define GfxDrawCurve				D3D11UIDrawCurve
 # define GfxDrawShadow				D3D11UIDrawShadow
 # define GfxDrawSemiSphere			D3D11UIDrawSemiSphere
@@ -58,6 +57,7 @@ enum Quadrant {
 # define GfxCropScreen				D3D11UICropScreen
 # define GfxClearCrop				D3D11UIClearCrop
 # define GfxGetCurrentCrop			D3D11UIGetCurrentCrop
+# define GfxSetActiveVBuffer		D3D11UISetActiveVBuffer
 #endif
 
 

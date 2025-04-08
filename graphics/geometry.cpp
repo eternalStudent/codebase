@@ -123,6 +123,18 @@ inline Box2 GetIntersection(Box2 box, Point2 pos, Dimensions2 dim) {
 	return GetIntersection(box, GetBounds(pos, dim));
 }
 
+inline bool Intersects(Box2 a, Box2 b) {
+	float32 x0 = MAX(a.x0, b.x0);
+	float32 y0 = MAX(a.y0, b.y0);
+	float32 x1 = MIN(a.x1, b.x1);
+	float32 y1 = MIN(a.y1, b.y1);
+	return x0 < x1 && y0 < y1;
+}
+
+inline bool Intersects(Box2 box, Point2 pos, Dimensions2 dim) {
+	return Intersects(box, GetBounds(pos, dim));
+}
+
 union Box2i {
 	struct {Point2i p0, p1;};
 	struct {int32 x0, y0, x1, y1;};

@@ -65,6 +65,14 @@ struct D3D11Program {
 	};
 };
 
+struct D3D11VBuffer {
+	D3D11Program* currentProgram;
+	ID3D11Buffer* handle;
+	D3D11_MAPPED_SUBRESOURCE mapped;
+	int32 quadCount;
+	int32 bufferSize;
+};
+
 enum {
 	D3D11_BILINEAR,
 	D3D11_NEAREST,
@@ -76,7 +84,6 @@ struct {
 	ID3D11Device1* device;
 	ID3D11DeviceContext1* context;
 	IDXGISwapChain1* swapChain;
-	ID3D11Buffer* vbuffer;
 	ID3D11Buffer* mvpBuffer;
 	ID3D11Buffer* cbuffer;
 	ID3D11RenderTargetView* rtView;
@@ -101,13 +108,11 @@ struct {
 	D3D11Program segmentProgram;
 	D3D11Program imageProgram;
 
-	D3D11Program* currentProgram;
-	
-	int32 quadCount;
+	D3D11VBuffer vbuffers[4];
+	int32 activeBuffer;
+
 	Dimensions2i dim;
 	FLOAT background[4];
-	D3D11_MAPPED_SUBRESOURCE mapped;
-
 	Box2 crop;
 } d3d11;
 
@@ -710,6 +715,7 @@ void D3D11UIInit(uint32 globalFlags) {
 		}
 		hr = d3d11.device->CreateRasterizerState1(&desc, &d3d11.ss_rasterizer);
 		ASSERT_HR(hr);
+		d3d11.context->RSSetState(d3d11.ss_rasterizer);
 	}
 
 	{
@@ -727,14 +733,57 @@ void D3D11UIInit(uint32 globalFlags) {
 	{
 		D3D11_BUFFER_DESC desc = {};
 		{
-			desc.ByteWidth = KB(128);
+			desc.ByteWidth = KB(256);
 			desc.Usage = D3D11_USAGE_DYNAMIC;
 			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 		};
 
-		hr = d3d11.device->CreateBuffer(&desc, NULL, &d3d11.vbuffer);
+		hr = d3d11.device->CreateBuffer(&desc, NULL, &d3d11.vbuffers[0].handle);
 		ASSERT_HR(hr);
+		d3d11.vbuffers[0].bufferSize = KB(256);
+	}
+
+	{
+		D3D11_BUFFER_DESC desc = {};
+		{
+			desc.ByteWidth = KB(32);
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		};
+
+		hr = d3d11.device->CreateBuffer(&desc, NULL, &d3d11.vbuffers[1].handle);
+		ASSERT_HR(hr);
+		d3d11.vbuffers[1].bufferSize = KB(32);
+	}
+
+	{
+		D3D11_BUFFER_DESC desc = {};
+		{
+			desc.ByteWidth = KB(32);
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		};
+
+		hr = d3d11.device->CreateBuffer(&desc, NULL, &d3d11.vbuffers[2].handle);
+		ASSERT_HR(hr);
+		d3d11.vbuffers[2].bufferSize = KB(32);
+	}
+
+	{
+		D3D11_BUFFER_DESC desc = {};
+		{
+			desc.ByteWidth = KB(16);
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		};
+
+		hr = d3d11.device->CreateBuffer(&desc, NULL, &d3d11.vbuffers[3].handle);
+		ASSERT_HR(hr);
+		d3d11.vbuffers[3].bufferSize = KB(16);
 	}
 
 	{
@@ -893,7 +942,7 @@ void D3D11UIBeginDrawing() {
 	}
 
 	d3d11.dim = dim;
-	d3d11.quadCount = 0;
+	d3d11.vbuffers[d3d11.activeBuffer].quadCount = 0;
 
 	// minimized
 	if (d3d11.rtView == NULL) return;
@@ -963,26 +1012,27 @@ void D3D11UISetFontAtlas(Image image) {
 }
 
 void D3D11UIFlush() {
-	if (!d3d11.quadCount) return;
+	D3D11VBuffer* buffer = d3d11.vbuffers + d3d11.activeBuffer;
+	if (!buffer->quadCount) return;
 
-	d3d11.context->Unmap((ID3D11Resource*)d3d11.vbuffer, 0);
+	d3d11.context->Unmap((ID3D11Resource*)buffer->handle, 0);
 
 	// Input Assembler
-	d3d11.context->IASetInputLayout(d3d11.currentProgram->layout);
+	d3d11.context->IASetInputLayout(buffer->currentProgram->layout);
 	d3d11.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	UINT stride = d3d11.currentProgram->stride;
+	UINT stride = buffer->currentProgram->stride;
 	UINT offset = 0;
-	d3d11.context->IASetVertexBuffers(0, 1, &d3d11.vbuffer, &stride, &offset);
+	d3d11.context->IASetVertexBuffers(0, 1, &buffer->handle, &stride, &offset);
 
-	d3d11.context->VSSetShader(d3d11.currentProgram->vshader, NULL, 0);
-	d3d11.context->PSSetShader(d3d11.currentProgram->pshader, NULL, 0);
+	d3d11.context->VSSetShader(buffer->currentProgram->vshader, NULL, 0);
+	d3d11.context->PSSetShader(buffer->currentProgram->pshader, NULL, 0);
 
 	PixelSpaceYIsDown();
-	if (d3d11.currentProgram->texture.resource)
-		d3d11.context->PSSetShaderResources(0, 1, &d3d11.currentProgram->texture.resource);
-	if (d3d11.currentProgram->texture.sampler)
-		d3d11.context->PSSetSamplers(0, 1, &d3d11.currentProgram->texture.sampler);
-	if (d3d11.currentProgram == &d3d11.glyphProgram) {
+	if (buffer->currentProgram->texture.resource)
+		d3d11.context->PSSetShaderResources(0, 1, &buffer->currentProgram->texture.resource);
+	if (buffer->currentProgram->texture.sampler)
+		d3d11.context->PSSetSamplers(0, 1, &buffer->currentProgram->texture.sampler);
+	if (buffer->currentProgram == &d3d11.glyphProgram) {
 		// TODO: I don't love this
 		D3D11_MAPPED_SUBRESOURCE mapped;
 		d3d11.context->Map((ID3D11Resource*)d3d11.cbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
@@ -991,8 +1041,12 @@ void D3D11UIFlush() {
 		d3d11.context->VSSetConstantBuffers(1, 1, &d3d11.cbuffer);
 	}
 
-	d3d11.context->DrawInstanced(4, d3d11.quadCount, 0, 0);
-	d3d11.quadCount = 0;
+	d3d11.context->DrawInstanced(4, buffer->quadCount, 0, 0);
+	buffer->quadCount = 0;
+}
+
+void D3D11UISetActiveVBuffer(int32 index) {
+	d3d11.activeBuffer = index;
 }
 
 void OSD3D11SwapBuffers() {
@@ -1011,18 +1065,31 @@ void D3D11UIEndDrawing() {
 	OSD3D11SwapBuffers();
 }
 
-void DrawQuad(D3D11Quad quad) {
-	if (d3d11.currentProgram != &d3d11.quadProgram) {
+void SwitchProgram(D3D11Program* program) {
+	D3D11VBuffer* buffer = d3d11.vbuffers + d3d11.activeBuffer;
+	if (buffer->currentProgram != program) {
 		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.quadProgram;
-		DisableMultiSample();
+		buffer->currentProgram = program;
+	}
+}
+
+void AddQuadToActiveVBuffer(void* quad, ssize size) {
+	D3D11VBuffer* buffer = d3d11.vbuffers + d3d11.activeBuffer;
+	if (buffer->quadCount*(size + 1) > buffer->bufferSize) {
+		ASSERT(0);
+		return;
 	}
 
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+	if (buffer->quadCount == 0)
+		d3d11.context->Map((ID3D11Resource*)buffer->handle, 0, D3D11_MAP_WRITE_DISCARD, 0, &buffer->mapped);
 
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Quad), &quad, sizeof(D3D11Quad));
-	d3d11.quadCount++;
+	memcpy((byte*)buffer->mapped.pData + buffer->quadCount*size, quad, size);
+	buffer->quadCount++;
+}
+
+void DrawQuad(D3D11Quad quad) {
+	SwitchProgram(&d3d11.quadProgram);
+	AddQuadToActiveVBuffer(&quad, sizeof(quad));
 }
 
 void D3D11UIDrawSolidColorQuad(
@@ -1290,37 +1357,8 @@ void D3D11UIDrawShadow(Point2 pos, Dimensions2 dim, float32 radius, Point2 offse
 	DrawQuad(quad);
 }
 
-void D3D11UIDrawImage(D3D11Texture image, Point2 pos, Point2 dim) {
-	D3D11UIFlush();
-	DisableMultiSample();
-	PixelSpaceYIsDown();
-
-	d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-	D3D11Rectangle rect = {pos, pos+dim};
-	memcpy((byte*)d3d11.mapped.pData, &rect, sizeof(D3D11Rectangle));
-	d3d11.context->Unmap((ID3D11Resource*)d3d11.vbuffer, 0);
-
-	// Input Assembler
-	d3d11.context->IASetInputLayout(d3d11.imageProgram.layout);
-	d3d11.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	UINT stride = d3d11.imageProgram.stride;
-	UINT offset = 0;
-	d3d11.context->IASetVertexBuffers(0, 1, &d3d11.vbuffer, &stride, &offset);
-
-	d3d11.context->VSSetShader(d3d11.imageProgram.vshader, NULL, 0);
-	d3d11.context->PSSetShader(d3d11.imageProgram.pshader, NULL, 0);
-	d3d11.context->PSSetShaderResources(0, 1, &image.resource);
-	d3d11.context->PSSetSamplers(0, 1, &image.sampler);
-
-	d3d11.context->DrawInstanced(4, 1, 0, 0);
-}
-
 void D3D11UIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
-	if (d3d11.currentProgram != &d3d11.glyphProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.glyphProgram;
-		DisableMultiSample();
-	}
+	SwitchProgram(&d3d11.glyphProgram);
 
 	D3D11Glyph glyph = {
 		0,
@@ -1332,22 +1370,13 @@ void D3D11UIDrawGlyph(Point2 pos, Dimensions2 dim, Box2 crop, Color color) {
 		0, 0
 	};
 
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Glyph), &glyph, sizeof(D3D11Glyph));
-	d3d11.quadCount++;
+	AddQuadToActiveVBuffer(&glyph, sizeof(glyph));
 }
 
 void D3D11UIDrawWavyLine(Point2 pos, Dimensions2 dim, float32 thickness, Color color) {
-	if (d3d11.currentProgram != &d3d11.glyphProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.glyphProgram;
-		DisableMultiSample();
-	}
+	SwitchProgram(&d3d11.glyphProgram);
 
 	Point2 unused = {};
-
 	D3D11Glyph glyph = {
 		1,
 		{pos.x, pos.y - dim.height},
@@ -1359,22 +1388,13 @@ void D3D11UIDrawWavyLine(Point2 pos, Dimensions2 dim, float32 thickness, Color c
 		2.5f*dim.height,
 	};
 
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Glyph), &glyph, sizeof(D3D11Glyph));
-	d3d11.quadCount++;
+	AddQuadToActiveVBuffer(&glyph, sizeof(glyph));
 }
 
 void D3D11UIDrawStraightLine(Point2 pos, float32 width, float32 thickness, Color color) {
-	if (d3d11.currentProgram != &d3d11.glyphProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.glyphProgram;
-		DisableMultiSample();
-	}
+	SwitchProgram(&d3d11.glyphProgram);
 
 	Point2 unused = {};
-
 	D3D11Glyph glyph = {
 		2,
 		{pos.x, pos.y - 0.5f*thickness},
@@ -1385,19 +1405,37 @@ void D3D11UIDrawStraightLine(Point2 pos, float32 width, float32 thickness, Color
 		0, 0
 	};
 
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
+	AddQuadToActiveVBuffer(&glyph, sizeof(glyph));
+}
 
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Glyph), &glyph, sizeof(D3D11Glyph));
-	d3d11.quadCount++;
+void D3D11UIDrawImage(D3D11Texture image, Point2 pos, Point2 dim) {
+	D3D11UIFlush();
+	DisableMultiSample();
+	PixelSpaceYIsDown();
+
+	D3D11VBuffer* vbuffer = d3d11.vbuffers + d3d11.activeBuffer;
+	d3d11.context->Map((ID3D11Resource*)vbuffer->handle, 0, D3D11_MAP_WRITE_DISCARD, 0, &vbuffer->mapped);
+	D3D11Rectangle rect = {pos, pos+dim};
+	memcpy((byte*)vbuffer->mapped.pData, &rect, sizeof(D3D11Rectangle));
+	d3d11.context->Unmap((ID3D11Resource*)vbuffer->handle, 0);
+
+	// Input Assembler
+	d3d11.context->IASetInputLayout(d3d11.imageProgram.layout);
+	d3d11.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	UINT stride = d3d11.imageProgram.stride;
+	UINT offset = 0;
+	d3d11.context->IASetVertexBuffers(0, 1, &vbuffer->handle, &stride, &offset);
+
+	d3d11.context->VSSetShader(d3d11.imageProgram.vshader, NULL, 0);
+	d3d11.context->PSSetShader(d3d11.imageProgram.pshader, NULL, 0);
+	d3d11.context->PSSetShaderResources(0, 1, &image.resource);
+	d3d11.context->PSSetSamplers(0, 1, &image.sampler);
+
+	d3d11.context->DrawInstanced(4, 1, 0, 0);
 }
 
 void D3D11UIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick, Color color) {
-	if (d3d11.currentProgram != &d3d11.segmentProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.segmentProgram;
-		EnableMultiSample();
-	}
+	SwitchProgram(&d3d11.segmentProgram);
 	
 #define SEGMENTS	32
 	Point2 prev = p0;
@@ -1420,44 +1458,26 @@ void D3D11UIDrawCurve(Point2 p0, Point2 p1, Point2 p2, Point2 p3, float32 thick,
 			color
 		};
 
-		if (d3d11.quadCount == 0)
-			d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-		memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Segment), &segment, sizeof(segment));
-		d3d11.quadCount++;
+		AddQuadToActiveVBuffer(&segment, sizeof(segment));
 		prev = current;
 	}
 #undef SEGMENTS
 }
 
 void D3D11UIDrawHueGrad(Point2 pos0, Point2 pos1, Point2 uv) {
+	SwitchProgram(&d3d11.hueProgram);
+
 	D3D11Hue hue = {pos0, pos1, uv};
-	if (d3d11.currentProgram != &d3d11.hueProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.hueProgram;
-		DisableMultiSample();
-	}
 
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11Hue), &hue, sizeof(D3D11Hue));
-	d3d11.quadCount++;
+	AddQuadToActiveVBuffer(&hue, sizeof(hue));
 }
 
 void D3D11UIDrawSLQuad(Point2 pos0, Point2 pos1, float32 hue) {
+	SwitchProgram(&d3d11.slProgram);
+
 	D3D11SLBox sl = {pos0, pos1, hue};
-	if (d3d11.currentProgram != &d3d11.slProgram) {
-		D3D11UIFlush();
-		d3d11.currentProgram = &d3d11.slProgram;
-		DisableMultiSample();
-	}
 
-	if (d3d11.quadCount == 0)
-		d3d11.context->Map((ID3D11Resource*)d3d11.vbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &d3d11.mapped);
-
-	memcpy((byte*)d3d11.mapped.pData + d3d11.quadCount*sizeof(D3D11SLBox), &sl, sizeof(D3D11SLBox));
-	d3d11.quadCount++;
+	AddQuadToActiveVBuffer(&sl, sizeof(sl));
 }
 
 Box2 D3D11UIGetCurrentCrop() {
