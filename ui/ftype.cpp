@@ -6,7 +6,8 @@ struct {
 	FT_Library  library;
 } ftype;
 
-void FTypeInit() {
+void FTypeInit(FontAlphaMode alphaMode) {
+	(void)alphaMode;
 	FT_Error error = FT_Init_FreeType(&ftype.library);
 	ASSERT(!error);
 }

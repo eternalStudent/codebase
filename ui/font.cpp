@@ -9,6 +9,11 @@ struct TextMetrics {
 	bool lastCharIsNewLine;
 };
 
+enum FontAlphaMode {
+	FAM_Linear,
+	FAM_GammaCorrected
+};
+
 #if FONT_BAKED
 #  include "bakedfont.cpp"
 #endif

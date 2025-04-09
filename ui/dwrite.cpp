@@ -84,7 +84,7 @@ struct {
 	byte fontFileLoader_bytes[sizeof(InMemoryFontFileLoader)];
 } dwrite;
 
-void DWriteInit(BOOL linearRendering) {
+void DWriteInit(FontAlphaMode alphaMode) {
 	const UINT32 width = 512;
 	const UINT32 height = 512;
 	HRESULT hr;
@@ -97,13 +97,13 @@ void DWriteInit(BOOL linearRendering) {
 	ASSERT_HR(hr);
 	
 	FLOAT gamma = baseRenderingParams->GetGamma();
-	FLOAT enhanced_contrast = baseRenderingParams->GetEnhancedContrast();
+	FLOAT enhancedContrast = baseRenderingParams->GetEnhancedContrast();
 	hr = dwrite.factory->CreateCustomRenderingParams(
-		linearRendering ? 1 : gamma,
-		enhanced_contrast,
+		alphaMode == FAM_Linear ? 1 : gamma,
+		enhancedContrast,
 		0,
 		DWRITE_PIXEL_GEOMETRY_FLAT,
-		DWRITE_RENDERING_MODE_NATURAL,
+		DWRITE_RENDERING_MODE_NATURAL_SYMMETRIC,
 		&dwrite.renderingParams);
 	ASSERT_HR(hr);
 	

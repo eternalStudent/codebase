@@ -117,7 +117,7 @@ struct {
 } d3d11;
 
 static char quadCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
+"	#line " STRINGIFY(__LINE__) "\n\n"
 R"STRING(
 	struct VS_INPUT	{
 		float2 pos0 : POS0;
@@ -187,6 +187,12 @@ R"STRING(
 		return length(max(pos, 0)) + min(max(pos.x, pos.y), 0) - radius;
 	}
 
+	float3 sRGB_To_Linear(float3 srgb) {
+		float3 low  = srgb/12.92;
+		float3 high = pow((srgb + 0.055)/1.055, 2.4);
+		return lerp(low, high, step(0.04045, srgb));
+	}
+
 	float4 ps(PS_INPUT input) : SV_TARGET	
 	{		
 		float2 pos = input.pos.xy;
@@ -199,14 +205,16 @@ R"STRING(
 		float smoothness = 0.573896787348 + 0.5*input.blur;
 		float a = 1 - smoothstep(-smoothness, smoothness, sd_);
 		float a2 = 1 - smoothstep(-smoothness, smoothness, sd2);
-		color = lerp(input.bColor, input.color, a2);
+		if (input.bThickness > 0)
+			color = lerp(input.bColor, input.color, a2);
 		color.a *= a;
+		color = float4(sRGB_To_Linear(color.rgb), color.a);
 		return color;
 	}
 )STRING";
 
 static char glyphCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
+"	#line " STRINGIFY(__LINE__) "\n\n"
 R"STRING(
 	struct VS_INPUT	{
 		uint type : TYPE;
@@ -241,6 +249,12 @@ R"STRING(
 	Texture2D<float> atlas : register(t0);
 	SamplerState lsampler : register(s0);
 
+	float3 sRGB_To_Linear(float3 srgb) {
+		float3 low  = srgb/12.92;
+		float3 high = pow((srgb + 0.055)/1.055, 2.4);
+		return lerp(low, high, step(0.04045, srgb));
+	}
+
 	PS_INPUT vs(VS_INPUT input) {
 		PS_INPUT output;
 		float2 pixel_poses[] = {
@@ -274,7 +288,7 @@ R"STRING(
 		output.pixel = 2/abs(input.pos1.y - input.pos0.y);
 		output.thickness = input.thickness;
 
-		output.color = input.color;
+		output.color = float4(sRGB_To_Linear(input.color.rgb), input.color.a);
 		output.type = input.type;
 
 		return output;
@@ -300,7 +314,7 @@ R"STRING(
 )STRING";
 
 static char imageCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
+"	#line " STRINGIFY(__LINE__) "\n\n"
 R"STRING(
 	struct VS_INPUT	{
 		float2 pos0 : POS0;
@@ -349,7 +363,7 @@ R"STRING(
 )STRING";
 
 char segmentCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
+"	#line " STRINGIFY(__LINE__) "\n\n"
 R"STRING(
 	struct VS_INPUT	{
 		float2 pos0 : POS0;
@@ -390,7 +404,7 @@ R"STRING(
 )STRING";
 
 char hueCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
+"	#line " STRINGIFY(__LINE__) "\n\n"
 R"STRING(
 	struct VS_INPUT	{
 		float2 pos0 : POS0;
@@ -425,16 +439,23 @@ R"STRING(
 		return output;
 	}
 
+	float3 sRGB_To_Linear(float3 srgb) {
+		float3 low  = srgb/12.92;
+		float3 high = pow((srgb + 0.055)/1.055, 2.4);
+		return lerp(low, high, step(0.04045, srgb));
+	}
+
 	float4 ps(PS_INPUT input) : SV_TARGET {				
 		float r = abs(input.hue * 6 - 3) - 1;
 		float g = 2 - abs(input.hue * 6 - 2);
 		float b = 2 - abs(input.hue * 6 - 4);
-		return saturate(float4(r, g, b, 1));
+		float3 srgb = saturate(float3(r, g, b));
+		return float4(sRGB_To_Linear(srgb), 1);
 	}
 )STRING";
 
 char slCode[] = 
-"	#line " STRINGIFY(__LINE__) "\n"
+"	#line " STRINGIFY(__LINE__) "\n\n"
 R"STRING(
 	struct VS_INPUT	{
 		float2 pos0 : POS0;
@@ -476,6 +497,12 @@ R"STRING(
 			: 0.f - (1/(2*yInvStep));
 
 		return output;
+	}
+
+	float3 sRGB_To_Linear(float3 srgb) {
+		float3 low  = srgb/12.92;
+		float3 high = pow((srgb + 0.055)/1.055, 2.4);
+		return lerp(low, high, step(0.04045, srgb));
 	}
 
 	float4 ps(PS_INPUT input) : SV_TARGET {
@@ -520,7 +547,8 @@ R"STRING(
 			b = l - d*(hh - 11);
 		}
 
-		return float4(r, g, b, 1);
+		float3 srgb = float3(r, g, b);
+		return float4(sRGB_To_Linear(srgb), 1);
 	}
 )STRING";
 

@@ -159,6 +159,12 @@ float sd(vec2 pos, vec2 halfSize, float radius) {
 	return length(max(pos, 0)) + min(max(pos.x, pos.y), 0) - radius;
 }
 
+vec3 sRGB_To_Linear(vec3 srgb) {
+	vec3 low  = srgb/12.92;
+	vec3 high = pow((srgb + 0.055)/1.055, vec3(2.4));
+	return mix(low, high, step(0.04045, srgb));
+}
+
 void main() {
 	if (pixelpos.x < crop.x || pixelpos.x > crop.z || pixelpos.y < crop.y || pixelpos.y > crop.w)
 		discard;
@@ -170,8 +176,11 @@ void main() {
 	float a1 = 1.0f - smoothstep(-smoothness, smoothness, sd_from_outer);
 	float a2 = 1.0f - smoothstep(-smoothness, smoothness, sd_from_inner);
 	
-	out_color = mix(borderColor, color, a2);
-	out_color.a = out_color.a*a1;
+	if (borderThickness > 0)
+		out_color = mix(borderColor, color, a2);
+	else
+		out_color = color;
+	out_color = vec4(sRGB_To_Linear(out_color.rgb), out_color.a*a1);
 }
 	)STRING";
 
@@ -196,6 +205,12 @@ out float pixel;
 
 uniform mat4 mvp;
 uniform vec2 atlasDim;
+
+vec3 sRGB_To_Linear(vec3 srgb) {
+	vec3 low  = srgb/12.92;
+	vec3 high = pow((srgb + 0.055)/1.055, vec3(2.4));
+	return mix(low, high, step(0.04045, srgb));
+}
 
 void main() {
 	vec2 poses[4] = {
@@ -228,7 +243,7 @@ void main() {
 
 	type = in_type;
 	uv = uvs[gl_VertexID]/atlasDim;
-	color = in_color;
+	color = vec4(sRGB_To_Linear(in_color.rgb), in_color.a);
 	gl_Position = mvp * vec4(pixelpos, 0.0, 1.0);
 }
 	)STRING";
@@ -308,8 +323,14 @@ out vec4 color;
 
 uniform mat4 mvp;
 
+vec3 sRGB_To_Linear(vec3 srgb) {
+	vec3 low  = srgb/12.92;
+	vec3 high = pow((srgb + 0.055)/1.055, vec3(2.4));
+	return mix(low, high, step(0.04045, srgb));
+}
+
 void main() {
-	color = in_color;
+	color = vec4(sRGB_To_Linear(in_color.rgb), in_color.a);
 
 	vec2 poses[4] = {
 		in_pos0,
@@ -366,11 +387,17 @@ out vec4 out_color;
 
 in float hue;
 
+vec3 sRGB_To_Linear(vec3 srgb) {
+	vec3 low  = srgb/12.92;
+	vec3 high = pow((srgb + 0.055)/1.055, vec3(2.4));
+	return mix(low, high, step(0.04045, srgb));
+}
+
 void main() {
 	float r = clamp(abs(hue * 6 - 3) - 1, 0.0, 1.0);
 	float g = clamp(2 - abs(hue * 6 - 2), 0.0, 1.0);
 	float b = clamp(2 - abs(hue * 6 - 4), 0.0, 1.0);
-	out_color = vec4(r, g, b, 1);
+	out_color = vec4(sRGB_To_Linear(vec3(r, g, b)), 1);
 }
 )STRING";
 
@@ -413,6 +440,12 @@ GLchar* slFragmentSource = (GLchar*)R"STRING(
 out vec4 out_color;
 
 in vec3 hsl;
+
+vec3 sRGB_To_Linear(vec3 srgb) {
+	vec3 low  = srgb/12.92;
+	vec3 high = pow((srgb + 0.055)/1.055, vec3(2.4));
+	return mix(low, high, step(0.04045, srgb));
+}
 
 void main() {
 	float h = hsl.x;
@@ -459,7 +492,7 @@ void main() {
 		b = l - d*(hh - 11);
 	}
 
-	out_color = vec4(r, g, b, 1);
+	out_color = vec4(sRGB_To_Linear(vec3(r, g, b)), 1);
 }
 )STRING";
 
